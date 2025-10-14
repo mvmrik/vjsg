@@ -45,60 +45,32 @@
                         v-for="obj in getObjectsForParcel(parcel.id)"
                         :key="obj.id"
                         v-show="isCellInObject(i, obj)"
-                        class="placed-object-large"
+                        :class="['placed-object-large', { 'building-large': isBuilding(obj) }]"
                         @click.stop="selectObject(obj)"
                       >
                         <c-icon :name="getObjectIcon(obj.object_type)" />
+                        <div v-if="isBuilding(obj)" class="build-overlay-large">
+                          <div class="build-time-small">{{ getRemainingTimeText(obj) }}</div>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                <!-- Object Palette -->
+                <!-- Object selection moved to modal: keep selection instructions -->
                 <div class="editor-palette">
                   <h6>Обекти</h6>
-                  <div class="object-palette">
-                    <div
-                      v-for="objType in availableObjects"
-                      :key="objType.type"
-                      class="palette-object"
-                      :class="{ selected: selectedObjectType?.type === objType.type }"
-                      @click="selectObjectType(objType)"
-                    >
-                      <c-icon :name="objType.icon" class="me-2" />
-                      {{ objType.name }}
-                    </div>
-                  </div>
-
-                  <div v-if="selectedObjectType" class="mt-3">
-                    <h6>Избран обект: {{ selectedObjectType.name }}</h6>
-                    <p>Маркирани клетки: {{ selectedCells.size }}</p>
-                    <div class="d-flex gap-2">
-                      <c-button color="success" size="sm" @click="confirmPlacement">
-                        <c-icon name="cilCheck" class="me-1" />
-                        Постави
-                      </c-button>
+                  <div class="mt-3">
+                    <p class="text-muted small">
+                      <c-icon name="cilInfo" class="me-1" />
+                      Маркирайте клетки в мрежата, след това натиснете "Запази" и ще изберете типа обект в изскачащ прозорец.
+                    </p>
+                    <div class="d-flex gap-2 mt-2">
                       <c-button color="secondary" size="sm" @click="clearSelection">
                         <c-icon name="cilX" class="me-1" />
                         Изчисти селекцията
                       </c-button>
                     </div>
-                  </div>
-
-                  <div v-if="selectedObject" class="mt-3">
-                    <h6>Избран обект</h6>
-                    <p>{{ selectedObject.object_type }}</p>
-                    <c-button color="danger" size="sm" @click="removeObject(selectedObject)">
-                      <c-icon name="cilTrash" class="me-1" />
-                      Премахни
-                    </c-button>
-                  </div>
-
-                  <div v-else class="mt-3">
-                    <p class="text-muted small">
-                      <c-icon name="cilInfo" class="me-1" />
-                      Кликнете върху клетките за да ги маркирате, после изберете обект
-                    </p>
                   </div>
                 </div>
               </div>
@@ -118,11 +90,63 @@
     >
       {{ message }}
     </c-alert>
+  
+  <!-- Object type chooser modal -->
+  <c-modal v-model="showObjectModal" size="lg">
+      <c-modal-header>
+        <c-modal-title>Изберете тип обект</c-modal-title>
+      </c-modal-header>
+      <c-modal-body>
+        <div class="object-palette d-flex flex-column">
+          <div
+            v-for="objType in availableObjects"
+            :key="objType.type"
+            class="palette-object p-2"
+            :class="{ selected: modalSelectedObjectType?.type === objType.type }"
+            style="cursor: pointer;"
+            @click="modalSelectedObjectType = objType"
+          >
+            <c-icon :name="objType.icon" class="me-2" />
+            {{ objType.name }}
+          </div>
+        </div>
+      </c-modal-body>
+      <c-modal-footer>
+        <c-button color="secondary" @click="(modalSelectedObjectType = null, showObjectModal = false)">Откажи</c-button>
+        <c-button color="primary" :disabled="!modalSelectedObjectType" @click="confirmModalPlacement">
+          Потвърди
+        </c-button>
+      </c-modal-footer>
+    </c-modal>
+
+    <!-- Fallback modal (simple overlay) -->
+    <div v-if="showObjectModal && useFallbackModal" class="fallback-backdrop" @click.self="(modalSelectedObjectType = null, showObjectModal = false)">
+      <div class="fallback-modal">
+        <h5>Изберете тип обект</h5>
+        <div class="object-palette d-flex flex-column mt-2">
+          <div
+            v-for="objType in availableObjects"
+            :key="objType.type + '-fb'"
+            class="palette-object p-2"
+            :class="{ selected: modalSelectedObjectType?.type === objType.type }"
+            style="cursor: pointer;"
+            @click="modalSelectedObjectType = objType"
+          >
+            <c-icon :name="objType.icon" class="me-2" />
+            {{ objType.name }}
+          </div>
+        </div>
+        <div class="d-flex justify-content-end gap-2 mt-3">
+          <c-button color="secondary" size="sm" @click="(modalSelectedObjectType = null, showObjectModal = false)">Откажи</c-button>
+          <c-button color="primary" size="sm" :disabled="!modalSelectedObjectType" @click="confirmModalPlacement">Потвърди</c-button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script>
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useGameStore } from '../stores/gameStore';
 import axios from 'axios';
@@ -141,6 +165,10 @@ export default {
     const selectedObject = ref(null);
     const selectedObjectType = ref(null);
     const selectedCells = ref(new Set());
+  const showObjectModal = ref(false);
+  const pendingSelectionBounds = ref(null);
+    const modalSelectedObjectType = ref(null);
+    const useFallbackModal = ref(true);
 
     const parcelId = computed(() => parseInt(route.params.parcelId));
     const parcel = computed(() => {
@@ -173,18 +201,19 @@ export default {
 
     const canSelectCell = (cellIndex) => {
       if (selectedCells.value.has(cellIndex)) return false;
-      
-      // Check if adjacent to any selected cell
-      const x = cellIndex % 10;
-      const y = Math.floor(cellIndex / 10);
-      
+
+      // Convert to 0-based coordinates
+      const x = (cellIndex - 1) % 10;
+      const y = Math.floor((cellIndex - 1) / 10);
+
+      // adjacent cell indices (convert back to 1-based index values)
       const adjacentCells = [
-        (y - 1) * 10 + x, // top
-        (y + 1) * 10 + x, // bottom
-        y * 10 + (x - 1), // left
-        y * 10 + (x + 1)  // right
+        (y - 1) * 10 + x + 1, // top
+        (y + 1) * 10 + x + 1, // bottom
+        y * 10 + (x - 1) + 1, // left
+        y * 10 + (x + 1) + 1  // right
       ];
-      
+
       return adjacentCells.some(adj => selectedCells.value.has(adj));
     };
 
@@ -197,30 +226,72 @@ export default {
       selectedObjectType.value = null;
     };
 
-    const selectObjectType = (objType) => {
-      if (selectedCells.value.size === 0) {
-        message.value = 'Първо маркирайте област в града';
+    // When user clicks Save and there is a selection, we open the modal and store selection bounds
+    const placePendingObject = (objType) => {
+      // deprecated: selection is handled via modal confirmed placement
+    };
+
+    const confirmModalPlacement = async () => {
+      if (selectedCells.value.size === 0 || !modalSelectedObjectType.value) return;
+      // Build a single object with explicit cells array to preserve arbitrary shape
+      const cellsArr = Array.from(selectedCells.value).map(cellIndex => {
+        return {
+          x: (cellIndex - 1) % 10,
+          y: Math.floor((cellIndex - 1) / 10)
+        };
+      });
+
+      const newObj = {
+        parcel_id: parcel.value.id,
+        object_type: modalSelectedObjectType.value.type,
+        cells: cellsArr,
+        properties: {}
+      };
+      cityObjects.value.push(newObj);
+
+      // close modal and clear modal selection
+      modalSelectedObjectType.value = null;
+      showObjectModal.value = false;
+      pendingSelectionBounds.value = null;
+      clearSelection();
+
+      // Submit the new object to server so it is persisted and returns with ids
+      await submitSave();
+    };
+
+    const submitSave = async () => {
+      if (cityObjects.value.length === 0) {
+        message.value = 'Няма обекти за запазване. Първо изберете тип обект и го поставете.';
         messageType.value = 'warning';
         return;
       }
-      selectedObjectType.value = objType;
-      selectedObject.value = null;
-    };
 
-    const confirmPlacement = () => {
-      if (selectedObjectType.value && selectedCells.value.size > 0) {
-        const bounds = getSelectionBounds();
-        const newObj = {
-          parcel_id: parcel.value.id,
-          object_type: selectedObjectType.value.type,
-          x: bounds.minX,
-          y: bounds.minY,
-          width: bounds.width,
-          height: bounds.height,
-          properties: {}
-        };
-        cityObjects.value.push(newObj);
-        clearSelection();
+      loading.value = true;
+      try {
+        // Send only objects belonging to the current parcel to avoid touching other parcels
+        const objectsForThisParcel = cityObjects.value.filter(o => o.parcel_id === parcel.value.id);
+        const res = await axios.post('/api/city-objects/save', {
+          objects: objectsForThisParcel
+        });
+        if (res.data.success) {
+          // Post-process returned objects: null out ready_at for expired builds
+          const objs = res.data.objects.map(o => {
+            const ready = getReadyTimestamp(o);
+            if (ready && ready <= Date.now()) {
+              o.ready_at = null;
+            }
+            return o;
+          });
+          cityObjects.value = objs;
+          message.value = 'Промените са запазени успешно!';
+          messageType.value = 'success';
+        }
+      } catch (e) {
+        message.value = 'Грешка при запазване';
+        messageType.value = 'error';
+        console.error('Save error:', e.response?.data);
+      } finally {
+        loading.value = false;
       }
     };
 
@@ -231,8 +302,8 @@ export default {
       let minX = 10, minY = 10, maxX = 0, maxY = 0;
 
       cells.forEach(cellIndex => {
-        const x = cellIndex % 10;
-        const y = Math.floor(cellIndex / 10);
+        const x = (cellIndex - 1) % 10;
+        const y = Math.floor((cellIndex - 1) / 10);
         minX = Math.min(minX, x);
         minY = Math.min(minY, y);
         maxX = Math.max(maxX, x);
@@ -250,11 +321,17 @@ export default {
     };
 
     const isCellInObject = (cellIndex, obj) => {
-      const cellX = cellIndex % 10;
-      const cellY = Math.floor(cellIndex / 10);
+      const cellX = (cellIndex - 1) % 10;
+      const cellY = Math.floor((cellIndex - 1) / 10);
 
-      return cellX >= obj.x && cellX < obj.x + obj.width &&
-             cellY >= obj.y && cellY < obj.y + obj.height;
+      if (obj.cells && Array.isArray(obj.cells)) {
+        return obj.cells.some(c => c.x === cellX && c.y === cellY);
+      }
+      if (obj.x != null && obj.width != null && obj.y != null && obj.height != null) {
+        return cellX >= obj.x && cellX < obj.x + obj.width &&
+               cellY >= obj.y && cellY < obj.y + obj.height;
+      }
+      return false;
     };
 
     const getObjectsForParcel = (parcelId) => {
@@ -276,30 +353,25 @@ export default {
     };
 
     const saveChanges = async () => {
-      // Check if there are any objects to save
-      if (cityObjects.value.length === 0) {
-        message.value = 'Няма обекти за запазване. Първо изберете тип обект и го поставете.';
-        messageType.value = 'warning';
+      // debug: indicate handler was invoked
+      message.value = 'Натиснат е Запази...';
+      messageType.value = 'info';
+      // If user has a selection but hasn't chosen an object type yet, open modal to choose
+      if (selectedCells.value.size > 0) {
+        // debug: log selection and bounds
+        const sel = Array.from(selectedCells.value);
+        console.log('saveChanges: selectedCells=', sel);
+        const bounds = getSelectionBounds();
+        console.log('saveChanges: selectionBounds=', bounds);
+        pendingSelectionBounds.value = bounds;
+        message.value = 'Отварям избор на тип обект...';
+        messageType.value = 'info';
+        showObjectModal.value = true;
         return;
       }
 
-      loading.value = true;
-      try {
-        const res = await axios.post('/api/city-objects/save', {
-          objects: cityObjects.value
-        });
-        if (res.data.success) {
-          cityObjects.value = res.data.objects;
-          message.value = 'Промените са запазени успешно!';
-          messageType.value = 'success';
-        }
-      } catch (e) {
-        message.value = 'Грешка при запазване';
-        messageType.value = 'error';
-        console.error('Save error:', e.response?.data);
-      } finally {
-        loading.value = false;
-      }
+      // Otherwise, submit current cityObjects to server
+      await submitSave();
     };
 
     const goBackToCity = () => {
@@ -310,12 +382,73 @@ export default {
       try {
         const res = await axios.get('/api/city-objects');
         if (res.data.success) {
-          cityObjects.value = res.data.objects;
+          const objs = res.data.objects.map(o => {
+            const ready = getReadyTimestamp(o);
+            if (ready && ready <= Date.now()) {
+              o.ready_at = null;
+            }
+            return o;
+          });
+          cityObjects.value = objs;
         }
       } catch (e) {
         console.error('Failed to fetch city objects', e);
       }
     };
+
+    const getProgressPercent = (obj) => {
+      const totalSeconds = obj.build_seconds || (obj.cells ? obj.cells.length * 60 : 0);
+      if (!totalSeconds || !obj.ready_at) return 100;
+      const ready = getReadyTimestamp(obj);
+      if (!ready) return 100;
+      const total = totalSeconds * 1000;
+      const started = ready - total;
+      const now = Date.now();
+      const elapsed = Math.max(0, Math.min(now - started, total));
+      return Math.floor((elapsed / total) * 100);
+    };
+
+    const getReadyTimestamp = (obj) => {
+      if (obj.ready_at) {
+        const t = Date.parse(obj.ready_at);
+        if (!isNaN(t)) return t;
+      }
+      if (obj.created_at) {
+        const created = Date.parse(obj.created_at);
+        const totalSeconds = obj.build_seconds || (obj.cells ? obj.cells.length * 60 : 0);
+        if (!isNaN(created) && totalSeconds) return created + totalSeconds * 1000;
+      }
+      return null;
+    };
+
+    const getRemainingTimeText = (obj) => {
+      const ready = getReadyTimestamp(obj);
+      if (!ready) return '';
+      const now = Date.now();
+      const remainingMs = Math.max(0, ready - now);
+      const sec = Math.ceil(remainingMs / 1000);
+      const m = Math.floor(sec / 60);
+      const s = sec % 60;
+      return `${m}m ${s}s`;
+    };
+
+    const isBuilding = (obj) => {
+      const ready = getReadyTimestamp(obj);
+      if (!ready) return false;
+      return ready > Date.now();
+    };
+
+    // Tick every second to update progress displays
+    let tickInterval = null;
+    onMounted(() => {
+      tickInterval = setInterval(() => {
+        cityObjects.value = cityObjects.value.slice();
+      }, 1000);
+    });
+    // Clear interval when unmounted
+    onUnmounted(() => {
+      if (tickInterval) clearInterval(tickInterval);
+    });
 
     onMounted(async () => {
       if (gameStore.user) {
@@ -332,15 +465,16 @@ export default {
       parcel,
       cityObjects,
       selectedObject,
-      selectedObjectType,
       selectedCells,
       availableObjects,
       toggleCellSelection,
       canSelectCell,
       isCellSelected,
       clearSelection,
-      selectObjectType,
-      confirmPlacement,
+    showObjectModal,
+    modalSelectedObjectType,
+    confirmModalPlacement,
+    useFallbackModal,
       getSelectionBounds,
       isCellInObject,
       getObjectsForParcel,
@@ -348,7 +482,10 @@ export default {
       removeObject,
       saveChanges,
       goBackToCity,
-      getObjectIcon
+      getObjectIcon,
+      getProgressPercent,
+      getRemainingTimeText,
+      isBuilding
     };
   }
 }
@@ -421,6 +558,9 @@ export default {
   cursor: pointer;
 }
 
+.build-overlay-large { position:absolute; inset:0; display:flex; align-items:flex-end; }
+.build-time-small { position:absolute; bottom:2px; right:6px; font-size:10px; color:#004085 }
+
 .editor-palette {
   width: 100%;
   max-width: 500px;
@@ -457,5 +597,23 @@ export default {
   .palette-object {
     padding: 10px;
   }
+}
+
+/* Fallback modal styles */
+.fallback-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+.fallback-modal {
+  background: white;
+  padding: 16px;
+  border-radius: 6px;
+  width: 320px;
+  max-width: 90%;
 }
 </style>

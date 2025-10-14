@@ -35,9 +35,12 @@
                           v-for="obj in getObjectsForParcel(parcel.id)"
                           :key="obj.id"
                           v-show="isCellInObject(i, obj)"
-                          class="placed-object"
+                          :class="['placed-object', { 'building': isBuilding(obj) }]"
                         >
                           <c-icon :name="getObjectIcon(obj.object_type)" />
+                          <div v-if="isBuilding(obj)" class="build-overlay">
+                            <div class="build-time">{{ getRemainingTimeText(obj) }}</div>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -64,7 +67,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, watch } from 'vue';
+import { ref, computed, onMounted, watch, onUnmounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useGameStore } from '../stores/gameStore';
 import axios from 'axios';
@@ -148,7 +151,16 @@ export default {
       try {
         const res = await axios.get('/api/city-objects');
         if (res.data.success) {
-          cityObjects.value = res.data.objects;
+          // Post-process: if ready timestamp is in the past, null it locally so UI won't treat it as building
+          const objs = res.data.objects.map(o => {
+            const ready = getReadyTimestamp(o);
+            if (ready && ready <= Date.now()) {
+              // ensure expired builds are not shown as building
+              o.ready_at = null;
+            }
+            return o;
+          });
+          cityObjects.value = objs;
         }
       } catch (e) {
         console.error('Failed to fetch city objects', e);
@@ -159,11 +171,82 @@ export default {
       return cityObjects.value.filter(obj => obj.parcel_id === parcelId);
     };
 
+    const getTotalBuildSeconds = (obj) => {
+      if (obj.build_seconds) return obj.build_seconds;
+      if (obj.cells && Array.isArray(obj.cells)) return obj.cells.length * 60;
+      return 0;
+    };
+
+    const getReadyTimestamp = (obj) => {
+      // return ms timestamp of ready time; if ready_at missing, try to compute from created_at
+      if (obj.ready_at) {
+        const t = Date.parse(obj.ready_at);
+        if (!isNaN(t)) return t;
+      }
+      if (obj.created_at) {
+        const created = Date.parse(obj.created_at);
+        const totalSeconds = getTotalBuildSeconds(obj);
+        if (!isNaN(created) && totalSeconds) return created + totalSeconds * 1000;
+      }
+      return null;
+    };
+
+    const getProgressPercent = (obj) => {
+      const totalSeconds = getTotalBuildSeconds(obj);
+      if (!totalSeconds || !obj.ready_at) return 100;
+  const ready = getReadyTimestamp(obj);
+  if (!ready) return 100;
+      const total = totalSeconds * 1000;
+      const started = ready - total;
+      const now = Date.now();
+      const elapsed = Math.max(0, Math.min(now - started, total));
+      return Math.floor((elapsed / total) * 100);
+    };
+
+    const getRemainingTimeText = (obj) => {
+      const totalSeconds = getTotalBuildSeconds(obj);
+      if (!totalSeconds || !obj.ready_at) return '';
+  const ready = getReadyTimestamp(obj);
+  if (!ready) return '';
+  const now = Date.now();
+  const remainingMs = Math.max(0, ready - now);
+      const sec = Math.ceil(remainingMs / 1000);
+      const m = Math.floor(sec / 60);
+      const s = sec % 60;
+      return `${m}m ${s}s`;
+    };
+
+    const isBuilding = (obj) => {
+  const ready = getReadyTimestamp(obj);
+  if (!ready) return false;
+  return ready > Date.now();
+    };
+
+    // Tick to refresh progress for existing building objects
+    let tickInterval = null;
+    onMounted(() => {
+      // ensure we refresh every second so progress/time shows up for existing items
+      tickInterval = setInterval(() => {
+        cityObjects.value = cityObjects.value.slice();
+      }, 1000);
+    });
+    onUnmounted(() => {
+      if (tickInterval) clearInterval(tickInterval);
+    });
+
     const isCellInObject = (cellIndex, obj) => {
       const cellX = (cellIndex - 1) % 10;
       const cellY = Math.floor((cellIndex - 1) / 10);
-      return cellX >= obj.x && cellX < obj.x + obj.width &&
-             cellY >= obj.y && cellY < obj.y + obj.height;
+      // If object has explicit cells array, check membership
+      if (obj.cells && Array.isArray(obj.cells)) {
+        return obj.cells.some(c => c.x === cellX && c.y === cellY);
+      }
+      // Backwards compatible: rectangle fields
+      if (obj.x != null && obj.width != null && obj.y != null && obj.height != null) {
+        return cellX >= obj.x && cellX < obj.x + obj.width &&
+               cellY >= obj.y && cellY < obj.y + obj.height;
+      }
+      return false;
     };
 
     const getObjectIcon = (type) => {
@@ -206,6 +289,7 @@ export default {
       }
     });
 
+    // export everything the template needs (including helpers)
     return {
       loading,
       message,
@@ -218,7 +302,11 @@ export default {
       getObjectsForParcel,
       isCellInObject,
       openParcelEditor,
-      getObjectIcon
+      getObjectIcon,
+      getProgressPercent,
+      getRemainingTimeText,
+      getTotalBuildSeconds,
+      isBuilding
     };
   }
 }
@@ -293,6 +381,12 @@ export default {
   border: 1px solid #007bff;
   cursor: pointer;
 }
+
+.placed-object.building { background: rgba(220,53,69,0.08); border-color: #dc3545; }
+.placed-object .build-progress { background: rgba(220,53,69,0.6); }
+
+.build-overlay { position: absolute; inset: 0; display:flex; align-items:flex-end; }
+.build-time { position:absolute; bottom:2px; right:4px; font-size:10px; color:#004085 }
 
 .placement-preview {
   position: absolute;

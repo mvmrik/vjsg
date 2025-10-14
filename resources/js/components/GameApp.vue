@@ -83,7 +83,7 @@
               <span>&copy; {{ new Date().getFullYear() }} Resource Legends. Всички права запазени.</span>
             </div>
             <div class="ms-auto">
-              <span>Версия 1.0.0</span>
+              <span>Версия {{ appVersion }}</span>
             </div>
           </div>
         </c-footer>
@@ -112,6 +112,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useGameStore } from '../stores/gameStore';
 import LoginForm from './LoginForm.vue';
+import appVersion from '../version';
 
 export default {
   name: 'GameApp',
@@ -212,8 +213,9 @@ export default {
       currentUser,
       navigation,
       logout,
-      onLoginSuccess,
-      router
+  onLoginSuccess,
+  router,
+  appVersion
     };
   }
 }
