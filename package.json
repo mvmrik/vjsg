@@ -1,0 +1,28 @@
+{
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "dev": "vite",
+        "build": "vite build"
+    },
+    "devDependencies": {
+        "@tailwindcss/postcss": "^4.1.14",
+        "autoprefixer": "^10.4.21",
+        "axios": "^1.12.2",
+        "laravel-vite-plugin": "^1.0.0",
+        "tailwindcss": "^4.1.14",
+        "vite": "^5.0.0"
+    },
+    "dependencies": {
+        "@coreui/coreui": "^5.4.3",
+        "@coreui/icons": "^3.0.1",
+        "@coreui/icons-vue": "^2.2.0",
+        "@coreui/vue": "^5.7.0",
+        "@vitejs/plugin-vue": "^6.0.1",
+        "bootstrap": "^5.3.8",
+        "leaflet": "^1.9.4",
+        "pinia": "^3.0.3",
+        "vue": "^3.5.22",
+        "vue-router": "^4.5.1"
+    }
+}

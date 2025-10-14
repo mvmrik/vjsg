@@ -1,0 +1,6 @@
+/* CoreUI Styles */
+@import '@coreui/coreui/dist/css/coreui.min.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
