@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Session;
 use App\Models\Person;
+use App\Models\OccupiedWorker;
 
 class PeopleController extends Controller
 {
@@ -17,16 +18,27 @@ class PeopleController extends Controller
 
         $groups = Person::where('user_id', $userId)->get();
 
-        $total = $groups->sum('count');
+        // Get occupied counts by level
+        $occupiedByLevel = OccupiedWorker::where('user_id', $userId)
+            ->where('occupied_until', '>', now())
+            ->selectRaw('level, SUM(count) as occupied_count')
+            ->groupBy('level')
+            ->pluck('occupied_count', 'level')
+            ->all();
 
-        // Breakdown by level
-        $byLevel = $groups->mapWithKeys(function ($g) {
-            return [$g->level => $g->count];
+        $total = $groups->sum('count');
+        $totalOccupied = array_sum($occupiedByLevel);
+        $totalFree = $total - $totalOccupied;
+
+        // Breakdown by level (free counts)
+        $byLevel = $groups->mapWithKeys(function ($g) use ($occupiedByLevel) {
+            $occupied = $occupiedByLevel[$g->level] ?? 0;
+            return [$g->level => $g->count - $occupied];
         })->all();
 
         return response()->json([
             'success' => true,
-            'total' => $total,
+            'total' => $totalFree,
             'by_level' => $byLevel,
             'groups' => $groups
         ]);

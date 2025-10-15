@@ -7,6 +7,7 @@ use App\Models\CityObject;
 use Illuminate\Support\Facades\Session;
 use App\Models\ObjectType;
 use App\Models\Person;
+use App\Models\OccupiedWorker;
 use App\Models\Parcel;
 
 class CityController extends Controller
@@ -23,6 +24,11 @@ class CityController extends Controller
             ->whereNotNull('ready_at')
             ->where('ready_at', '<=', now())
             ->update(['ready_at' => null]);
+
+        // FREE OCCUPIED WORKERS: Delete occupied_worker records for completed buildings
+        OccupiedWorker::whereHas('cityObject', function ($query) use ($userId) {
+            $query->where('user_id', $userId)->whereNull('ready_at');
+        })->delete();
 
         $objects = CityObject::where('user_id', $userId)->get();
 
@@ -183,6 +189,17 @@ class CityController extends Controller
                 $arr = $created->toArray();
                 $arr['build_seconds'] = $buildSeconds;
                 $objects[] = (object)$arr;
+
+                // OCCUPY WORKERS: Create occupied_worker record if workers were used
+                if ($workers && isset($workers['level']) && isset($workers['count'])) {
+                    OccupiedWorker::create([
+                        'user_id' => $userId,
+                        'level' => intval($workers['level']),
+                        'count' => intval($workers['count']),
+                        'occupied_until' => $readyAt,
+                        'city_object_id' => $created->id
+                    ]);
+                }
             }
         }
 
