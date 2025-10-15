@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\CityObject;
 use Illuminate\Support\Facades\Session;
+use App\Models\ObjectType;
 
 class CityController extends Controller
 {
@@ -23,10 +24,24 @@ class CityController extends Controller
 
         $objects = CityObject::where('user_id', $userId)->get();
 
+        // Annotate build_seconds for frontend convenience
+        $types = ObjectType::all()->keyBy('type');
+        $objsArr = $objects->map(function ($o) use ($types) {
+            $arr = $o->toArray();
+            $type = $types[$o->object_type] ?? null;
+            if ($type) {
+                $arr['build_seconds'] = intval($type->build_time_minutes) * 60;
+            } else {
+                // fallback: 1 minute per cell
+                $arr['build_seconds'] = isset($o->cells) && is_array($o->cells) ? count($o->cells) * 60 : 60;
+            }
+            return $arr;
+        });
+
         return response()->json([
             'success' => true,
             'cleaned' => $cleaned,
-            'objects' => $objects
+            'objects' => $objsArr
         ]);
     }
 
@@ -84,12 +99,18 @@ class CityController extends Controller
                     $objects[] = $existing;
                 }
             } else {
-                // New object: compute ready_at and create
-                $cellsCount = count($objData['cells']);
-                $buildSeconds = $cellsCount * 60; // 1 minute per cell
+                // New object: compute ready_at based on object type table (minutes)
+                $type = ObjectType::where('type', $objData['object_type'])->first();
+                if ($type) {
+                    $buildSeconds = intval($type->build_time_minutes) * 60;
+                } else {
+                    // fallback: 1 minute per cell
+                    $cellsCount = isset($objData['cells']) && is_array($objData['cells']) ? count($objData['cells']) : 1;
+                    $buildSeconds = $cellsCount * 60;
+                }
                 $readyAt = now()->addSeconds($buildSeconds);
 
-                $objects[] = CityObject::create([
+                $created = CityObject::create([
                     'user_id' => $userId,
                     'parcel_id' => $objData['parcel_id'],
                     'object_type' => $objData['object_type'],
@@ -97,6 +118,9 @@ class CityController extends Controller
                     'properties' => $objData['properties'] ?? [],
                     'ready_at' => $readyAt
                 ]);
+                $arr = $created->toArray();
+                $arr['build_seconds'] = $buildSeconds;
+                $objects[] = (object)$arr;
             }
         }
 
@@ -113,12 +137,37 @@ class CityController extends Controller
             ->update(['ready_at' => null]);
 
         $allObjects = CityObject::where('user_id', $userId)->get();
+        $types = ObjectType::all()->keyBy('type');
+        $allArr = $allObjects->map(function ($o) use ($types) {
+            $arr = $o->toArray();
+            $type = $types[$o->object_type] ?? null;
+            if ($type) {
+                $arr['build_seconds'] = intval($type->build_time_minutes) * 60;
+            } else {
+                $arr['build_seconds'] = isset($o->cells) && is_array($o->cells) ? count($o->cells) * 60 : 60;
+            }
+            return $arr;
+        });
 
         return response()->json([
             'success' => true,
             'message' => 'City saved successfully',
             'cleaned_after_save' => $cleanedAfter,
-            'objects' => $allObjects
+            'objects' => $allArr
         ]);
+    }
+
+    /**
+     * Return available object types from DB
+     */
+    public function types()
+    {
+        $userId = Session::get('user_id');
+        if (!$userId) {
+            return response()->json(['success' => false, 'message' => 'Not authenticated'], 401);
+        }
+
+        $types = ObjectType::orderBy('type')->get();
+        return response()->json(['success' => true, 'types' => $types]);
     }
 }

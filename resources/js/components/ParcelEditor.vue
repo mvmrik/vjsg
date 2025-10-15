@@ -101,13 +101,19 @@
           <div
             v-for="objType in availableObjects"
             :key="objType.type"
-            class="palette-object p-2"
+            class="palette-object p-2 d-flex justify-content-between align-items-center"
             :class="{ selected: modalSelectedObjectType?.type === objType.type }"
             style="cursor: pointer;"
             @click="modalSelectedObjectType = objType"
           >
-            <c-icon :name="objType.icon" class="me-2" />
-            {{ objType.name }}
+            <div class="d-flex align-items-center">
+              <c-icon :name="objType.icon" class="me-2" />
+              <div>{{ objType.name }}</div>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+              <div class="text-muted small">{{ objType.build_time_minutes }}m</div>
+              <c-icon v-if="modalSelectedObjectType?.type === objType.type" name="cilCheck" class="text-primary" />
+            </div>
           </div>
         </div>
       </c-modal-body>
@@ -127,14 +133,21 @@
           <div
             v-for="objType in availableObjects"
             :key="objType.type + '-fb'"
-            class="palette-object p-2"
+            class="palette-object p-2 d-flex justify-content-between align-items-center"
             :class="{ selected: modalSelectedObjectType?.type === objType.type }"
             style="cursor: pointer;"
             @click="modalSelectedObjectType = objType"
           >
-            <c-icon :name="objType.icon" class="me-2" />
-            {{ objType.name }}
+            <div class="d-flex align-items-center">
+              <c-icon :name="objType.icon" class="me-2" />
+              <div>{{ objType.name }}</div>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+              <div class="text-muted small">{{ objType.build_time_minutes }}m</div>
+              <c-icon v-if="modalSelectedObjectType?.type === objType.type" name="cilCheck" class="text-primary" />
+            </div>
           </div>
+        
         </div>
         <div class="d-flex justify-content-end gap-2 mt-3">
           <c-button color="secondary" size="sm" @click="(modalSelectedObjectType = null, showObjectModal = false)">Откажи</c-button>
@@ -175,15 +188,10 @@ export default {
       return gameStore.parcels?.find(p => p.id === parcelId.value && p.user_id === gameStore.user?.id);
     });
 
-    const availableObjects = [
-      { type: 'house', name: 'Къща', icon: 'cilHome', width: 3, height: 3 },
-      { type: 'tree', name: 'Дърво', icon: 'cilTree', width: 1, height: 1 },
-      { type: 'well', name: 'Кладенец', icon: 'cilDrop', width: 2, height: 2 },
-      { type: 'barn', name: 'Хамбар', icon: 'cilStorage', width: 4, height: 2 }
-    ];
+    const availableObjects = ref([]);
 
     const getObjectIcon = (type) => {
-      const obj = availableObjects.find(o => o.type === type);
+      const obj = availableObjects.value.find(o => o.type === type);
       return obj ? obj.icon : 'cilQuestion';
     };
 
@@ -353,9 +361,7 @@ export default {
     };
 
     const saveChanges = async () => {
-      // debug: indicate handler was invoked
-      message.value = 'Натиснат е Запази...';
-      messageType.value = 'info';
+      // No persistent debug message here - open modal or save directly
       // If user has a selection but hasn't chosen an object type yet, open modal to choose
       if (selectedCells.value.size > 0) {
         // debug: log selection and bounds
@@ -364,8 +370,8 @@ export default {
         const bounds = getSelectionBounds();
         console.log('saveChanges: selectionBounds=', bounds);
         pendingSelectionBounds.value = bounds;
-        message.value = 'Отварям избор на тип обект...';
-        messageType.value = 'info';
+        // Ensure object types are loaded from server when opening modal
+        await fetchObjectTypes();
         showObjectModal.value = true;
         return;
       }
@@ -393,6 +399,24 @@ export default {
         }
       } catch (e) {
         console.error('Failed to fetch city objects', e);
+      }
+    };
+
+    const fetchObjectTypes = async () => {
+      try {
+        const res = await axios.get('/api/object-types');
+        if (res.data.success) {
+          // expected array of types with fields: type, name, icon, build_time_minutes
+          availableObjects.value = res.data.types.map(t => ({
+            type: t.type,
+            name: t.name,
+            icon: t.icon || 'cilQuestion',
+            build_time_minutes: t.build_time_minutes || 1,
+            meta: t.meta || null
+          }));
+        }
+      } catch (e) {
+        console.error('Failed to fetch object types', e);
       }
     };
 
@@ -454,6 +478,7 @@ export default {
       if (gameStore.user) {
         await gameStore.fetchParcels();
         await fetchCityObjects();
+        await fetchObjectTypes();
       }
       loading.value = false;
     });
@@ -597,6 +622,15 @@ export default {
   .palette-object {
     padding: 10px;
   }
+
+  /* Visible selected styling for palette items */
+  .palette-object.selected {
+    background: rgba(0, 123, 255, 0.12);
+    border: 1px solid rgba(0,123,255,0.35);
+    border-radius: 6px;
+  }
+
+  .palette-object.selected div:first-child { font-weight: 600; }
 }
 
 /* Fallback modal styles */
