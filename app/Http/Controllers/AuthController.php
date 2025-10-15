@@ -39,9 +39,8 @@ class AuthController extends Controller
             'last_active' => now(),
         ]);
 
-        // Add 2 level 1 people
-        \App\Models\Person::create(['user_id' => $user->id, 'level' => 1]);
-        \App\Models\Person::create(['user_id' => $user->id, 'level' => 1]);
+        // Add 2 level 1 people as one record
+        \App\Models\Person::create(['user_id' => $user->id, 'level' => 1, 'count' => 2]);
 
         // Auto-login
         $request->session()->put('user_id', $user->id);
@@ -51,7 +50,7 @@ class AuthController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Registration successful!',
-            'redirect' => route('profile')
+            'redirect' => '/map'
         ]);
     }
 

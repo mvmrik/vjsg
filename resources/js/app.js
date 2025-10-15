@@ -27,11 +27,11 @@ axios.defaults.withCredentials = true;
 // Define routes
 const routes = [
   { path: '/', name: 'home', component: HomePage },
-  { path: '/profile', name: 'profile', component: ProfilePage, meta: { requiresAuth: true } },
   { path: '/map', name: 'map', component: MapPage, meta: { requiresAuth: true } },
-  { path: '/inventory', name: 'inventory', component: InventoryPage, meta: { requiresAuth: true } },
   { path: '/city', name: 'city', component: CityPage, meta: { requiresAuth: true } },
-  { path: '/city/:parcelId', name: 'parcel-editor', component: ParcelEditor, meta: { requiresAuth: true } }
+  { path: '/city/:parcelId', name: 'parcel-editor', component: ParcelEditor, meta: { requiresAuth: true } },
+  { path: '/settings', name: 'settings', component: ProfilePage, meta: { requiresAuth: true } },
+  { path: '/inventory', name: 'inventory', component: InventoryPage, meta: { requiresAuth: true } }
 ];
 
 // Create router

@@ -24,11 +24,11 @@
                 <c-button 
                   color="success" 
                   size="lg"
-                  @click="$router.push('/profile')" 
+                  @click="$router.push('/settings')" 
                   v-if="gameStore.isAuthenticated"
                 >
                   <c-icon name="cilUser" class="me-2" />
-                  Моят профил
+                  Моите настройки
                 </c-button>
               </div>
             </c-card-body>
@@ -204,9 +204,9 @@
                   <c-icon name="cilStorage" class="me-2" />
                   Събери ресурси
                 </c-button>
-                <c-button color="info" @click="$router.push('/profile')">
+                <c-button color="info" @click="$router.push('/settings')">
                   <c-icon name="cilUser" class="me-2" />
-                  Редактирай профила
+                  Настройки
                 </c-button>
               </div>
             </c-card-body>
@@ -429,7 +429,8 @@ export default {
 
       try {
         await gameStore.login(loginForm.value.privateKey);
-        showMessage('Успешно влизане!', 'success');
+        // Login successful, redirect to map
+        await router.push('/map');
       } catch (error) {
         showMessage(gameStore.error || 'Грешка при влизане', 'error');
       } finally {
@@ -443,9 +444,8 @@ export default {
 
       try {
         await gameStore.register(registerForm.value.username);
-        // Registration successful, navigate to profile
+        // Registration successful, redirect handled by gameStore
         registerForm.value.username = '';
-        await router.push('/profile');
       } catch (error) {
         showMessage(gameStore.error || 'Грешка при регистрация', 'error');
       } finally {

@@ -1,72 +1,28 @@
 <template>
   <div class="c-app c-default-layout">
-    <!-- CoreUI Sidebar -->
-    <c-sidebar
-      :show="sidebarShow"
-      @update:show="val => sidebarShow = val"
-      :minimize="sidebarMinimize"
-      :fixed="true"
-    >
-      <c-sidebar-brand>
-        <div class="h5 mb-0 text-white">Resource Legends</div>
-        <template #minimized>
-          <strong>RL</strong>
-        </template>
-      </c-sidebar-brand>
-
-      <c-sidebar-nav
-        :nav="navigation"
-        navLink="router-link"
-      />
-    </c-sidebar>
-
     <!-- Main content wrapper -->
     <div class="c-wrapper">
-      <!-- CoreUI Header -->
-      <c-header
-        :fixed="true"
-        class="d-flex"
-      >
-        <c-sidebar-toggler
-          @click="sidebarShow = !sidebarShow"
-          class="d-none d-md-flex ml-3"
-        />
-        
-        <div class="breadcrumb ms-2">Resource Legends</div>
-
-        <c-header-nav class="ms-auto mr-4">
-          <div v-if="isLoggedIn" class="dropdown position-relative">
-            <c-icon
-              name="cilMenu"
-              size="lg"
-              class="cursor-pointer"
-              @click="dropdownVisible = !dropdownVisible"
-            />
-            <div v-show="dropdownVisible" class="dropdown-menu show position-absolute end-0 mt-2" style="z-index: 1000;">
-              <a class="dropdown-item" @click="$router.push('/'); dropdownVisible = false;">
-                <c-icon name="cilHome" class="me-2" />
-                Начало
+      <!-- Custom Header with centered icons - only for logged in users -->
+      <header v-if="isLoggedIn" class="bg-primary text-white py-3 shadow-sm">
+        <div class="container-fluid">
+          <div class="d-flex justify-content-center align-items-center">
+            <nav class="d-flex gap-4">
+              <a @click="$router.push('/map')" :class="['text-decoration-none d-flex flex-column align-items-center p-2 rounded', currentRoute === '/map' ? 'bg-light text-dark' : 'text-white']" style="cursor: pointer;">
+                <c-icon name="cilHome" size="2xl" class="mb-1" />
+                <small>Начало</small>
               </a>
-              <a class="dropdown-item" @click="$router.push('/profile'); dropdownVisible = false;">
-                <c-icon name="cilUser" class="me-2" />
-                Профил
+              <a @click="$router.push('/city')" :class="['text-decoration-none d-flex flex-column align-items-center p-2 rounded', currentRoute.startsWith('/city') ? 'bg-light text-dark' : 'text-white']" style="cursor: pointer;">
+                <c-icon name="cilMap" size="2xl" class="mb-1" />
+                <small>Град</small>
               </a>
-              <a class="dropdown-item" @click="$router.push('/map'); dropdownVisible = false;">
-                <c-icon name="cilMap" class="me-2" />
-                Карта
+              <a @click="$router.push('/settings')" :class="['text-decoration-none d-flex flex-column align-items-center p-2 rounded', currentRoute === '/settings' ? 'bg-light text-dark' : 'text-white']" style="cursor: pointer;">
+                <c-icon name="cilSettings" size="2xl" class="mb-1" />
+                <small>Настройки</small>
               </a>
-              <a class="dropdown-item" @click="$router.push('/city'); dropdownVisible = false;">
-                <c-icon name="cilCity" class="me-2" />
-                Град
-              </a>
-              <a class="dropdown-item" @click="logout(); dropdownVisible = false;">
-                <c-icon name="cilAccountLogout" class="me-2" />
-                Изход
-              </a>
-            </div>
+            </nav>
           </div>
-        </c-header-nav>
-      </c-header>
+        </div>
+      </header>
 
       <!-- Page Content -->
       <div class="c-body">
@@ -109,7 +65,7 @@
 
 <script>
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import { useGameStore } from '../stores/gameStore';
 import LoginForm from './LoginForm.vue';
 import appVersion from '../version';
@@ -122,13 +78,15 @@ export default {
   setup() {
     const gameStore = useGameStore();
     const router = useRouter();
+    const route = useRoute();
     const sidebarShow = ref(true);
     const sidebarMinimize = ref(false);
     const showLoginModal = ref(false);
     const dropdownVisible = ref(false);
 
     const currentUser = computed(() => gameStore.user);
-    const isLoggedIn = computed(() => localStorage.getItem('game_logged_in') === 'true');
+    const isLoggedIn = computed(() => gameStore.isAuthenticated);
+    const currentRoute = computed(() => route.path);
 
     const navigation = computed(() => [
       {
@@ -165,8 +123,8 @@ export default {
       },
       {
         _name: 'CSidebarNavItem',
-        name: 'Профил',
-        to: '/profile',
+        name: 'Настройки',
+        to: '/settings',
         icon: 'cilUser'
       }
     ]);
@@ -205,17 +163,15 @@ export default {
     });
 
     return {
-      sidebarShow,
-      sidebarMinimize,
       showLoginModal,
       dropdownVisible,
       isLoggedIn,
       currentUser,
-      navigation,
+      currentRoute,
       logout,
-  onLoginSuccess,
-  router,
-  appVersion
+      onLoginSuccess,
+      router,
+      appVersion
     };
   }
 }

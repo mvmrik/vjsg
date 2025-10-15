@@ -47,6 +47,16 @@
                 Настройки
               </c-nav-link>
             </c-nav-item>
+            <c-nav-item>
+              <c-nav-link
+                href="#logout-tab"
+                :active="activeTab === 'logout'"
+                @click="activeTab = 'logout'"
+              >
+                <c-icon name="cilAccountLogout" class="me-2" />
+                Изход
+              </c-nav-link>
+            </c-nav-item>
           </c-nav>
         </c-card-body>
       </c-card>
@@ -122,15 +132,6 @@
               </c-col>
             </c-row>
 
-            <c-row class="mb-3">
-              <c-col md="12">
-                <c-form-label>Дата на регистрация</c-form-label>
-                <c-form-input
-                  :value="formatDate(gameStore.user?.created_at)"
-                  readonly
-                />
-              </c-col>
-            </c-row>
           </c-form>
         </c-card-body>
       </c-card>
@@ -142,37 +143,34 @@
         </c-card-header>
         <c-card-body>
           <c-row>
-            <c-col sm="6" md="3" class="mb-3">
+            <c-col class="col-sm-6 col-md-3 mb-3">
               <c-card class="text-center">
                 <c-card-body>
-                  <c-icon name="cilStorage" size="2xl" class="text-primary mb-2" />
-                  <h4 class="mb-1">{{ gameStats.resources }}</h4>
-                  <p class="text-muted mb-0">Ресурси</p>
+                  <c-icon name="cilPeople" size="2xl" class="text-primary mb-2" />
+                  <h4 class="mb-1">{{ gameStats.people }}</h4>
+                  <p class="text-muted mb-0">Хора</p>
                 </c-card-body>
               </c-card>
             </c-col>
-            
-            <c-col sm="6" md="3" class="mb-3">
+            <c-col class="col-sm-6 col-md-3 mb-3">
               <c-card class="text-center">
                 <c-card-body>
-                  <c-icon name="cilStar" size="2xl" class="text-warning mb-2" />
-                  <h4 class="mb-1">{{ gameStats.level }}</h4>
-                  <p class="text-muted mb-0">Ниво</p>
+                  <c-icon name="cilBuilding" size="2xl" class="text-success mb-2" />
+                  <h4 class="mb-1">{{ gameStats.buildings }}</h4>
+                  <p class="text-muted mb-0">Обекти</p>
                 </c-card-body>
               </c-card>
             </c-col>
-            
-            <c-col sm="6" md="3" class="mb-3">
+            <c-col class="col-sm-6 col-md-3 mb-3">
               <c-card class="text-center">
                 <c-card-body>
-                  <c-icon name="cilChart" size="2xl" class="text-success mb-2" />
-                  <h4 class="mb-1">{{ gameStats.experience }}</h4>
-                  <p class="text-muted mb-0">Опит</p>
+                  <c-icon name="cilChart" size="2xl" class="text-warning mb-2" />
+                  <h4 class="mb-1">-</h4>
+                  <p class="text-muted mb-0">Ново</p>
                 </c-card-body>
               </c-card>
             </c-col>
-            
-            <c-col sm="6" md="3" class="mb-3">
+            <c-col class="col-sm-6 col-md-3 mb-3">
               <c-card class="text-center">
                 <c-card-body>
                   <c-icon name="cilMap" size="2xl" class="text-info mb-2" />
@@ -253,6 +251,26 @@
         </c-card-body>
       </c-card>
 
+      <!-- Logout Tab Content -->
+      <c-card v-show="activeTab === 'logout'">
+        <c-card-header>
+          <strong>Изход от системата</strong>
+        </c-card-header>
+        <c-card-body>
+          <div class="text-center">
+            <c-icon name="cilAccountLogout" size="4xl" class="text-warning mb-4" />
+            <h5 class="mb-3">Готови ли сте да излезете?</h5>
+            <p class="text-muted mb-4">
+              Ще бъдете пренасочени към началната страница. Можете да влезете отново по всяко време.
+            </p>
+            <c-button color="primary" size="lg" @click="logout()">
+              <c-icon name="cilAccountLogout" class="me-2" />
+              Излез от акаунта
+            </c-button>
+          </div>
+        </c-card-body>
+      </c-card>
+
       <!-- Success/Error Messages -->
       <c-alert
         v-if="message"
@@ -309,6 +327,8 @@ export default {
     });
 
     const gameStats = ref({
+      people: 2,
+      buildings: 0,
       resources: 1250,
       level: 15,
       experience: 3450,
@@ -359,11 +379,6 @@ export default {
       });
     };
 
-    const formatDate = (dateString) => {
-      if (!dateString) return 'N/A';
-      return new Date(dateString).toLocaleDateString('bg-BG');
-    };
-
     const updateProfile = () => {
       message.value = 'Профилът беше обновен успешно!';
       messageType.value = 'success';
@@ -385,6 +400,16 @@ export default {
         messageType.value = 'error';
       }
       confirmDelete.value = false;
+    };
+
+    const logout = async () => {
+      try {
+        await gameStore.logout();
+        router.push('/');
+      } catch (error) {
+        message.value = 'Грешка при изход';
+        messageType.value = 'error';
+      }
     };
     
     onMounted(() => {
@@ -420,10 +445,10 @@ export default {
       levelProgress,
       monthlyActivity,
       copyToClipboard,
-      formatDate,
       updateProfile,
       saveSettings,
-      deleteAccount
+      deleteAccount,
+      logout
     };
   }
 }

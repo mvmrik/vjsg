@@ -27,7 +27,7 @@ Route::get('/{any}', function () {
 })->where('any', '.*');
 
 // Authentication API routes
-Route::get('/profile', [AuthController::class, 'profile'])->name('profile');
+Route::get('/settings', [AuthController::class, 'profile'])->name('profile');
 // Authentication API routes
 Route::post('/register', [AuthController::class, 'register'])->name('register.submit');
 Route::post('/login', [AuthController::class, 'login'])->name('login.submit');
