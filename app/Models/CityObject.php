@@ -13,14 +13,14 @@ class CityObject extends Model
         'user_id',
         'parcel_id',
         'object_type',
-        'cells',
+        'x',
+        'y',
         'properties',
         'ready_at'
     ];
 
     protected $casts = [
-        'properties' => 'array',
-        'cells' => 'array'
+        'properties' => 'array'
     ];
 
     protected $dates = [

@@ -40,7 +40,7 @@ class CityController extends Controller
             if ($type) {
                 $baseSeconds = intval($type->build_time_minutes) * 60;
             } else {
-                $baseSeconds = isset($o->cells) && is_array($o->cells) ? count($o->cells) * 60 : 60;
+                $baseSeconds = 60; // fallback for single cell
             }
 
             // If object has workers info in properties, apply reduction
@@ -73,9 +73,8 @@ class CityController extends Controller
             'objects' => 'required|array',
             'objects.*.parcel_id' => 'required|integer',
             'objects.*.object_type' => 'required|string',
-            'objects.*.cells' => 'required|array',
-            'objects.*.cells.*.x' => 'required|integer|min:0|max:9',
-            'objects.*.cells.*.y' => 'required|integer|min:0|max:9'
+            'objects.*.x' => 'required|integer|min:0|max:9',
+            'objects.*.y' => 'required|integer|min:0|max:9'
         ]);
 
         // Get the parcel_id from the first object (all objects should be for the same parcel)
@@ -119,7 +118,8 @@ class CityController extends Controller
                 $existing = CityObject::where('user_id', $userId)->where('id', $objData['id'])->first();
                 if ($existing) {
                     $existing->object_type = $objData['object_type'];
-                    $existing->cells = $objData['cells'];
+                    $existing->x = $objData['x'];
+                    $existing->y = $objData['y'];
                     $existing->properties = $objData['properties'] ?? [];
                     $existing->save();
                     $objects[] = $existing;
@@ -139,14 +139,25 @@ class CityController extends Controller
                 $baseSeconds = intval($type->build_time_minutes) * 60;
 
                 // VALIDATION: Ensure cells are within grid bounds and not overlapping with existing objects
-                $cells = $objData['cells'];
-                foreach ($cells as $cell) {
-                    if ($cell['x'] < 0 || $cell['x'] > 9 || $cell['y'] < 0 || $cell['y'] > 9) {
-                        return response()->json([
-                            'success' => false, 
-                            'message' => 'Invalid cell coordinates: x and y must be between 0-9'
-                        ], 400);
-                    }
+                $x = $objData['x'];
+                $y = $objData['y'];
+                if ($x < 0 || $x > 9 || $y < 0 || $y > 9) {
+                    return response()->json([
+                        'success' => false, 
+                        'message' => 'Invalid cell coordinates: x and y must be between 0-9'
+                    ], 400);
+                }
+
+                // Check for overlap with existing objects on this parcel
+                $existing = CityObject::where('parcel_id', $parcelId)
+                    ->where('x', $x)
+                    ->where('y', $y)
+                    ->first();
+                if ($existing) {
+                    return response()->json([
+                        'success' => false, 
+                        'message' => 'Cell already occupied by another object'
+                    ], 400);
                 }
 
                 // Check for workers info sent in properties (level & count)
@@ -182,7 +193,8 @@ class CityController extends Controller
                     'user_id' => $userId,
                     'parcel_id' => $objData['parcel_id'],
                     'object_type' => $objData['object_type'],
-                    'cells' => $objData['cells'],
+                    'x' => $objData['x'],
+                    'y' => $objData['y'],
                     'properties' => $props,
                     'ready_at' => $readyAt
                 ]);
@@ -223,7 +235,7 @@ class CityController extends Controller
             if ($type) {
                 $baseSeconds = intval($type->build_time_minutes) * 60;
             } else {
-                $baseSeconds = isset($o->cells) && is_array($o->cells) ? count($o->cells) * 60 : 60;
+                $baseSeconds = 60; // single cell fallback
             }
 
             // Apply workers reduction if present

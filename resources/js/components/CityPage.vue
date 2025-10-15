@@ -172,9 +172,7 @@ export default {
     };
 
     const getTotalBuildSeconds = (obj) => {
-      if (obj.build_seconds) return obj.build_seconds;
-      if (obj.cells && Array.isArray(obj.cells)) return obj.cells.length * 60;
-      return 0;
+      return obj.build_seconds || 60;
     };
 
     const getReadyTimestamp = (obj) => {
@@ -237,16 +235,8 @@ export default {
     const isCellInObject = (cellIndex, obj) => {
       const cellX = (cellIndex - 1) % 10;
       const cellY = Math.floor((cellIndex - 1) / 10);
-      // If object has explicit cells array, check membership
-      if (obj.cells && Array.isArray(obj.cells)) {
-        return obj.cells.some(c => c.x === cellX && c.y === cellY);
-      }
-      // Backwards compatible: rectangle fields
-      if (obj.x != null && obj.width != null && obj.y != null && obj.height != null) {
-        return cellX >= obj.x && cellX < obj.x + obj.width &&
-               cellY >= obj.y && cellY < obj.y + obj.height;
-      }
-      return false;
+      // Check if object occupies this single cell
+      return obj.x === cellX && obj.y === cellY;
     };
 
     const getObjectIcon = (type) => {

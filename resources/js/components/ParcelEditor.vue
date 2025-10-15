@@ -309,42 +309,22 @@ export default {
     });
 
     const toggleCellSelection = (cellIndex) => {
+      // For single-cell buildings: only allow one cell selection
       if (selectedCells.value.has(cellIndex)) {
-        // Allow deselection of any selected cell
-        selectedCells.value.delete(cellIndex);
+        selectedCells.value.clear(); // Deselect if already selected
       } else {
-        // Check if this cell can be selected (must be adjacent to existing selection or first cell)
-        if (selectedCells.value.size === 0 || canSelectCell(cellIndex)) {
-          selectedCells.value.add(cellIndex);
-        }
+        selectedCells.value.clear(); // Clear any previous selection
+        selectedCells.value.add(cellIndex); // Select this cell
       }
-    };
-
-    const canSelectCell = (cellIndex) => {
-      if (selectedCells.value.has(cellIndex)) return false;
-
-      // Convert to 0-based coordinates
-      const x = (cellIndex - 1) % 10;
-      const y = Math.floor((cellIndex - 1) / 10);
-
-      // adjacent cell indices (convert back to 1-based index values)
-      const adjacentCells = [
-        (y - 1) * 10 + x + 1, // top
-        (y + 1) * 10 + x + 1, // bottom
-        y * 10 + (x - 1) + 1, // left
-        y * 10 + (x + 1) + 1  // right
-      ];
-
-      return adjacentCells.some(adj => selectedCells.value.has(adj));
-    };
-
-    const isCellSelected = (cellIndex) => {
-      return selectedCells.value.has(cellIndex);
     };
 
     const clearSelection = () => {
       selectedCells.value.clear();
       selectedObjectType.value = null;
+    };
+
+    const isCellSelected = (cellIndex) => {
+      return selectedCells.value.has(cellIndex);
     };
 
     // When user clicks Save and there is a selection, we open the modal and store selection bounds
@@ -354,13 +334,11 @@ export default {
 
     const confirmModalPlacement = async () => {
       if (selectedCells.value.size === 0 || !modalSelectedObjectType.value) return;
-      // Build a single object with explicit cells array to preserve arbitrary shape
-      const cellsArr = Array.from(selectedCells.value).map(cellIndex => {
-        return {
-          x: (cellIndex - 1) % 10,
-          y: Math.floor((cellIndex - 1) / 10)
-        };
-      });
+      
+      // Get single cell coordinates
+      const cellIndex = Array.from(selectedCells.value)[0];
+      const cellX = (cellIndex - 1) % 10;
+      const cellY = Math.floor((cellIndex - 1) / 10);
 
       const props = {};
       if (selectedWorkerLevel.value && selectedWorkerCount.value) {
@@ -370,7 +348,8 @@ export default {
       const newObj = {
         parcel_id: parcel.value.id,
         object_type: modalSelectedObjectType.value.type,
-        cells: cellsArr,
+        x: cellX,
+        y: cellY,
         properties: props
       };
       cityObjects.value.push(newObj);
@@ -421,43 +400,11 @@ export default {
       }
     };
 
-    const getSelectionBounds = () => {
-      if (selectedCells.value.size === 0) return null;
-
-      const cells = Array.from(selectedCells.value);
-      let minX = 10, minY = 10, maxX = 0, maxY = 0;
-
-      cells.forEach(cellIndex => {
-        const x = (cellIndex - 1) % 10;
-        const y = Math.floor((cellIndex - 1) / 10);
-        minX = Math.min(minX, x);
-        minY = Math.min(minY, y);
-        maxX = Math.max(maxX, x);
-        maxY = Math.max(maxY, y);
-      });
-
-      return {
-        minX,
-        minY,
-        maxX,
-        maxY,
-        width: maxX - minX + 1,
-        height: maxY - minY + 1
-      };
-    };
-
     const isCellInObject = (cellIndex, obj) => {
       const cellX = (cellIndex - 1) % 10;
       const cellY = Math.floor((cellIndex - 1) / 10);
 
-      if (obj.cells && Array.isArray(obj.cells)) {
-        return obj.cells.some(c => c.x === cellX && c.y === cellY);
-      }
-      if (obj.x != null && obj.width != null && obj.y != null && obj.height != null) {
-        return cellX >= obj.x && cellX < obj.x + obj.width &&
-               cellY >= obj.y && cellY < obj.y + obj.height;
-      }
-      return false;
+      return obj.x === cellX && obj.y === cellY;
     };
 
     const getObjectsForParcel = (parcelId) => {
@@ -482,8 +429,11 @@ export default {
       // No persistent debug message here - open modal or save directly
       // If user has a selection but hasn't chosen an object type yet, open modal to choose
       if (selectedCells.value.size > 0) {
-        const bounds = getSelectionBounds();
-        pendingSelectionBounds.value = bounds;
+        // Single cell selected - get x,y coordinates
+        const cellIndex = Array.from(selectedCells.value)[0];
+        const cellX = (cellIndex - 1) % 10;
+        const cellY = Math.floor((cellIndex - 1) / 10);
+        pendingSelectionBounds.value = { x: cellX, y: cellY };
         // Ensure object types and people are loaded from server when opening modal
         await Promise.all([fetchObjectTypes(), fetchPeople()]);
         // reset worker selection when opening modal
@@ -539,7 +489,7 @@ export default {
     };
 
     const getProgressPercent = (obj) => {
-      const totalSeconds = obj.build_seconds || (obj.cells ? obj.cells.length * 60 : 0);
+      const totalSeconds = obj.build_seconds || 60;
       if (!totalSeconds || !obj.ready_at) return 100;
       const ready = getReadyTimestamp(obj);
       if (!ready) return 100;
@@ -557,7 +507,7 @@ export default {
       }
       if (obj.created_at) {
         const created = Date.parse(obj.created_at);
-        const totalSeconds = obj.build_seconds || (obj.cells ? obj.cells.length * 60 : 0);
+        const totalSeconds = obj.build_seconds || 60;
         if (!isNaN(created) && totalSeconds) return created + totalSeconds * 1000;
       }
       return null;
@@ -611,14 +561,12 @@ export default {
       selectedCells,
       availableObjects,
       toggleCellSelection,
-      canSelectCell,
       isCellSelected,
       clearSelection,
     showObjectModal,
     modalSelectedObjectType,
     confirmModalPlacement,
     useFallbackModal,
-      getSelectionBounds,
       isCellInObject,
       getObjectsForParcel,
       selectObject,
