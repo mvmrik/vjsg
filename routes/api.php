@@ -47,4 +47,5 @@ Route::middleware(['game.auth'])->group(function () {
     Route::get('/city-objects', [CityController::class, 'index'])->name('api.city-objects.index');
     Route::post('/city-objects/save', [CityController::class, 'save'])->name('api.city-objects.save');
     Route::get('/object-types', [CityController::class, 'types'])->name('api.object-types.index');
+    Route::get('/people', [\App\Http\Controllers\PeopleController::class, 'index'])->name('api.people.index');
 });

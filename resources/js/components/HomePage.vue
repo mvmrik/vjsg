@@ -113,10 +113,13 @@
             <c-card-body class="pb-0 d-flex justify-content-between align-items-start">
               <div>
                 <div class="fs-4 fw-semibold">
-                  {{ gameStats.experience || 0 }}
-                  <span class="fs-6 ms-2 fw-normal">exp</span>
+                  {{ people.total || 0 }}
+                  <span class="fs-6 ms-2 fw-normal">популация</span>
                 </div>
-                <div>Опит</div>
+                <div>Хора (по нива)</div>
+                <div class="small text-white-50 mt-1" v-if="people.by_level">
+                  <span v-for="(count, lvl) in people.by_level" :key="lvl" class="me-2">LV {{ lvl }}: {{ count }}</span>
+                </div>
               </div>
               <c-dropdown>
                 <template #toggler="{ on }">
@@ -128,7 +131,7 @@
                     <c-icon name="cilOptions" />
                   </c-button>
                 </template>
-                <c-dropdown-item>Действие</c-dropdown-item>
+                <c-dropdown-item>Управление</c-dropdown-item>
               </c-dropdown>
             </c-card-body>
           </c-card>
@@ -368,6 +371,8 @@ export default {
       parcels: 3
     });
 
+    const people = ref({ total: 0, by_level: null, groups: [] });
+
     const recentActivity = ref([
       {
         id: 1,
@@ -464,8 +469,24 @@ export default {
       if (gameStore.isAuthenticated) {
         // Load real game stats here
         gameStore.checkAuthStatus();
+        // fetch people info
+        fetchPeople();
       }
     });
+
+    const fetchPeople = async () => {
+      try {
+        const res = await fetch('/api/people');
+        const data = await res.json();
+        if (data.success) {
+          people.value.total = data.total || 0;
+          people.value.by_level = data.by_level || {};
+          people.value.groups = data.groups || [];
+        }
+      } catch (e) {
+        console.error('Failed to fetch people', e);
+      }
+    };
     
     return {
       message,
@@ -475,6 +496,7 @@ export default {
       loginForm,
       registerForm,
       gameStats,
+      people,
       recentActivity,
       gameStore,
       showMessage,

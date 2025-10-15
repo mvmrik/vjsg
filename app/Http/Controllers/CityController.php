@@ -6,6 +6,8 @@ use Illuminate\Http\Request;
 use App\Models\CityObject;
 use Illuminate\Support\Facades\Session;
 use App\Models\ObjectType;
+use App\Models\Person;
+use App\Models\Parcel;
 
 class CityController extends Controller
 {
@@ -30,11 +32,20 @@ class CityController extends Controller
             $arr = $o->toArray();
             $type = $types[$o->object_type] ?? null;
             if ($type) {
-                $arr['build_seconds'] = intval($type->build_time_minutes) * 60;
+                $baseSeconds = intval($type->build_time_minutes) * 60;
             } else {
-                // fallback: 1 minute per cell
-                $arr['build_seconds'] = isset($o->cells) && is_array($o->cells) ? count($o->cells) * 60 : 60;
+                $baseSeconds = isset($o->cells) && is_array($o->cells) ? count($o->cells) * 60 : 60;
             }
+
+            // If object has workers info in properties, apply reduction
+            $workers = $o->properties['workers'] ?? null;
+            if ($workers && isset($workers['level']) && isset($workers['count'])) {
+                $reductionSeconds = intval($workers['level']) * intval($workers['count']) * 60;
+                $finalSeconds = max(60, $baseSeconds - $reductionSeconds);
+            } else {
+                $finalSeconds = $baseSeconds;
+            }
+            $arr['build_seconds'] = $finalSeconds;
             return $arr;
         });
 
@@ -65,6 +76,15 @@ class CityController extends Controller
         $parcelId = $request->objects[0]['parcel_id'] ?? null;
         if (!$parcelId) {
             return response()->json(['success' => false, 'message' => 'Invalid parcel_id'], 400);
+        }
+
+        // VALIDATION: Verify parcel belongs to current user
+        $parcel = Parcel::where('id', $parcelId)->where('user_id', $userId)->first();
+        if (!$parcel) {
+            return response()->json([
+                'success' => false, 
+                'message' => 'Access denied: Parcel does not belong to you'
+            ], 403);
         }
 
         // Determine which incoming objects have IDs (existing) vs new
@@ -101,13 +121,55 @@ class CityController extends Controller
             } else {
                 // New object: compute ready_at based on object type table (minutes)
                 $type = ObjectType::where('type', $objData['object_type'])->first();
-                if ($type) {
-                    $buildSeconds = intval($type->build_time_minutes) * 60;
-                } else {
-                    // fallback: 1 minute per cell
-                    $cellsCount = isset($objData['cells']) && is_array($objData['cells']) ? count($objData['cells']) : 1;
-                    $buildSeconds = $cellsCount * 60;
+                
+                // VALIDATION: Ensure object type exists in database
+                if (!$type) {
+                    return response()->json([
+                        'success' => false, 
+                        'message' => 'Invalid object type: ' . $objData['object_type']
+                    ], 400);
                 }
+                
+                $baseSeconds = intval($type->build_time_minutes) * 60;
+
+                // VALIDATION: Ensure cells are within grid bounds and not overlapping with existing objects
+                $cells = $objData['cells'];
+                foreach ($cells as $cell) {
+                    if ($cell['x'] < 0 || $cell['x'] > 9 || $cell['y'] < 0 || $cell['y'] > 9) {
+                        return response()->json([
+                            'success' => false, 
+                            'message' => 'Invalid cell coordinates: x and y must be between 0-9'
+                        ], 400);
+                    }
+                }
+
+                // Check for workers info sent in properties (level & count)
+                $props = $objData['properties'] ?? [];
+                $workers = $props['workers'] ?? null;
+                
+                // VALIDATION: Verify user actually has the claimed workers
+                if ($workers && isset($workers['level']) && isset($workers['count'])) {
+                    $level = intval($workers['level']);
+                    $count = intval($workers['count']);
+                    
+                    // Query people table to verify user has this many workers at this level
+                    $personGroup = Person::where('user_id', $userId)
+                        ->where('level', $level)
+                        ->first();
+                    
+                    if (!$personGroup || $personGroup->count < $count) {
+                        return response()->json([
+                            'success' => false, 
+                            'message' => 'Invalid workers: You do not have ' . $count . ' workers at level ' . $level
+                        ], 400);
+                    }
+                    
+                    $reductionSeconds = $level * $count * 60;
+                    $buildSeconds = max(60, $baseSeconds - $reductionSeconds);
+                } else {
+                    $buildSeconds = $baseSeconds;
+                }
+
                 $readyAt = now()->addSeconds($buildSeconds);
 
                 $created = CityObject::create([
@@ -115,7 +177,7 @@ class CityController extends Controller
                     'parcel_id' => $objData['parcel_id'],
                     'object_type' => $objData['object_type'],
                     'cells' => $objData['cells'],
-                    'properties' => $objData['properties'] ?? [],
+                    'properties' => $props,
                     'ready_at' => $readyAt
                 ]);
                 $arr = $created->toArray();
@@ -142,10 +204,20 @@ class CityController extends Controller
             $arr = $o->toArray();
             $type = $types[$o->object_type] ?? null;
             if ($type) {
-                $arr['build_seconds'] = intval($type->build_time_minutes) * 60;
+                $baseSeconds = intval($type->build_time_minutes) * 60;
             } else {
-                $arr['build_seconds'] = isset($o->cells) && is_array($o->cells) ? count($o->cells) * 60 : 60;
+                $baseSeconds = isset($o->cells) && is_array($o->cells) ? count($o->cells) * 60 : 60;
             }
+
+            // Apply workers reduction if present
+            $workers = $o->properties['workers'] ?? null;
+            if ($workers && isset($workers['level']) && isset($workers['count'])) {
+                $reductionSeconds = intval($workers['level']) * intval($workers['count']) * 60;
+                $finalSeconds = max(60, $baseSeconds - $reductionSeconds);
+            } else {
+                $finalSeconds = $baseSeconds;
+            }
+            $arr['build_seconds'] = $finalSeconds;
             return $arr;
         });
 

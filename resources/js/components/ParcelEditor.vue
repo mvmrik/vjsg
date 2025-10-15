@@ -97,10 +97,27 @@
         <c-modal-title>Изберете тип обект</c-modal-title>
       </c-modal-header>
       <c-modal-body>
+        <div class="mb-3 d-flex gap-2">
+          <div>
+            <label class="form-label small mb-1">Ниво на работниците</label>
+            <select class="form-select" v-model="selectedWorkerLevel">
+              <option :value="null">(без работници)</option>
+              <option v-for="(count, lvl) in people.by_level" :key="lvl" :value="lvl">LV {{ lvl }} ({{ count }})</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label small mb-1">Брой работници</label>
+            <select class="form-select" v-model.number="selectedWorkerCount">
+              <option :value="0">0</option>
+              <option v-for="n in availableCountsForLevel(selectedWorkerLevel)" :key="n" :value="n">{{ n }}</option>
+            </select>
+          </div>
+        </div>
+
         <div class="object-palette d-flex flex-column">
           <div
             v-for="objType in availableObjects"
-            :key="objType.type"
+            :key="objType.type + '-' + selectedWorkerLevel + '-' + selectedWorkerCount"
             class="palette-object p-2 d-flex justify-content-between align-items-center"
             :class="{ selected: modalSelectedObjectType?.type === objType.type }"
             style="cursor: pointer;"
@@ -111,7 +128,10 @@
               <div>{{ objType.name }}</div>
             </div>
             <div class="d-flex align-items-center gap-2">
-              <div class="text-muted small">{{ objType.build_time_minutes }}m</div>
+                <div class="d-flex flex-column align-items-end">
+                <div class="text-muted small">{{ objType.build_time_minutes }}m</div>
+                <div class="text-success small fw-bold">{{ displayedTimes[objType.type] || objType.build_time_minutes }}m</div>
+              </div>
               <c-icon v-if="modalSelectedObjectType?.type === objType.type" name="cilCheck" class="text-primary" />
             </div>
           </div>
@@ -119,7 +139,11 @@
       </c-modal-body>
       <c-modal-footer>
         <c-button color="secondary" @click="(modalSelectedObjectType = null, showObjectModal = false)">Откажи</c-button>
-        <c-button color="primary" :disabled="!modalSelectedObjectType" @click="confirmModalPlacement">
+        <c-button 
+          color="primary" 
+          :disabled="!modalSelectedObjectType || !selectedWorkerLevel || selectedWorkerCount === 0" 
+          @click="confirmModalPlacement"
+        >
           Потвърди
         </c-button>
       </c-modal-footer>
@@ -129,10 +153,27 @@
     <div v-if="showObjectModal && useFallbackModal" class="fallback-backdrop" @click.self="(modalSelectedObjectType = null, showObjectModal = false)">
       <div class="fallback-modal">
         <h5>Изберете тип обект</h5>
+        <div class="mb-3 d-flex gap-2">
+          <div>
+            <label class="form-label small mb-1">Ниво на работниците</label>
+            <select class="form-select" v-model="selectedWorkerLevel">
+              <option :value="null">(без работници)</option>
+              <option v-for="(count, lvl) in people.by_level" :key="lvl + '-fb'" :value="lvl">LV {{ lvl }} ({{ count }})</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label small mb-1">Брой работници</label>
+            <select class="form-select" v-model.number="selectedWorkerCount">
+              <option :value="0">0</option>
+              <option v-for="n in availableCountsForLevel(selectedWorkerLevel)" :key="'fb-' + n" :value="n">{{ n }}</option>
+            </select>
+          </div>
+        </div>
+
         <div class="object-palette d-flex flex-column mt-2">
           <div
             v-for="objType in availableObjects"
-            :key="objType.type + '-fb'"
+            :key="objType.type + '-fb-' + selectedWorkerLevel + '-' + selectedWorkerCount"
             class="palette-object p-2 d-flex justify-content-between align-items-center"
             :class="{ selected: modalSelectedObjectType?.type === objType.type }"
             style="cursor: pointer;"
@@ -143,15 +184,24 @@
               <div>{{ objType.name }}</div>
             </div>
             <div class="d-flex align-items-center gap-2">
-              <div class="text-muted small">{{ objType.build_time_minutes }}m</div>
+                <div class="d-flex flex-column align-items-end">
+                <div class="text-muted small">{{ objType.build_time_minutes }}m</div>
+                <div class="text-success small fw-bold">{{ displayedTimes[objType.type] || objType.build_time_minutes }}m</div>
+              </div>
               <c-icon v-if="modalSelectedObjectType?.type === objType.type" name="cilCheck" class="text-primary" />
             </div>
           </div>
-        
         </div>
         <div class="d-flex justify-content-end gap-2 mt-3">
           <c-button color="secondary" size="sm" @click="(modalSelectedObjectType = null, showObjectModal = false)">Откажи</c-button>
-          <c-button color="primary" size="sm" :disabled="!modalSelectedObjectType" @click="confirmModalPlacement">Потвърди</c-button>
+          <c-button 
+            color="primary" 
+            size="sm" 
+            :disabled="!modalSelectedObjectType || !selectedWorkerLevel || selectedWorkerCount === 0" 
+            @click="confirmModalPlacement"
+          >
+            Потвърди
+          </c-button>
         </div>
       </div>
     </div>
@@ -189,11 +239,74 @@ export default {
     });
 
     const availableObjects = ref([]);
+    const people = ref({ total: 0, by_level: {}, groups: [] });
+    const selectedWorkerLevel = ref(null);
+    const selectedWorkerCount = ref(0);
+    const displayedTimes = ref({});
 
     const getObjectIcon = (type) => {
       const obj = availableObjects.value.find(o => o.type === type);
       return obj ? obj.icon : 'cilQuestion';
     };
+
+    const fetchPeople = async () => {
+      try {
+        const res = await axios.get('/api/people');
+        if (res.data.success) {
+          people.value.total = res.data.total || 0;
+          people.value.by_level = res.data.by_level || {};
+          people.value.groups = res.data.groups || [];
+        }
+      } catch (e) {
+        console.error('Failed to fetch people', e);
+      }
+    };
+
+    const availableCountsForLevel = (level) => {
+      const count = people.value.by_level?.[level] || 0;
+      const arr = [];
+      for (let i = 1; i <= count; i++) arr.push(i);
+      return arr;
+    };
+
+    const updateDisplayedTimes = () => {
+      const lvl = selectedWorkerLevel.value ? parseInt(selectedWorkerLevel.value) : 0;
+      const cnt = selectedWorkerCount.value ? parseInt(selectedWorkerCount.value) : 0;
+      const newTimes = {};
+      availableObjects.value.forEach(o => {
+        const base = o.build_time_minutes || 1;
+        if (lvl > 0 && cnt > 0) {
+          const reduction = lvl * cnt;
+          newTimes[o.type] = Math.max(1, base - reduction);
+        } else {
+          newTimes[o.type] = base;
+        }
+      });
+      displayedTimes.value = newTimes;
+    };
+
+    const getAdjustedTime = computed(() => {
+      return (objType) => {
+        const base = objType.build_time_minutes || 1;
+        const lvl = selectedWorkerLevel.value ? parseInt(selectedWorkerLevel.value) : 0;
+        const cnt = selectedWorkerCount.value ? parseInt(selectedWorkerCount.value) : 0;
+        if (lvl > 0 && cnt > 0) {
+          const reduction = lvl * cnt;
+          return Math.max(1, base - reduction);
+        }
+        return base;
+      };
+    });
+
+    // when level changes, reset selected count (avoid stale selection)
+    watch(selectedWorkerLevel, (newVal, oldVal) => {
+      selectedWorkerCount.value = 0;
+      updateDisplayedTimes();
+    });
+
+    watch(selectedWorkerCount, () => {
+      updateDisplayedTimes();
+    });
 
     const toggleCellSelection = (cellIndex) => {
       if (selectedCells.value.has(cellIndex)) {
@@ -249,11 +362,16 @@ export default {
         };
       });
 
+      const props = {};
+      if (selectedWorkerLevel.value && selectedWorkerCount.value) {
+        props.workers = { level: parseInt(selectedWorkerLevel.value), count: parseInt(selectedWorkerCount.value) };
+      }
+
       const newObj = {
         parcel_id: parcel.value.id,
         object_type: modalSelectedObjectType.value.type,
         cells: cellsArr,
-        properties: {}
+        properties: props
       };
       cityObjects.value.push(newObj);
 
@@ -364,14 +482,14 @@ export default {
       // No persistent debug message here - open modal or save directly
       // If user has a selection but hasn't chosen an object type yet, open modal to choose
       if (selectedCells.value.size > 0) {
-        // debug: log selection and bounds
-        const sel = Array.from(selectedCells.value);
-        console.log('saveChanges: selectedCells=', sel);
         const bounds = getSelectionBounds();
-        console.log('saveChanges: selectionBounds=', bounds);
         pendingSelectionBounds.value = bounds;
-        // Ensure object types are loaded from server when opening modal
-        await fetchObjectTypes();
+        // Ensure object types and people are loaded from server when opening modal
+        await Promise.all([fetchObjectTypes(), fetchPeople()]);
+        // reset worker selection when opening modal
+        selectedWorkerLevel.value = null;
+        selectedWorkerCount.value = 0;
+        updateDisplayedTimes();
         showObjectModal.value = true;
         return;
       }
@@ -511,6 +629,13 @@ export default {
       getProgressPercent,
       getRemainingTimeText,
       isBuilding
+      ,
+      people,
+      selectedWorkerLevel,
+      selectedWorkerCount,
+      availableCountsForLevel,
+      getAdjustedTime,
+      displayedTimes
     };
   }
 }
