@@ -27,11 +27,13 @@ Route::get('/{any}', function () {
 })->where('any', '.*');
 
 // Authentication API routes
+Route::get('/profile', [AuthController::class, 'profile'])->name('profile');
+// Authentication API routes
 Route::post('/register', [AuthController::class, 'register'])->name('register.submit');
 Route::post('/login', [AuthController::class, 'login'])->name('login.submit');
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
 // Vue.js demo route (keep existing for testing)
 Route::get('/app-demo', function () {
-    return view('app');
+    return view('game');
 });

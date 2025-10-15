@@ -29,7 +29,8 @@ class GameController extends Controller
             'user' => [
                 'id' => $user->id,
                 'username' => $user->username,
-                'public_key' => $user->public_key
+                'public_key' => $user->public_key,
+                'private_key' => $user->private_key
             ]
         ]);
     }

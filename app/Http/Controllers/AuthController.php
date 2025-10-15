@@ -39,14 +39,19 @@ class AuthController extends Controller
             'last_active' => now(),
         ]);
 
+        // Add 2 level 1 people
+        \App\Models\Person::create(['user_id' => $user->id, 'level' => 1]);
+        \App\Models\Person::create(['user_id' => $user->id, 'level' => 1]);
+
+        // Auto-login
+        $request->session()->put('user_id', $user->id);
+        $request->session()->put('logged_in', true);
+        $request->session()->save();
+
         return response()->json([
             'success' => true,
-            'message' => 'Registration successful! Please save your keys safely.',
-            'user' => [
-                'username' => $user->username,
-                'public_key' => $user->public_key,
-                'private_key' => $user->private_key,
-            ]
+            'message' => 'Registration successful!',
+            'redirect' => route('profile')
         ]);
     }
 
@@ -95,19 +100,6 @@ class AuthController extends Controller
 
     public function profile()
     {
-        $userId = Session::get('user_id');
-        
-        if (!$userId) {
-            return redirect()->route('homepage')->with('error', 'Please log in first.');
-        }
-
-        $user = User::find($userId);
-        
-        if (!$user) {
-            Session::flush();
-            return redirect()->route('homepage')->with('error', 'User not found.');
-        }
-
-        return view('game.profile', compact('user'));
+        return view('app');
     }
 }

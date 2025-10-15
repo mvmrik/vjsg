@@ -442,21 +442,10 @@ export default {
       message.value = '';
 
       try {
-        const result = await gameStore.register(registerForm.value.username);
-        showMessage(
-          `✅ ${result.message}<br><br>
-          <strong>📱 Вашите ключове:</strong><br>
-          <strong>Публичен:</strong> ${result.user.public_key}<br>
-          <strong>Частен:</strong> ${result.user.private_key}<br><br>
-          ⚠️ <strong>ВАЖНО:</strong> Запазете частния ключ сигурно - нужен е за влизане!`, 
-          'success'
-        );
+        await gameStore.register(registerForm.value.username);
+        // Registration successful, navigate to profile
         registerForm.value.username = '';
-        
-        // Auto switch to login tab after successful registration
-        setTimeout(() => {
-          activeAuthTab.value = 'login';
-        }, 3000);
+        await router.push('/profile');
       } catch (error) {
         showMessage(gameStore.error || 'Грешка при регистрация', 'error');
       } finally {

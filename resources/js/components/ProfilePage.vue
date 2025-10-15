@@ -69,6 +69,31 @@
               </c-col>
             </c-row>
 
+            <c-row class="mb-3" v-if="gameStore.user?.private_key">
+              <c-col md="12">
+                <c-form-label>Частен ключ</c-form-label>
+                <c-input-group>
+                  <c-form-input
+                    :value="showPrivateKey ? gameStore.user.private_key : '•'.repeat(64)"
+                    readonly
+                    class="font-monospace"
+                  />
+                  <c-button
+                    type="button"
+                    color="outline-secondary"
+                    @click="showPrivateKey ? copyToClipboard(gameStore.user.private_key) : (showPrivateKey = true)"
+                  >
+                    <span v-if="!showPrivateKey">👁</span>
+                    <c-icon v-else name="cilCopy" />
+                  </c-button>
+                </c-input-group>
+                <c-form-text class="text-danger">
+                  <c-icon name="cilWarning" class="me-1" />
+                  ВНИМАНИЕ: Никога не споделяйте частния си ключ! Той е нужен за влизане в системата.
+                </c-form-text>
+              </c-col>
+            </c-row>
+
             <c-row class="mb-3" v-if="gameStore.user?.public_key">
               <c-col md="12">
                 <c-form-label>Публичен ключ</c-form-label>
@@ -93,38 +118,6 @@
                     class="me-1"
                   />
                   {{ copied ? 'Копирано в clipboard!' : 'Публичният ключ може да се споделя безопасно.' }}
-                </c-form-text>
-              </c-col>
-            </c-row>
-
-            <c-row class="mb-3" v-if="gameStore.user?.private_key">
-              <c-col md="12">
-                <c-form-label>Частен ключ</c-form-label>
-                <c-input-group>
-                  <c-form-input
-                    :value="showPrivateKey ? gameStore.user.private_key : '•'.repeat(64)"
-                    readonly
-                    class="font-monospace"
-                  />
-                  <c-button
-                    type="button"
-                    :color="showPrivateKey ? 'warning' : 'outline-secondary'"
-                    @click="showPrivateKey = !showPrivateKey"
-                  >
-                    <c-icon :name="showPrivateKey ? 'cilEyeSlash' : 'cilEye'" />
-                  </c-button>
-                  <c-button
-                    type="button"
-                    color="outline-secondary"
-                    @click="copyToClipboard(gameStore.user.private_key)"
-                    v-if="showPrivateKey"
-                  >
-                    <c-icon name="cilCopy" />
-                  </c-button>
-                </c-input-group>
-                <c-form-text class="text-danger">
-                  <c-icon name="cilWarning" class="me-1" />
-                  ВНИМАНИЕ: Никога не споделяйте частния си ключ! Той е нужен за влизане в системата.
                 </c-form-text>
               </c-col>
             </c-row>

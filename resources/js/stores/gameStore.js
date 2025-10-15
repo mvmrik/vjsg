@@ -24,6 +24,10 @@ export const useGameStore = defineStore('auth', {
         const response = await axios.post('/register', { username });
         
         if (response.data.success) {
+          // Auto-login after registration
+          this.isAuthenticated = true;
+          localStorage.setItem('game_logged_in', 'true');
+          await this.fetchUserData();
           return response.data;
         } else {
           throw new Error(response.data.message);

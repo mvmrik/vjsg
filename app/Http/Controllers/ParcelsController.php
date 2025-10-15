@@ -51,10 +51,12 @@ class ParcelsController extends Controller
             // First parcel at (0,0)
             \Log::info("First parcel for user {$userId}");
         } else {
-            // Check if within ~12m of any existing parcel
+            // Find the closest adjacent parcel
             $adjacent = Parcel::where('user_id', $userId)
-                ->whereRaw("ABS(lat - ?) <= 0.00015", [$lat]) // ~15m
-                ->whereRaw("ABS(lng - ?) <= 0.00015", [$lng])
+                ->selectRaw("*, ABS(lat - ?) + ABS(lng - ?) as distance", [$lat, $lng])
+                ->havingRaw("ABS(lat - ?) <= 0.00015", [$lat])
+                ->havingRaw("ABS(lng - ?) <= 0.00015", [$lng])
+                ->orderBy('distance')
                 ->first();
 
             if ($adjacent) {
@@ -67,15 +69,19 @@ class ParcelsController extends Controller
                 $latMeters = $latDiff * 111000;
                 $lngMeters = $lngDiff * 111000 * cos(deg2rad($adjacent->lat));
 
-                // Determine direction (threshold: 5 meters)
+                \Log::info("Lat diff: {$latDiff}, Lng diff: {$lngDiff}, Lat meters: {$latMeters}, Lng meters: {$lngMeters}");
+
+                // Determine direction - prioritize the axis with larger absolute difference
                 if (abs($latMeters) > abs($lngMeters)) {
-                    // North/South
+                    // North/South dominates
                     $cityX = $adjacent->city_x;
                     $cityY = $adjacent->city_y + ($latMeters > 0 ? 1 : -1);
+                    \Log::info("Direction: N/S, new city: ({$cityX}, {$cityY})");
                 } else {
-                    // East/West
+                    // East/West dominates (or equal)
                     $cityX = $adjacent->city_x + ($lngMeters > 0 ? 1 : -1);
                     $cityY = $adjacent->city_y;
+                    \Log::info("Direction: E/W, new city: ({$cityX}, {$cityY})");
                 }
 
                 // Check if position is already taken
