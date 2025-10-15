@@ -6,16 +6,11 @@
           <c-card>
             <c-card-header>
               <div class="d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">
+                <h5 class="card-title mb-0">
                   <c-icon name="cilCity" class="me-2" />
                   Редактиране на парцел
                 </h5>
                 <div class="d-flex gap-2">
-                  <c-button color="success" size="sm" @click="saveChanges" :disabled="loading">
-                    <c-spinner v-if="loading" size="sm" class="me-1" />
-                    <c-icon v-else name="cilSave" class="me-1" />
-                    Запази
-                  </c-button>
                   <c-button color="secondary" @click="goBackToCity">
                     <c-icon name="cilArrowLeft" class="me-1" />
                     Обратно към града
@@ -37,7 +32,6 @@
                       v-for="i in 100"
                       :key="i"
                       class="large-grid-cell"
-                      :class="{ 'cell-selected': isCellSelected(i) }"
                       @click="toggleCellSelection(i)"
                     >
                       <!-- Show placed objects -->
@@ -63,14 +57,8 @@
                   <div class="mt-3">
                     <p class="text-muted small">
                       <c-icon name="cilInfo" class="me-1" />
-                      Маркирайте клетки в мрежата, след това натиснете "Запази" и ще изберете типа обект в изскачащ прозорец.
+                      Кликнете върху празна клетка в мрежата, за да изберете тип обект.
                     </p>
-                    <div class="d-flex gap-2 mt-2">
-                      <c-button color="secondary" size="sm" @click="clearSelection">
-                        <c-icon name="cilX" class="me-1" />
-                        Изчисти селекцията
-                      </c-button>
-                    </div>
                   </div>
                 </div>
               </div>
@@ -227,7 +215,6 @@ export default {
     const cityObjects = ref([]);
     const selectedObject = ref(null);
     const selectedObjectType = ref(null);
-    const selectedCells = ref(new Set());
   const showObjectModal = ref(false);
   const pendingSelectionBounds = ref(null);
     const modalSelectedObjectType = ref(null);
@@ -308,14 +295,29 @@ export default {
       updateDisplayedTimes();
     });
 
-    const toggleCellSelection = (cellIndex) => {
-      // For single-cell buildings: only allow one cell selection
-      if (selectedCells.value.has(cellIndex)) {
-        selectedCells.value.clear(); // Deselect if already selected
-      } else {
-        selectedCells.value.clear(); // Clear any previous selection
-        selectedCells.value.add(cellIndex); // Select this cell
+    const toggleCellSelection = async (cellIndex) => {
+      // For single-cell buildings: directly open modal for this cell
+      const cellX = (cellIndex - 1) % 10;
+      const cellY = Math.floor((cellIndex - 1) / 10);
+      
+      // Check if cell is already occupied
+      const existingObject = cityObjects.value.find(obj => 
+        obj.parcel_id === parcel.value.id && obj.x === cellX && obj.y === cellY
+      );
+      
+      if (existingObject) {
+        // If occupied, select the object instead
+        selectObject(existingObject);
+        return;
       }
+      
+      // Open modal for building on this cell
+      pendingSelectionBounds.value = { x: cellX, y: cellY };
+      await Promise.all([fetchObjectTypes(), fetchPeople()]);
+      selectedWorkerLevel.value = null;
+      selectedWorkerCount.value = 0;
+      updateDisplayedTimes();
+      showObjectModal.value = true;
     };
 
     const clearSelection = () => {
@@ -333,12 +335,10 @@ export default {
     };
 
     const confirmModalPlacement = async () => {
-      if (selectedCells.value.size === 0 || !modalSelectedObjectType.value) return;
+      if (!pendingSelectionBounds.value || !modalSelectedObjectType.value) return;
       
-      // Get single cell coordinates
-      const cellIndex = Array.from(selectedCells.value)[0];
-      const cellX = (cellIndex - 1) % 10;
-      const cellY = Math.floor((cellIndex - 1) / 10);
+      const cellX = pendingSelectionBounds.value.x;
+      const cellY = pendingSelectionBounds.value.y;
 
       const props = {};
       if (selectedWorkerLevel.value && selectedWorkerCount.value) {
@@ -358,7 +358,6 @@ export default {
       modalSelectedObjectType.value = null;
       showObjectModal.value = false;
       pendingSelectionBounds.value = null;
-      clearSelection();
 
       // Submit the new object to server so it is persisted and returns with ids
       await submitSave();
@@ -414,7 +413,6 @@ export default {
     const selectObject = (obj) => {
       selectedObject.value = obj;
       selectedObjectType.value = null;
-      clearSelection();
     };
 
     const removeObject = (obj) => {
@@ -423,29 +421,6 @@ export default {
         cityObjects.value.splice(index, 1);
       }
       selectedObject.value = null;
-    };
-
-    const saveChanges = async () => {
-      // No persistent debug message here - open modal or save directly
-      // If user has a selection but hasn't chosen an object type yet, open modal to choose
-      if (selectedCells.value.size > 0) {
-        // Single cell selected - get x,y coordinates
-        const cellIndex = Array.from(selectedCells.value)[0];
-        const cellX = (cellIndex - 1) % 10;
-        const cellY = Math.floor((cellIndex - 1) / 10);
-        pendingSelectionBounds.value = { x: cellX, y: cellY };
-        // Ensure object types and people are loaded from server when opening modal
-        await Promise.all([fetchObjectTypes(), fetchPeople()]);
-        // reset worker selection when opening modal
-        selectedWorkerLevel.value = null;
-        selectedWorkerCount.value = 0;
-        updateDisplayedTimes();
-        showObjectModal.value = true;
-        return;
-      }
-
-      // Otherwise, submit current cityObjects to server
-      await submitSave();
     };
 
     const goBackToCity = () => {
@@ -558,11 +533,8 @@ export default {
       parcel,
       cityObjects,
       selectedObject,
-      selectedCells,
       availableObjects,
       toggleCellSelection,
-      isCellSelected,
-      clearSelection,
     showObjectModal,
     modalSelectedObjectType,
     confirmModalPlacement,
@@ -571,7 +543,6 @@ export default {
       getObjectsForParcel,
       selectObject,
       removeObject,
-      saveChanges,
       goBackToCity,
       getObjectIcon,
       getProgressPercent,
@@ -635,11 +606,6 @@ export default {
 
 .large-grid-cell:hover {
   background: rgba(0, 123, 255, 0.1);
-}
-
-.large-grid-cell.cell-selected {
-  background: rgba(0, 123, 255, 0.3) !important;
-  border-color: #007bff;
 }
 
 .placed-object-large {
