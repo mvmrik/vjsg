@@ -13,6 +13,7 @@ class CityObject extends Model
         'user_id',
         'parcel_id',
         'object_type',
+        'level',
         'x',
         'y',
         'properties',

@@ -213,7 +213,6 @@ export default {
     const message = ref('');
     const messageType = ref('');
     const cityObjects = ref([]);
-    const selectedObject = ref(null);
     const selectedObjectType = ref(null);
   const showObjectModal = ref(false);
   const pendingSelectionBounds = ref(null);
@@ -411,8 +410,16 @@ export default {
     };
 
     const selectObject = (obj) => {
-      selectedObject.value = obj;
-      selectedObjectType.value = null;
+      try {
+        console.log('selectObject called with obj:', obj);
+        console.log('parcelId.value:', parcelId.value);
+        const url = `/city/${parcelId.value}/object/${obj.id}`;
+        console.log('navigating to:', url);
+        router.push(url);
+        console.log('navigation successful');
+      } catch (error) {
+        console.error('Error in selectObject:', error);
+      }
     };
 
     const removeObject = (obj) => {
@@ -532,7 +539,6 @@ export default {
       messageType,
       parcel,
       cityObjects,
-      selectedObject,
       availableObjects,
       toggleCellSelection,
     showObjectModal,

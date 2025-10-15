@@ -193,6 +193,7 @@ class CityController extends Controller
                     'user_id' => $userId,
                     'parcel_id' => $objData['parcel_id'],
                     'object_type' => $objData['object_type'],
+                    'level' => 1,
                     'x' => $objData['x'],
                     'y' => $objData['y'],
                     'properties' => $props,
@@ -270,5 +271,70 @@ class CityController extends Controller
 
         $types = ObjectType::orderBy('type')->get();
         return response()->json(['success' => true, 'types' => $types]);
+    }
+
+    /**
+     * Upgrade object level
+     */
+    public function upgrade(Request $request)
+    {
+        $userId = Session::get('user_id');
+        if (!$userId) {
+            return response()->json(['success' => false, 'message' => 'Not authenticated'], 401);
+        }
+
+        $objectId = $request->input('object_id');
+        $workerLevel = $request->input('worker_level');
+        $workerCount = $request->input('worker_count');
+
+        if (!$objectId || $workerLevel === null || $workerLevel < 0 || !$workerCount || $workerCount < 0) {
+            return response()->json(['success' => false, 'message' => 'Invalid parameters'], 400);
+        }
+
+        $object = CityObject::where('id', $objectId)->where('user_id', $userId)->first();
+        if (!$object) {
+            return response()->json(['success' => false, 'message' => 'Object not found'], 404);
+        }
+
+        // Check if object is already being upgraded/built
+        if ($object->ready_at) {
+            return response()->json(['success' => false, 'message' => 'Object is already being upgraded'], 400);
+        }
+
+        // Calculate upgrade time (same as build time of the object type)
+        $objectType = ObjectType::where('type', $object->object_type)->first();
+        $baseMinutes = $objectType ? $objectType->build_time_minutes : 10;
+        $reduction = intval($workerLevel) * intval($workerCount);
+        $finalMinutes = max(1, $baseMinutes - $reduction);
+
+        // Update object properties to increase level
+        $properties = $object->properties ?? [];
+        $properties['workers'] = [
+            'level' => $workerLevel,
+            'count' => $workerCount
+        ];
+        
+        $object->level = ($object->level ?? 1) + 1;
+        $object->properties = $properties;
+
+        $object->properties = $properties;
+        $object->ready_at = now()->addMinutes($finalMinutes);
+        $object->save();
+
+        // Create occupied workers record
+        OccupiedWorker::create([
+            'user_id' => $userId,
+            'level' => intval($workerLevel),
+            'count' => intval($workerCount),
+            'occupied_until' => $object->ready_at,
+            'city_object_id' => $object->id
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Upgrade started successfully',
+            'ready_at' => $object->ready_at,
+            'upgrade_time_minutes' => $finalMinutes
+        ]);
     }
 }

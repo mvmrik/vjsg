@@ -17,6 +17,7 @@ import MapPage from './components/MapPage.vue';
 import InventoryPage from './components/InventoryPage.vue';
 import CityPage from './components/CityPage.vue';
 import ParcelEditor from './components/ParcelEditor.vue';
+import ObjectEditor from './components/ObjectEditor.vue';
 
 // Setup axios defaults
 axios.defaults.baseURL = window.location.origin;
@@ -30,6 +31,7 @@ const routes = [
   { path: '/map', name: 'map', component: MapPage, meta: { requiresAuth: true } },
   { path: '/city', name: 'city', component: CityPage, meta: { requiresAuth: true } },
   { path: '/city/:parcelId', name: 'parcel-editor', component: ParcelEditor, meta: { requiresAuth: true } },
+  { path: '/city/:parcelId/object/:objectId', name: 'object-editor', component: ObjectEditor, meta: { requiresAuth: true } },
   { path: '/settings', name: 'settings', component: ProfilePage, meta: { requiresAuth: true } },
   { path: '/inventory', name: 'inventory', component: InventoryPage, meta: { requiresAuth: true } }
 ];
