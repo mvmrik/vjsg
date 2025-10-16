@@ -43,6 +43,7 @@ Route::get('/translations/{locale}', function ($locale) {
         'city' => __('city', [], $locale),
         'home' => __('home', [], $locale),
         'map' => __('map', [], $locale),
+        'notifications' => __('notifications', [], $locale),
     ];
     
     return response()->json($translations);
@@ -69,4 +70,15 @@ Route::middleware(['game.auth'])->group(function () {
     Route::post('/city-objects/upgrade', [CityController::class, 'upgrade'])->name('api.city-objects.upgrade');
     Route::get('/object-types', [CityController::class, 'types'])->name('api.object-types.index');
     Route::get('/people', [\App\Http\Controllers\PeopleController::class, 'index'])->name('api.people.index');
+});
+
+use App\Http\Controllers\NotificationsController;
+
+Route::middleware(['game.auth'])->group(function () {
+    Route::get('/notifications', [NotificationsController::class, 'index'])->name('api.notifications.index');
+    Route::get('/notifications/unread-count', [NotificationsController::class, 'unreadCount'])->name('api.notifications.unread-count');
+    Route::get('/notifications/{id}', [NotificationsController::class, 'show'])->name('api.notifications.show');
+    Route::patch('/notifications/{id}/read', [NotificationsController::class, 'markAsRead'])->name('api.notifications.mark-read');
+    Route::patch('/notifications/mark-all-read', [NotificationsController::class, 'markAllAsRead'])->name('api.notifications.mark-all-read');
+    Route::patch('/notifications/{id}/confirm', [NotificationsController::class, 'confirm'])->name('api.notifications.confirm');
 });

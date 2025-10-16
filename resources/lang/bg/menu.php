@@ -6,6 +6,7 @@ return [
     'map' => 'Карта',
     'city' => 'Град',
     'inventory' => 'Инвентар',
+    'notifications' => 'Известия',
     'settings' => 'Настройки',
     'user' => 'Потребител',
 ];

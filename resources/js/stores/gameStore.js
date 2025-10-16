@@ -128,7 +128,7 @@ export const useGameStore = defineStore('auth', {
 
 
 
-    checkAuthStatus() {
+    async checkAuthStatus() {
       // Check cookies first (remember me)
       const cookies = document.cookie.split(';').reduce((acc, cookie) => {
         const [key, value] = cookie.trim().split('=');
@@ -138,12 +138,14 @@ export const useGameStore = defineStore('auth', {
       
       if (cookies.game_logged_in === 'true' && cookies.game_private_key) {
         // Auto-login with remembered private key
-        this.login(cookies.game_private_key, true).catch(error => {
+        try {
+          await this.login(cookies.game_private_key, true);
+        } catch (error) {
           console.error('Auto-login failed:', error);
           // Clear invalid cookies
           document.cookie = 'game_logged_in=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
           document.cookie = 'game_private_key=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-        });
+        }
         return;
       }
       
@@ -151,7 +153,7 @@ export const useGameStore = defineStore('auth', {
       const isLoggedIn = localStorage.getItem('game_logged_in') === 'true';
       if (isLoggedIn) {
         this.isAuthenticated = true;
-        this.fetchUserData();
+        await this.fetchUserData();
       }
     }
   }

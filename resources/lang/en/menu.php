@@ -6,6 +6,7 @@ return [
     'map' => 'Map',
     'city' => 'City',
     'inventory' => 'Inventory',
+    'notifications' => 'Notifications',
     'settings' => 'Settings',
     'user' => 'User',
 ];

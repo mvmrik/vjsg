@@ -20,6 +20,7 @@ import InventoryPage from './components/InventoryPage.vue';
 import CityPage from './components/CityPage.vue';
 import ParcelEditor from './components/ParcelEditor.vue';
 import ObjectEditor from './components/ObjectEditor.vue';
+import NotificationsPage from './components/NotificationsPage.vue';
 
 // Setup axios defaults
 axios.defaults.baseURL = window.location.origin;
@@ -34,6 +35,7 @@ const routes = [
   { path: '/city', name: 'city', component: CityPage, meta: { requiresAuth: true } },
   { path: '/city/:parcelId', name: 'parcel-editor', component: ParcelEditor, meta: { requiresAuth: true } },
   { path: '/city/:parcelId/object/:objectId', name: 'object-editor', component: ObjectEditor, meta: { requiresAuth: true } },
+  { path: '/notifications', name: 'notifications', component: NotificationsPage, meta: { requiresAuth: true } },
   { path: '/settings', name: 'settings', component: ProfilePage, meta: { requiresAuth: true } },
   { path: '/inventory', name: 'inventory', component: InventoryPage, meta: { requiresAuth: true } }
 ];
@@ -85,9 +87,25 @@ fetch('/api/translations/bg')
   .catch(err => console.error('Failed to load BG translations:', err));
 
 const translate = computed(() => (key) => {
-  const [section, actualKey] = key.split('.');
+  const keys = key.split('.');
+  const section = keys[0];
   const currentTranslations = translations[currentLocale.value];
-  return currentTranslations?.[section]?.[actualKey] || key;
+  
+  if (!currentTranslations || !currentTranslations[section]) {
+    return key;
+  }
+  
+  // Navigate through nested keys
+  let result = currentTranslations[section];
+  for (let i = 1; i < keys.length; i++) {
+    if (result && typeof result === 'object' && keys[i] in result) {
+      result = result[keys[i]];
+    } else {
+      return key;
+    }
+  }
+  
+  return result || key;
 });
 
 // Function to change language

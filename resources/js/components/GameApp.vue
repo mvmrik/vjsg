@@ -15,6 +15,13 @@
                 <c-icon name="cilMap" size="xl" class="mb-1" />
                 <small>{{ $t('menu.city') }}</small>
               </a>
+              <a @click="$router.push('/notifications')" :class="['text-decoration-none d-flex flex-column align-items-center p-2 rounded position-relative', currentRoute === '/notifications' ? 'bg-light text-dark' : 'text-white']" style="cursor: pointer;">
+                <c-icon name="cilBell" size="xl" class="mb-1" />
+                <small>{{ $t('menu.notifications') }}</small>
+                <c-badge v-if="unreadNotifications > 0" color="danger" class="position-absolute top-0 start-100 translate-middle rounded-pill">
+                  {{ unreadNotifications }}
+                </c-badge>
+              </a>
               <a @click="$router.push('/settings')" :class="['text-decoration-none d-flex flex-column align-items-center p-2 rounded', currentRoute === '/settings' ? 'bg-light text-dark' : 'text-white']" style="cursor: pointer;">
                 <c-icon name="cilSettings" size="xl" class="mb-1" />
                 <small>{{ $t('menu.settings') }}</small>
@@ -84,6 +91,7 @@ export default {
     const showLoginModal = ref(false);
     const dropdownVisible = ref(false);
     const appVersion = '0.5.0';
+    const unreadNotifications = ref(0);
 
     const currentUser = computed(() => gameStore.user);
     const isLoggedIn = computed(() => gameStore.isAuthenticated);
@@ -124,6 +132,16 @@ export default {
       },
       {
         _name: 'CSidebarNavItem',
+        name: 'Известия',
+        to: '/notifications',
+        icon: 'cilBell',
+        badge: unreadNotifications.value > 0 ? {
+          color: 'danger',
+          text: unreadNotifications.value
+        } : undefined
+      },
+      {
+        _name: 'CSidebarNavItem',
         name: 'Настройки',
         to: '/settings',
         icon: 'cilUser'
@@ -154,8 +172,24 @@ export default {
       }
     };
 
-    onMounted(() => {
-      gameStore.checkAuthStatus();
+    const fetchUnreadNotifications = async () => {
+      if (!isLoggedIn.value) return;
+
+      try {
+        const response = await fetch('/api/notifications/unread-count');
+        const data = await response.json();
+
+        if (data.success) {
+          unreadNotifications.value = data.count;
+        }
+      } catch (error) {
+        console.error('Failed to fetch unread notifications:', error);
+      }
+    };
+
+    onMounted(async () => {
+      await gameStore.checkAuthStatus();
+      await fetchUnreadNotifications();
       document.addEventListener('click', closeDropdown);
     });
 
@@ -169,6 +203,7 @@ export default {
       isLoggedIn,
       currentUser,
       currentRoute,
+      unreadNotifications,
       logout,
       onLoginSuccess,
       router,
