@@ -8,12 +8,12 @@
               <div class="d-flex justify-content-between align-items-center">
                 <h5 class="card-title mb-0">
                   <c-icon name="cilBuilding" class="me-2" />
-                  Редактиране на обект
+                  {{ $t('city.object_editing') }}
                 </h5>
                 <div class="d-flex gap-2">
                   <c-button color="secondary" @click="goBackToParcel">
                     <c-icon name="cilArrowLeft" class="me-1" />
-                    Обратно към парцел
+                    {{ $t('city.back_to_parcel') }}
                   </c-button>
                 </div>
               </div>
@@ -21,7 +21,7 @@
             <c-card-body>
               <div v-if="loading" class="text-center">
                 <c-spinner />
-                <p>Зареждане...</p>
+                <p>{{ $t('city.loading') }}</p>
               </div>
 
               <div v-else-if="object" class="object-editor-content">
@@ -43,31 +43,31 @@
 
                 <!-- Object info -->
                 <div class="object-info mt-4">
-                  <h6>Информация за обекта</h6>
+                  <h6>{{ $t('city.object_info') }}</h6>
                   <div class="row">
                     <div class="col-md-6">
-                      <p class="mb-1"><strong>Тип:</strong> {{ getObjectTypeName(object.object_type) }}</p>
-                      <p class="mb-1"><strong>Ниво:</strong> {{ object.level || 1 }}</p>
+                      <p class="mb-1"><strong>{{ $t('city.type') }}:</strong> {{ getObjectTypeName(object.object_type) }}</p>
+                      <p class="mb-1"><strong>{{ $t('city.level') }}:</strong> {{ object.level || 1 }}</p>
                     </div>
                     <div class="col-md-6">
                       <p v-if="!object.ready_at || remainingTimeText === ''" class="mb-1">
-                        <strong>Статус:</strong> <span class="text-success">Готов</span>
+                        <strong>{{ $t('city.status') }}:</strong> <span class="text-success">{{ $t('city.ready') }}</span>
                       </p>
                       <p v-else class="mb-1">
-                        <strong>Статус:</strong> <span class="text-danger">В строеж</span> - {{ remainingTimeText }}
+                        <strong>{{ $t('city.status') }}:</strong> <span class="text-danger">{{ $t('city.building') }}</span> - {{ remainingTimeText }}
                       </p>
                     </div>
                   </div>
                   <!-- Show workers info if building -->
                   <div v-if="isBuilding(object) && buildingWorkers" class="mt-2 alert alert-info py-2">
                     <small>
-                      <strong>Работници:</strong> {{ buildingWorkers.count }} х Ниво {{ buildingWorkers.level }}
+                      <strong>{{ $t('city.workers') }}:</strong> {{ buildingWorkers.count }} х {{ $t('city.level') }} {{ buildingWorkers.level }}
                     </small>
                   </div>
                   <div class="mt-3" v-if="!isBuilding(object)">
                     <c-button color="primary" @click="showUpgradeModal = true">
                       <c-icon name="cilArrowTop" class="me-1" />
-                      Обновяване на ниво
+                      {{ $t('city.upgrade_level') }}
                     </c-button>
                   </div>
                 </div>
@@ -82,20 +82,20 @@
     <div v-if="showUpgradeModal" class="upgrade-modal-overlay" @click="showUpgradeModal = false">
       <div class="upgrade-modal-content" @click.stop>
         <div class="modal-header">
-          <h5>Обновяване на ниво</h5>
+          <h5>{{ $t('city.upgrade_level') }}</h5>
           <button type="button" class="btn-close" @click="showUpgradeModal = false"></button>
         </div>
         <div class="modal-body">
-          <p class="mb-3">Изберете работници за обновяване на нивото на обекта.</p>
+          <p class="mb-3">{{ $t('city.select_workers_upgrade') }}</p>
           <div class="d-flex gap-2 mb-3">
             <div>
-              <label class="form-label small mb-1">Ниво на работниците</label>
+              <label class="form-label small mb-1">{{ $t('city.worker_level') }}</label>
               <select class="form-select" v-model="upgradeWorkerLevel">
                 <option v-for="(count, lvl) in people.by_level" :key="lvl" :value="lvl">LV {{ lvl }} ({{ count }})</option>
               </select>
             </div>
             <div>
-              <label class="form-label small mb-1">Брой работници</label>
+              <label class="form-label small mb-1">{{ $t('city.worker_count') }}</label>
               <select class="form-select" v-model.number="upgradeWorkerCount">
                 <option :value="0">0</option>
                 <option v-for="n in availableCountsForLevel(upgradeWorkerLevel)" :key="n" :value="n">{{ n }}</option>
@@ -103,18 +103,18 @@
             </div>
           </div>
           <div v-if="upgradeWorkerLevel && upgradeWorkerCount" class="alert alert-info">
-            <strong>Време за обновяване:</strong> {{ upgradeTimeMinutes }} минути
+            <strong>{{ $t('city.upgrade_time') }}:</strong> {{ upgradeTimeMinutes }} {{ $t('city.minutes') }}
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" @click="showUpgradeModal = false">Откажи</button>
+          <button type="button" class="btn btn-secondary" @click="showUpgradeModal = false">{{ $t('city.cancel') }}</button>
           <button 
             type="button" 
             class="btn btn-primary" 
             :disabled="!upgradeWorkerLevel || !upgradeWorkerCount || upgradeWorkerCount <= 0"
             @click="startUpgrade"
           >
-            Започни обновяване
+            {{ $t('city.start_upgrade') }}
           </button>
         </div>
       </div>
@@ -123,7 +123,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, inject } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useGameStore } from '../stores/gameStore';
 import axios from 'axios';
@@ -134,6 +134,7 @@ export default {
     const route = useRoute();
     const router = useRouter();
     const gameStore = useGameStore();
+    const $t = inject('$t');
 
     const loading = ref(true);
     const cityObjects = ref([]);
@@ -164,7 +165,7 @@ export default {
 
     const getObjectTypeName = (type) => {
       const obj = availableObjects.value.find(o => o.type === type);
-      return obj ? obj.name : 'Непознат';
+      return obj ? obj.name : $t('city.unknown');
     };
 
     const isBuilding = (obj) => {
@@ -343,7 +344,8 @@ export default {
       isBuilding,
       remainingTimeText,
       availableCountsForLevel,
-      startUpgrade
+      startUpgrade,
+      $t
     };
   }
 }

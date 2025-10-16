@@ -5,6 +5,8 @@ namespace App\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
+use App\Models\User;
+use Illuminate\Support\Facades\App;
 
 class CheckGameAuth
 {
@@ -25,6 +27,15 @@ class CheckGameAuth
                 return response()->json(['success' => false, 'message' => 'Not authenticated'], 401);
             }
             return response()->json(['success' => false, 'message' => 'Not authenticated'], 401);
+        }
+
+        // Set locale based on user preference
+        $userId = $request->session()->get('user_id');
+        $user = User::find($userId);
+        if ($user && $user->locale) {
+            App::setLocale($user->locale);
+        } else {
+            App::setLocale('en'); // default
         }
         
         return $next($request);

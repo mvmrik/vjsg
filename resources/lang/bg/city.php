@@ -1,0 +1,46 @@
+<?php
+
+return [
+    // City page translations
+    'my_city' => 'Моят град',
+    'no_parcels' => 'Нямате парцели за показване.',
+    'house' => 'Къща',
+    'tree' => 'Дърво',
+    'well' => 'Кладенец',
+    'barn' => 'Хамбар',
+    'build_time' => 'Време за строеж',
+    'minutes' => 'минути',
+    'seconds' => 'секунди',
+    'building' => 'Строи се',
+    'ready' => 'Готово',
+
+    // Parcel editor translations
+    'parcel_editing' => 'Редактиране на парцел',
+    'back_to_city' => 'Обратно към града',
+    'loading' => 'Зареждане...',
+    'objects' => 'Обекти',
+    'click_to_select_object' => 'Кликнете върху празна клетка в мрежата, за да изберете тип обект.',
+    'select_object_type' => 'Изберете тип обект',
+    'worker_level' => 'Ниво на работниците',
+    'worker_count' => 'Брой работници',
+    'no_workers' => '(без работници)',
+    'cancel' => 'Откажи',
+    'confirm' => 'Потвърди',
+    'no_objects_to_save' => 'Няма обекти за запазване. Първо изберете тип обект и го поставете.',
+    'changes_saved' => 'Промените са запазени успешно!',
+    'save_error' => 'Грешка при запазване',
+    'level' => 'Ниво',
+
+    // Object editor translations
+    'object_editing' => 'Редактиране на обект',
+    'back_to_parcel' => 'Обратно към парцел',
+    'object_info' => 'Информация за обекта',
+    'type' => 'Тип',
+    'status' => 'Статус',
+    'workers' => 'Работници',
+    'upgrade_level' => 'Обновяване на ниво',
+    'select_workers_upgrade' => 'Изберете работници за обновяване на нивото на обекта.',
+    'upgrade_time' => 'Време за обновяване',
+    'start_upgrade' => 'Започни обновяване',
+    'unknown' => 'Непознат',
+];

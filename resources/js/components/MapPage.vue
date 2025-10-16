@@ -5,7 +5,7 @@
         <c-card-header class="d-flex justify-content-between align-items-center">
           <strong>
             <c-icon name="cilMap" class="me-2" />
-            Игрова карта
+            {{ $t('map.game_map') }}
           </strong>
           <div>
             <c-button 
@@ -16,7 +16,7 @@
               class="me-2"
             >
               <c-icon name="cilLocationPin" class="me-1" />
-              Моите парцели
+              {{ $t('map.my_parcels') }}
             </c-button>
             <c-button 
               color="success" 
@@ -26,7 +26,7 @@
             >
               <c-spinner v-if="loading" size="sm" class="me-1" />
               <c-icon v-else name="cilReload" class="me-1" />
-              Обнови
+              {{ $t('map.refresh') }}
             </c-button>
           </div>
         </c-card-header>
@@ -41,28 +41,28 @@
     <c-col md="4">
       <c-card class="mb-4">
         <c-card-header>
-          <strong>Статистики</strong>
+          <strong>{{ $t('map.statistics') }}</strong>
         </c-card-header>
         <c-card-body>
           <c-list-group flush>
             <c-list-group-item class="d-flex justify-content-between align-items-center">
               <span>
                 <c-icon name="cilHome" class="me-2 text-primary" />
-                Мои парцели
+                {{ $t('map.my_parcels') }}
               </span>
               <c-badge color="primary">{{ userParcels.length }}</c-badge>
             </c-list-group-item>
             <c-list-group-item class="d-flex justify-content-between align-items-center">
               <span>
                 <c-icon name="cilGlobeAlt" class="me-2 text-success" />
-                Общо парцели
+                {{ $t('map.total_parcels') }}
               </span>
               <c-badge color="success">{{ parcels.length }}</c-badge>
             </c-list-group-item>
             <c-list-group-item class="d-flex justify-content-between align-items-center">
               <span>
                 <c-icon name="cilUser" class="me-2 text-info" />
-                Активни играчи
+                {{ $t('map.active_players') }}
               </span>
               <c-badge color="info">{{ uniqueOwners }}</c-badge>
             </c-list-group-item>
@@ -74,21 +74,21 @@
     <c-col md="4">
       <c-card class="mb-4">
         <c-card-header>
-          <strong>Легенда</strong>
+          <strong>{{ $t('map.legend') }}</strong>
         </c-card-header>
         <c-card-body>
           <div class="mb-3">
             <div class="d-flex align-items-center mb-2">
               <div class="legend-color me-2" style="background: #059669;"></div>
-              <span>Вашите парцели</span>
+              <span>{{ $t('map.your_parcels') }}</span>
             </div>
             <div class="d-flex align-items-center mb-2">
               <div class="legend-color me-2" style="background: #dc2626;"></div>
-              <span>Чужди парцели</span>
+              <span>{{ $t('map.other_parcels') }}</span>
             </div>
             <div class="d-flex align-items-center mb-2">
               <div class="legend-color dashed me-2" style="border: 1px dashed #cccccc; background: rgba(204,204,204,0.1);"></div>
-              <span>Достъпни за заявяване</span>
+              <span>{{ $t('map.available_for_claim') }}</span>
             </div>
           </div>
         </c-card-body>
@@ -98,21 +98,21 @@
     <c-col md="4">
       <c-card class="mb-4">
         <c-card-header>
-          <strong>Инструкции</strong>
+          <strong>{{ $t('map.instructions') }}</strong>
         </c-card-header>
         <c-card-body>
           <ul class="mb-0 ps-3">
             <li v-if="!userParcels.length" class="mb-2">
-              <strong>Първи парцел:</strong> Щракнете където и да е на картата
+              <strong>{{ $t('map.first_parcel') }}</strong>
             </li>
             <li v-else class="mb-2">
-              <strong>Нови парцели:</strong> Щракнете на сивите пунктирани квадрати
+              <strong>{{ $t('map.new_parcels') }}</strong>
             </li>
             <li class="mb-2">
-              <strong>Информация:</strong> Щракнете на парцел за детайли
+              <strong>{{ $t('map.parcel_info') }}</strong>
             </li>
             <li class="mb-0">
-              <strong>Навигация:</strong> Използвайте колелцето за мащабиране
+              <strong>{{ $t('map.navigation') }}</strong>
             </li>
           </ul>
         </c-card-body>
@@ -134,7 +134,7 @@
 
 <script>
 import axios from 'axios';
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, inject } from 'vue';
 import { useGameStore } from '../stores/gameStore';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -147,6 +147,12 @@ export default {
     const message = ref('');
     const messageType = ref('');
     const gameStore = useGameStore();
+    
+    // Local translate function
+    const $t = (key) => {
+      const [section, actualKey] = key.split('.');
+      return window.translations[section]?.[actualKey] || key;
+    };
 
     const userParcels = computed(() => 
       parcels.value.filter(p => p.user_id === gameStore.user?.id)
@@ -182,7 +188,7 @@ export default {
           weight: 1,
           fillOpacity: 0.5
         }).addTo(map);
-        rect.bindPopup(`Parcel: ${parseFloat(parcel.lat)}, ${parseFloat(parcel.lng)}<br>Owner: ${parcel.user.username}`);
+        rect.bindPopup(`${$t('map.parcel')}: ${parseFloat(parcel.lat)}, ${parseFloat(parcel.lng)}<br>${$t('map.owner')}: ${parcel.user.username}`);
         territories.push(rect);
       });
 
@@ -275,16 +281,16 @@ export default {
         if (res.data.success) {
           await gameStore.fetchParcels(); // Update game store
           updateMap();
-          message.value = 'Парцелът беше заявен успешно!';
+          message.value = $t('map.parcel_claimed_successfully');
           messageType.value = 'success';
           // Center on user's parcels
           centerOnUserParcels();
         } else {
-          message.value = res.data.message || 'Неуспешно заявяване на парцел';
+          message.value = res.data.message || $t('map.claim_failed');
           messageType.value = 'error';
         }
       } catch (e) {
-        message.value = e.response?.data?.message || 'Грешка при заявяване';
+        message.value = e.response?.data?.message || $t('map.claim_error');
         messageType.value = 'error';
       } finally {
         loading.value = false;
@@ -313,7 +319,7 @@ export default {
       map.on('click', function(e) {
         const latlng = e.latlng;
         if (isClaimed(latlng.lat, latlng.lng)) {
-          alert('This area is already claimed');
+          alert($t('map.area_already_claimed'));
           return;
         }
         const userParcels = parcels.value.filter(p => p.user_id === gameStore.user?.id);

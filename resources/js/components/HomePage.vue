@@ -6,10 +6,9 @@
         <c-col md="8">
           <c-card class="mb-4">
             <c-card-body>
-              <h1 class="display-5 fw-bold text-primary">Добре дошли в Resource Legends!</h1>
+              <h1 class="display-5 fw-bold text-primary">{{ $t('home.welcome_title') }}</h1>
               <p class="lead">
-                Влезте в света на събиране на ресурси и стратегическо планиране. 
-                Започнете своето приключение днес!
+                {{ $t('home.welcome_description') }}
               </p>
               <div class="d-flex gap-2">
                 <c-button 
@@ -19,7 +18,7 @@
                   v-if="gameStore.isAuthenticated"
                 >
                   <c-icon name="cilMap" class="me-2" />
-                  Отиди на картата
+                  {{ $t('home.go_to_map') }}
                 </c-button>
                 <c-button 
                   color="success" 
@@ -28,7 +27,7 @@
                   v-if="gameStore.isAuthenticated"
                 >
                   <c-icon name="cilUser" class="me-2" />
-                  Моите настройки
+                  {{ $t('home.my_settings') }}
                 </c-button>
               </div>
             </c-card-body>
@@ -39,14 +38,14 @@
           <c-card class="h-100">
             <c-card-body class="d-flex flex-column justify-content-center text-center">
               <c-icon name="cilGamepad" size="3xl" class="text-primary mb-3" />
-              <h5>Игрови статус</h5>
+              <h5>{{ $t('home.game_status') }}</h5>
               <p v-if="gameStore.isAuthenticated" class="text-success">
                 <c-icon name="cilCheckCircle" class="me-1" />
-                Влязъл като {{ gameStore.user?.username }}
+                {{ $t('home.logged_in_as') }} {{ gameStore.user?.username }}
               </p>
               <p v-else class="text-muted">
                 <c-icon name="cilAccountLogout" class="me-1" />
-                Не сте влезли в системата
+                {{ $t('home.not_logged_in') }}
               </p>
             </c-card-body>
           </c-card>
@@ -339,7 +338,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, inject } from 'vue';
 import { useRouter } from 'vue-router';
 import { useGameStore } from '../stores/gameStore';
 
@@ -348,6 +347,7 @@ export default {
   setup() {
     const router = useRouter();
     const gameStore = useGameStore();
+    const $t = inject('$t');
     
     const message = ref('');
     const messageType = ref('');
@@ -491,7 +491,8 @@ export default {
       showMessage,
       collectResources,
       handleLogin,
-      handleRegister
+      handleRegister,
+      $t
     };
   }
 }

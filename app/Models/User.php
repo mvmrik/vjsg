@@ -22,6 +22,7 @@ class User extends Authenticatable
         'public_key',
         'private_key',
         'last_active',
+        'locale',
     ];
 
     /**

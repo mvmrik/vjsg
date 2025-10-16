@@ -8,16 +8,16 @@
           <div class="d-flex justify-content-center align-items-center">
             <nav class="d-flex gap-4">
               <a @click="$router.push('/map')" :class="['text-decoration-none d-flex flex-column align-items-center p-2 rounded', currentRoute === '/map' ? 'bg-light text-dark' : 'text-white']" style="cursor: pointer;">
-                <c-icon name="cilHome" size="2xl" class="mb-1" />
-                <small>Начало</small>
+                <c-icon name="cilHome" size="xl" class="mb-1" />
+                <small>{{ $t('menu.home') }}</small>
               </a>
               <a @click="$router.push('/city')" :class="['text-decoration-none d-flex flex-column align-items-center p-2 rounded', currentRoute.startsWith('/city') ? 'bg-light text-dark' : 'text-white']" style="cursor: pointer;">
-                <c-icon name="cilMap" size="2xl" class="mb-1" />
-                <small>Град</small>
+                <c-icon name="cilMap" size="xl" class="mb-1" />
+                <small>{{ $t('menu.city') }}</small>
               </a>
               <a @click="$router.push('/settings')" :class="['text-decoration-none d-flex flex-column align-items-center p-2 rounded', currentRoute === '/settings' ? 'bg-light text-dark' : 'text-white']" style="cursor: pointer;">
-                <c-icon name="cilSettings" size="2xl" class="mb-1" />
-                <small>Настройки</small>
+                <c-icon name="cilSettings" size="xl" class="mb-1" />
+                <small>{{ $t('menu.settings') }}</small>
               </a>
             </nav>
           </div>
@@ -39,7 +39,7 @@
               <span>&copy; {{ new Date().getFullYear() }} Resource Legends. Всички права запазени.</span>
             </div>
             <div class="ms-auto">
-              <span>Версия {{ appVersion }}</span>
+              <span>{{ $t('global.version') }} {{ appVersion }}</span>
             </div>
           </div>
         </c-footer>
@@ -64,11 +64,10 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, inject } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useGameStore } from '../stores/gameStore';
 import LoginForm from './LoginForm.vue';
-import appVersion from '../version';
 
 export default {
   name: 'GameApp',
@@ -79,10 +78,12 @@ export default {
     const gameStore = useGameStore();
     const router = useRouter();
     const route = useRoute();
+    const $t = inject('$t');
     const sidebarShow = ref(true);
     const sidebarMinimize = ref(false);
     const showLoginModal = ref(false);
     const dropdownVisible = ref(false);
+    const appVersion = '0.4.0';
 
     const currentUser = computed(() => gameStore.user);
     const isLoggedIn = computed(() => gameStore.isAuthenticated);
@@ -171,7 +172,8 @@ export default {
       logout,
       onLoginSuccess,
       router,
-      appVersion
+      appVersion,
+      $t
     };
   }
 }

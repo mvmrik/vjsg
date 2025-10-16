@@ -5,7 +5,7 @@
         <c-card-header>
           <strong>
             <c-icon name="cilCity" class="me-2" />
-            Моят град
+            {{ $t('city.my_city') }}
           </strong>
         </c-card-header>
         <c-card-body>
@@ -14,7 +14,7 @@
             <c-col md="12">
               <div class="city-container">
                 <div v-if="userParcels.length === 0" class="text-center py-5">
-                  <p>Нямате парцели за показване.</p>
+                  <p>{{ $t('city.no_parcels') }}</p>
                 </div>
                 <div v-else class="city-map" :style="{ height: cityMapHeight + 'px', width: cityMapWidth + 'px' }">
                   <div
@@ -67,7 +67,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, watch, onUnmounted } from 'vue';
+import { ref, computed, onMounted, watch, onUnmounted, inject } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useGameStore } from '../stores/gameStore';
 import axios from 'axios';
@@ -78,6 +78,7 @@ export default {
     const gameStore = useGameStore();
     const router = useRouter();
     const route = useRoute();
+    const $t = inject('$t');
     const loading = ref(false);
     const message = ref('');
     const messageType = ref('');
@@ -204,7 +205,7 @@ export default {
       const sec = Math.ceil(remainingMs / 1000);
       const m = Math.floor(sec / 60);
       const s = sec % 60;
-      return `${m}m ${s}s`;
+      return `${m}${m === 1 ? $t('city.minutes').slice(0, -1) : $t('city.minutes')} ${s}${s === 1 ? $t('city.seconds').slice(0, -1) : $t('city.seconds')}`;
     };
 
     const isBuilding = (obj) => {
@@ -234,10 +235,10 @@ export default {
 
     const getObjectIcon = (type) => {
       const availableObjects = [
-        { type: 'house', name: 'Къща', icon: 'cilHome' },
-        { type: 'tree', name: 'Дърво', icon: 'cilTree' },
-        { type: 'well', name: 'Кладенец', icon: 'cilDrop' },
-        { type: 'barn', name: 'Хамбар', icon: 'cilStorage' }
+        { type: 'house', name: $t('city.house'), icon: 'cilHome' },
+        { type: 'tree', name: $t('city.tree'), icon: 'cilTree' },
+        { type: 'well', name: $t('city.well'), icon: 'cilDrop' },
+        { type: 'barn', name: $t('city.barn'), icon: 'cilStorage' }
       ];
       const obj = availableObjects.find(o => o.type === type);
       return obj ? obj.icon : 'cilQuestion';
@@ -289,7 +290,8 @@ export default {
       getProgressPercent,
       getRemainingTimeText,
       getTotalBuildSeconds,
-      isBuilding
+      isBuilding,
+      $t
     };
   }
 }

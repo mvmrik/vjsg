@@ -1,5 +1,4 @@
-import './bootstrap';
-import { createApp } from 'vue';
+import { createApp, ref, computed } from 'vue';
 import { createRouter, createWebHistory } from 'vue-router';
 import { createPinia } from 'pinia';
 import axios from 'axios';
@@ -64,4 +63,15 @@ app.use(CoreuiVue);
 app.provide('icons', icons);
 app.component('CIcon', CIcon);
 app.config.globalProperties.$http = axios;
+
+// Add translations
+const currentLocale = ref(window.locale || 'en');
+const translate = computed(() => (key) => {
+  const [section, actualKey] = key.split('.');
+  return window.translations[section]?.[actualKey] || key;
+});
+
+app.config.globalProperties.$t = translate.value;
+app.provide('$t', translate.value);
+
 app.mount('#app');

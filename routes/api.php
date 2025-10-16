@@ -32,6 +32,7 @@ Route::get('/hello', function () {
 // User API routes (require authentication)
 Route::middleware(['game.auth'])->group(function () {
     Route::get('/user-data', [GameController::class, 'getUserData'])->name('api.user-data');
+    Route::post('/user-data', [GameController::class, 'updateUserData'])->name('api.user-data.update');
 });
 
 use App\Http\Controllers\ParcelsController;

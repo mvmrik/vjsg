@@ -8,12 +8,12 @@
               <div class="d-flex justify-content-between align-items-center">
                 <h5 class="card-title mb-0">
                   <c-icon name="cilCity" class="me-2" />
-                  Редактиране на парцел
+                  {{ $t('city.parcel_editing') }}
                 </h5>
                 <div class="d-flex gap-2">
                   <c-button color="secondary" @click="goBackToCity">
                     <c-icon name="cilArrowLeft" class="me-1" />
-                    Обратно към града
+                    {{ $t('city.back_to_city') }}
                   </c-button>
                 </div>
               </div>
@@ -21,7 +21,7 @@
             <c-card-body>
               <div v-if="loading" class="text-center">
                 <c-spinner />
-                <p>Зареждане...</p>
+                <p>{{ $t('city.loading') }}</p>
               </div>
 
               <div v-else-if="parcel" class="parcel-editor-content">
@@ -51,7 +51,7 @@
                           {{ getRemainingTimeText(obj) }}
                         </div>
                         <div v-else class="object-info-badge d-none d-md-flex level-badge">
-                          Ниво {{ obj.level || 1 }}
+                          {{ $t('city.level') }} {{ obj.level || 1 }}
                         </div>
                       </div>
                     </div>
@@ -60,11 +60,11 @@
 
                 <!-- Object selection moved to modal: keep selection instructions -->
                 <div class="editor-palette">
-                  <h6>Обекти</h6>
+                  <h6>{{ $t('city.objects') }}</h6>
                   <div class="mt-3">
                     <p class="text-muted small">
                       <c-icon name="cilInfo" class="me-1" />
-                      Кликнете върху празна клетка в мрежата, за да изберете тип обект.
+                      {{ $t('city.click_to_select_object') }}
                     </p>
                   </div>
                 </div>
@@ -89,19 +89,19 @@
   <!-- Object type chooser modal -->
   <c-modal v-model="showObjectModal" size="lg">
       <c-modal-header>
-        <c-modal-title>Изберете тип обект</c-modal-title>
+        <c-modal-title>{{ $t('city.select_object_type') }}</c-modal-title>
       </c-modal-header>
       <c-modal-body>
         <div class="mb-3 d-flex gap-2">
           <div>
-            <label class="form-label small mb-1">Ниво на работниците</label>
+            <label class="form-label small mb-1">{{ $t('city.worker_level') }}</label>
             <select class="form-select" v-model="selectedWorkerLevel">
-              <option :value="null">(без работници)</option>
+              <option :value="null">{{ $t('city.no_workers') }}</option>
               <option v-for="(count, lvl) in people.by_level" :key="lvl" :value="lvl">LV {{ lvl }} ({{ count }})</option>
             </select>
           </div>
           <div>
-            <label class="form-label small mb-1">Брой работници</label>
+            <label class="form-label small mb-1">{{ $t('city.worker_count') }}</label>
             <select class="form-select" v-model.number="selectedWorkerCount">
               <option :value="0">0</option>
               <option v-for="n in availableCountsForLevel(selectedWorkerLevel)" :key="n" :value="n">{{ n }}</option>
@@ -133,13 +133,13 @@
         </div>
       </c-modal-body>
       <c-modal-footer>
-        <c-button color="secondary" @click="(modalSelectedObjectType = null, showObjectModal = false)">Откажи</c-button>
+        <c-button color="secondary" @click="(modalSelectedObjectType = null, showObjectModal = false)">{{ $t('city.cancel') }}</c-button>
         <c-button 
           color="primary" 
           :disabled="!modalSelectedObjectType || !selectedWorkerLevel || selectedWorkerCount === 0" 
           @click="confirmModalPlacement"
         >
-          Потвърди
+          {{ $t('city.confirm') }}
         </c-button>
       </c-modal-footer>
     </c-modal>
@@ -147,17 +147,17 @@
     <!-- Fallback modal (simple overlay) -->
     <div v-if="showObjectModal && useFallbackModal" class="fallback-backdrop" @click.self="(modalSelectedObjectType = null, showObjectModal = false)">
       <div class="fallback-modal">
-        <h5>Изберете тип обект</h5>
+        <h5>{{ $t('city.select_object_type') }}</h5>
         <div class="mb-3 d-flex gap-2">
           <div>
-            <label class="form-label small mb-1">Ниво на работниците</label>
+            <label class="form-label small mb-1">{{ $t('city.worker_level') }}</label>
             <select class="form-select" v-model="selectedWorkerLevel">
-              <option :value="null">(без работници)</option>
+              <option :value="null">{{ $t('city.no_workers') }}</option>
               <option v-for="(count, lvl) in people.by_level" :key="lvl + '-fb'" :value="lvl">LV {{ lvl }} ({{ count }})</option>
             </select>
           </div>
           <div>
-            <label class="form-label small mb-1">Брой работници</label>
+            <label class="form-label small mb-1">{{ $t('city.worker_count') }}</label>
             <select class="form-select" v-model.number="selectedWorkerCount">
               <option :value="0">0</option>
               <option v-for="n in availableCountsForLevel(selectedWorkerLevel)" :key="'fb-' + n" :value="n">{{ n }}</option>
@@ -188,14 +188,14 @@
           </div>
         </div>
         <div class="d-flex justify-content-end gap-2 mt-3">
-          <c-button color="secondary" size="sm" @click="(modalSelectedObjectType = null, showObjectModal = false)">Откажи</c-button>
+          <c-button color="secondary" size="sm" @click="(modalSelectedObjectType = null, showObjectModal = false)">{{ $t('city.cancel') }}</c-button>
           <c-button 
             color="primary" 
             size="sm" 
             :disabled="!modalSelectedObjectType || !selectedWorkerLevel || selectedWorkerCount === 0" 
             @click="confirmModalPlacement"
           >
-            Потвърди
+            {{ $t('city.confirm') }}
           </c-button>
         </div>
       </div>
@@ -204,7 +204,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, watch, onUnmounted } from 'vue';
+import { ref, computed, onMounted, watch, onUnmounted, inject } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useGameStore } from '../stores/gameStore';
 import axios from 'axios';
@@ -215,6 +215,7 @@ export default {
     const route = useRoute();
     const router = useRouter();
     const gameStore = useGameStore();
+    const $t = inject('$t');
 
     const loading = ref(true);
     const message = ref('');
@@ -378,7 +379,7 @@ export default {
 
     const submitSave = async () => {
       if (cityObjects.value.length === 0) {
-        message.value = 'Няма обекти за запазване. Първо изберете тип обект и го поставете.';
+        message.value = $t('city.no_objects_to_save');
         messageType.value = 'warning';
         return;
       }
@@ -393,11 +394,11 @@ export default {
         if (res.data.success) {
           // Backend already handles clearing expired ready_at
           cityObjects.value = res.data.objects;
-          message.value = 'Промените са запазени успешно!';
+          message.value = $t('city.changes_saved');
           messageType.value = 'success';
         }
       } catch (e) {
-        message.value = 'Грешка при запазване';
+        message.value = $t('city.save_error');
         messageType.value = 'error';
         console.error('Save error:', e.response?.data);
       } finally {
@@ -555,7 +556,8 @@ export default {
       selectedWorkerCount,
       availableCountsForLevel,
       getAdjustedTime,
-      displayedTimes
+      displayedTimes,
+      $t
     };
   }
 }
