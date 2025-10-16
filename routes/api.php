@@ -29,6 +29,25 @@ Route::get('/hello', function () {
     ]);
 });
 
+// Translations API
+Route::get('/translations/{locale}', function ($locale) {
+    $validLocales = ['en', 'bg'];
+    if (!in_array($locale, $validLocales)) {
+        return response()->json(['error' => 'Invalid locale'], 400);
+    }
+    
+    $translations = [
+        'global' => __('global', [], $locale),
+        'settings' => __('settings', [], $locale),
+        'menu' => __('menu', [], $locale),
+        'city' => __('city', [], $locale),
+        'home' => __('home', [], $locale),
+        'map' => __('map', [], $locale),
+    ];
+    
+    return response()->json($translations);
+});
+
 // User API routes (require authentication)
 Route::middleware(['game.auth'])->group(function () {
     Route::get('/user-data', [GameController::class, 'getUserData'])->name('api.user-data');

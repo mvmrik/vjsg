@@ -1,6 +1,28 @@
 <template>
   <c-row class="justify-content-center">
     <c-col md="12">
+      <!-- Language Selector -->
+      <div class="d-flex justify-content-end mb-3">
+        <div class="btn-group" role="group">
+          <button 
+            type="button" 
+            class="btn btn-outline-primary btn-sm px-2"
+            :class="{ active: currentLocale === 'en' }"
+            @click="changeLanguage('en')"
+          >
+            <span class="fi fi-us"></span>
+          </button>
+          <button 
+            type="button" 
+            class="btn btn-outline-primary btn-sm px-2"
+            :class="{ active: currentLocale === 'bg' }"
+            @click="changeLanguage('bg')"
+          >
+            <span class="fi fi-bg"></span>
+          </button>
+        </div>
+      </div>
+
       <!-- Welcome Section -->
       <c-row class="mb-4">
         <c-col md="8">
@@ -219,8 +241,8 @@
           <c-card>
             <c-card-body class="text-center py-4">
               <c-icon name="cilUser" size="3xl" class="text-muted mb-3" />
-              <h4>Влезте в системата</h4>
-              <p class="text-muted mb-4">За да започнете играта, моля влезте в системата или се регистрирайте.</p>
+              <h4>{{ $t('home.login_prompt') }}</h4>
+              <p class="text-muted mb-4">{{ $t('home.login_prompt') }}</p>
               
               <!-- Tab Navigation -->
               <c-nav variant="tabs" role="tablist" class="mb-4 justify-content-center">
@@ -231,7 +253,7 @@
                     class="cursor-pointer"
                   >
                     <c-icon name="cilAccountLogout" class="me-2" />
-                    Вход
+                    {{ $t('home.login') }}
                   </c-nav-link>
                 </c-nav-item>
                 <c-nav-item>
@@ -241,7 +263,7 @@
                     class="cursor-pointer"
                   >
                     <c-icon name="cilUserPlus" class="me-2" />
-                    Регистрация
+                    {{ $t('home.register') }}
                   </c-nav-link>
                 </c-nav-item>
               </c-nav>
@@ -255,16 +277,28 @@
                     </c-input-group-text>
                     <c-form-input
                       v-model="loginForm.privateKey"
-                      placeholder="Частен ключ (64 символа)"
+                      :placeholder="$t('home.private_key_placeholder')"
                       type="text"
                       maxlength="64"
                       required
                     />
                   </c-input-group>
                   
+                  <div class="form-check mb-3">
+                    <input 
+                      class="form-check-input" 
+                      type="checkbox" 
+                      id="rememberMeHome" 
+                      v-model="loginForm.rememberMe"
+                    >
+                    <label class="form-check-label" for="rememberMeHome">
+                      {{ $t('global.remember_me') }}
+                    </label>
+                  </div>
+                  
                   <c-form-text class="mb-3 text-muted">
                     <c-icon name="cilInfo" class="me-1" />
-                    Въведете вашия 64-символен частен ключ за вход в системата
+                    {{ $t('home.private_key_help') }}
                   </c-form-text>
 
                   <c-button
@@ -278,7 +312,7 @@
                       size="sm"
                       class="me-2"
                     />
-                    {{ loading ? 'Влизане...' : 'Влез' }}
+                    {{ loading ? $t('home.logging_in') : $t('home.login_button') }}
                   </c-button>
                 </c-form>
               </div>
@@ -292,7 +326,7 @@
                     </c-input-group-text>
                     <c-form-input
                       v-model="registerForm.username"
-                      placeholder="Потребителско име"
+                      :placeholder="$t('home.username_placeholder')"
                       required
                       :minlength="3"
                     />
@@ -300,7 +334,7 @@
                   
                   <c-form-text class="mb-3 text-muted">
                     <c-icon name="cilInfo" class="me-1" />
-                    Минимум 3 символа за потребителско име
+                    {{ $t('home.username_help') }}
                   </c-form-text>
 
                   <c-button
@@ -314,7 +348,7 @@
                       size="sm"
                       class="me-2"
                     />
-                    {{ loading ? 'Регистрация...' : 'Създай акаунт' }}
+                    {{ loading ? $t('home.registering') : $t('home.register_button') }}
                   </c-button>
                 </c-form>
               </div>
@@ -348,6 +382,8 @@ export default {
     const router = useRouter();
     const gameStore = useGameStore();
     const $t = inject('$t');
+    const $changeLanguage = inject('$changeLanguage');
+    const currentLocale = inject('currentLocale');
     
     const message = ref('');
     const messageType = ref('');
@@ -355,7 +391,8 @@ export default {
     const activeAuthTab = ref('login'); // Default to login tab
 
     const loginForm = ref({
-      privateKey: ''
+      privateKey: '',
+      rememberMe: false
     });
 
     const registerForm = ref({
@@ -428,7 +465,7 @@ export default {
       message.value = '';
 
       try {
-        await gameStore.login(loginForm.value.privateKey);
+        await gameStore.login(loginForm.value.privateKey, loginForm.value.rememberMe);
         // Login successful, redirect to map
         await router.push('/map');
       } catch (error) {
@@ -476,6 +513,10 @@ export default {
         console.error('Failed to fetch people', e);
       }
     };
+
+    const changeLanguage = (lang) => {
+      $changeLanguage(lang);
+    };
     
     return {
       message,
@@ -488,10 +529,12 @@ export default {
       people,
       recentActivity,
       gameStore,
+      currentLocale,
       showMessage,
       collectResources,
       handleLogin,
       handleRegister,
+      changeLanguage,
       $t
     };
   }

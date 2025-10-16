@@ -83,7 +83,7 @@ export default {
     const sidebarMinimize = ref(false);
     const showLoginModal = ref(false);
     const dropdownVisible = ref(false);
-    const appVersion = '0.4.0';
+    const appVersion = '0.5.0';
 
     const currentUser = computed(() => gameStore.user);
     const isLoggedIn = computed(() => gameStore.isAuthenticated);

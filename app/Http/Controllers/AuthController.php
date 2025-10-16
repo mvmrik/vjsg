@@ -58,6 +58,7 @@ class AuthController extends Controller
     {
         $request->validate([
             'private_key' => 'required|string|size:64',
+            'remember_me' => 'boolean'
         ]);
 
         $user = User::where('private_key', $request->private_key)->first();
@@ -75,6 +76,13 @@ class AuthController extends Controller
         // Create session
         $request->session()->put('user_id', $user->id);
         $request->session()->put('logged_in', true);
+        
+        // If remember me is requested, extend session lifetime
+        if ($request->remember_me) {
+            $request->session()->put('remember_me', true);
+            // Laravel will handle cookie lifetime automatically
+        }
+        
         $request->session()->save();
 
         return response()->json([
