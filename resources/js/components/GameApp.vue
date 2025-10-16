@@ -15,6 +15,13 @@
                 <c-icon name="cilMap" size="xl" class="mb-1" />
                 <small>{{ $t('menu.city') }}</small>
               </a>
+              <a @click="$router.push('/notifications')" :class="['text-decoration-none d-flex flex-column align-items-center p-2 rounded position-relative', currentRoute === '/notifications' ? 'bg-light text-dark' : 'text-white']" style="cursor: pointer;">
+                <c-icon name="cilBell" size="xl" class="mb-1" />
+                <small>{{ $t('menu.notifications') }}</small>
+                <c-badge v-if="unreadNotifications > 0" color="danger" class="position-absolute top-0 start-100 translate-middle rounded-pill">
+                  {{ unreadNotifications }}
+                </c-badge>
+              </a>
               <a @click="$router.push('/settings')" :class="['text-decoration-none d-flex flex-column align-items-center p-2 rounded', currentRoute === '/settings' ? 'bg-light text-dark' : 'text-white']" style="cursor: pointer;">
                 <c-icon name="cilSettings" size="xl" class="mb-1" />
                 <small>{{ $t('menu.settings') }}</small>
@@ -60,6 +67,26 @@
         <login-form @login-success="onLoginSuccess" />
       </c-modal-body>
     </c-modal>
+
+    <!-- Toast Notifications -->
+    <c-toaster placement="bottom-end" class="p-3">
+      <c-toast
+        v-for="toast in toasts"
+        :key="toast.id"
+        :visible="true"
+        :color="toast.color"
+        @close="removeToast(toast.id)"
+        autohide
+        :delay="5000"
+      >
+        <c-toast-header>
+          <strong class="me-auto">{{ toast.title }}</strong>
+        </c-toast-header>
+        <c-toast-body>
+          {{ toast.message }}
+        </c-toast-body>
+      </c-toast>
+    </c-toaster>
   </div>
 </template>
 
@@ -83,7 +110,9 @@ export default {
     const sidebarMinimize = ref(false);
     const showLoginModal = ref(false);
     const dropdownVisible = ref(false);
-    const appVersion = '0.5.0';
+    const appVersion = '0.6.0';
+    const unreadNotifications = computed(() => gameStore.unreadNotificationsCount);
+    const toasts = ref([]);
 
     const currentUser = computed(() => gameStore.user);
     const isLoggedIn = computed(() => gameStore.isAuthenticated);
@@ -124,6 +153,16 @@ export default {
       },
       {
         _name: 'CSidebarNavItem',
+        name: 'Известия',
+        to: '/notifications',
+        icon: 'cilBell',
+        badge: unreadNotifications.value > 0 ? {
+          color: 'danger',
+          text: unreadNotifications.value
+        } : undefined
+      },
+      {
+        _name: 'CSidebarNavItem',
         name: 'Настройки',
         to: '/settings',
         icon: 'cilUser'
@@ -133,6 +172,31 @@ export default {
     const userParcels = computed(() => {
       return gameStore.parcels?.filter(p => p.user_id === gameStore.user?.id) || [];
     });
+
+    const addToast = (title, message, color = 'info') => {
+      const toast = {
+        id: Date.now(),
+        title,
+        message,
+        color
+      };
+      toasts.value.push(toast);
+    };
+
+    const removeToast = (id) => {
+      toasts.value = toasts.value.filter(toast => toast.id !== id);
+    };
+
+    const getNotificationColor = (type) => {
+      const colors = {
+        info: 'info',
+        success: 'success',
+        warning: 'warning',
+        danger: 'danger',
+        functional: 'primary'
+      };
+      return colors[type] || 'info';
+    };
 
     const logout = () => {
       gameStore.logout();
@@ -154,13 +218,25 @@ export default {
       }
     };
 
-    onMounted(() => {
-      gameStore.checkAuthStatus();
+    onMounted(async () => {
+      await gameStore.checkAuthStatus();
       document.addEventListener('click', closeDropdown);
+      
+      // Listen for notification toast events
+      window.addEventListener('show-notification-toast', (event) => {
+        const notification = event.detail;
+        const color = getNotificationColor(notification.type);
+        const translatedTitle = $t(notification.title);
+        const translatedMessage = $t(notification.message, notification.data || {});
+        addToast(translatedTitle, translatedMessage, color);
+      });
     });
 
     onUnmounted(() => {
       document.removeEventListener('click', closeDropdown);
+      window.removeEventListener('show-notification-toast', () => {});
+      // Stop polling when component unmounts
+      gameStore.stopPolling();
     });
 
     return {
@@ -169,6 +245,10 @@ export default {
       isLoggedIn,
       currentUser,
       currentRoute,
+      unreadNotifications,
+      toasts,
+      addToast,
+      removeToast,
       logout,
       onLoginSuccess,
       router,

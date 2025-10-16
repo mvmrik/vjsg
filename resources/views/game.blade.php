@@ -18,6 +18,16 @@
             city: @json(__('city')),
             home: @json(__('home')),
             map: @json(__('map')),
+            notifications: @json(__('notifications')),
+        };
+        window.translations_bg = {
+            global: @json(__('global', [], 'bg')),
+            settings: @json(__('settings', [], 'bg')),
+            menu: @json(__('menu', [], 'bg')),
+            city: @json(__('city', [], 'bg')),
+            home: @json(__('home', [], 'bg')),
+            map: @json(__('map', [], 'bg')),
+            notifications: @json(__('notifications', [], 'bg')),
         };
     </script>
     @vite('resources/js/app.js')

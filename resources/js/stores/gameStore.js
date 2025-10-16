@@ -7,7 +7,9 @@ export const useGameStore = defineStore('auth', {
     parcels: [],
     isAuthenticated: false,
     loading: false,
-    error: null
+    error: null,
+    unreadNotificationsCount: 0,
+    pollingInterval: null
   }),
 
   getters: {
@@ -63,6 +65,8 @@ export const useGameStore = defineStore('auth', {
           }
           
           await this.fetchUserData();
+          // Start polling for notifications
+          this.startPolling();
           return response.data;
         } else {
           throw new Error(response.data.message);
@@ -76,6 +80,9 @@ export const useGameStore = defineStore('auth', {
     },
 
     async logout() {
+      // Stop polling
+      this.stopPolling();
+      
       try {
         await axios.post('/logout');
       } catch (error) {
@@ -96,6 +103,8 @@ export const useGameStore = defineStore('auth', {
         const response = await axios.get('/api/user-data');
         if (response.data.success) {
           this.user = response.data.user;
+          // Also fetch unread notifications count
+          await this.fetchUnreadNotificationsCount();
         }
       } catch (error) {
         console.error('Failed to fetch user data:', error);
@@ -128,7 +137,7 @@ export const useGameStore = defineStore('auth', {
 
 
 
-    checkAuthStatus() {
+    async checkAuthStatus() {
       // Check cookies first (remember me)
       const cookies = document.cookie.split(';').reduce((acc, cookie) => {
         const [key, value] = cookie.trim().split('=');
@@ -138,12 +147,14 @@ export const useGameStore = defineStore('auth', {
       
       if (cookies.game_logged_in === 'true' && cookies.game_private_key) {
         // Auto-login with remembered private key
-        this.login(cookies.game_private_key, true).catch(error => {
+        try {
+          await this.login(cookies.game_private_key, true);
+        } catch (error) {
           console.error('Auto-login failed:', error);
           // Clear invalid cookies
           document.cookie = 'game_logged_in=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
           document.cookie = 'game_private_key=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-        });
+        }
         return;
       }
       
@@ -151,7 +162,67 @@ export const useGameStore = defineStore('auth', {
       const isLoggedIn = localStorage.getItem('game_logged_in') === 'true';
       if (isLoggedIn) {
         this.isAuthenticated = true;
-        this.fetchUserData();
+        await this.fetchUserData();
+        // Start polling for notifications
+        this.startPolling();
+      }
+    },
+
+    async fetchUnreadNotificationsCount() {
+      try {
+        const response = await axios.get('/api/notifications/unread-count');
+        if (response.data.success) {
+          const oldCount = this.unreadNotificationsCount;
+          this.unreadNotificationsCount = response.data.count;
+          
+          // If count increased, show toast with latest notification
+          if (this.unreadNotificationsCount > oldCount && this.unreadNotificationsCount > 0) {
+            await this.showLatestNotificationToast();
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch unread notifications count:', error);
+      }
+    },
+
+    async fetchLatestUnreadNotification() {
+      try {
+        const response = await axios.get('/api/notifications/latest-unread');
+        if (response.data.success && response.data.notification) {
+          return response.data.notification;
+        }
+      } catch (error) {
+        console.error('Failed to fetch latest unread notification:', error);
+      }
+      return null;
+    },
+
+    async showLatestNotificationToast() {
+      const notification = await this.fetchLatestUnreadNotification();
+      if (notification) {
+        // Emit event to show toast (will be handled in GameApp.vue)
+        window.dispatchEvent(new CustomEvent('show-notification-toast', { 
+          detail: notification 
+        }));
+      }
+    },
+
+    startPolling() {
+      // Stop existing polling if any
+      this.stopPolling();
+      
+      // Start polling every 30 seconds
+      this.pollingInterval = setInterval(async () => {
+        if (this.isAuthenticated) {
+          await this.fetchUnreadNotificationsCount();
+        }
+      }, 30000); // 30 seconds
+    },
+
+    stopPolling() {
+      if (this.pollingInterval) {
+        clearInterval(this.pollingInterval);
+        this.pollingInterval = null;
       }
     }
   }
