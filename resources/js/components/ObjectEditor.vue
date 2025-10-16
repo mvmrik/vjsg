@@ -50,9 +50,19 @@
                       <p class="mb-1"><strong>Ниво:</strong> {{ object.level || 1 }}</p>
                     </div>
                     <div class="col-md-6">
-                      <p v-if="!object.ready_at || remainingTimeText === ''" class="mb-1"><strong>Статус:</strong> Готов</p>
-                      <p v-else class="mb-1"><strong>Оставащо време:</strong> {{ remainingTimeText }}</p>
+                      <p v-if="!object.ready_at || remainingTimeText === ''" class="mb-1">
+                        <strong>Статус:</strong> <span class="text-success">Готов</span>
+                      </p>
+                      <p v-else class="mb-1">
+                        <strong>Статус:</strong> <span class="text-danger">В строеж</span> - {{ remainingTimeText }}
+                      </p>
                     </div>
+                  </div>
+                  <!-- Show workers info if building -->
+                  <div v-if="isBuilding(object) && buildingWorkers" class="mt-2 alert alert-info py-2">
+                    <small>
+                      <strong>Работници:</strong> {{ buildingWorkers.count }} х Ниво {{ buildingWorkers.level }}
+                    </small>
                   </div>
                   <div class="mt-3" v-if="!isBuilding(object)">
                     <c-button color="primary" @click="showUpgradeModal = true">
@@ -179,6 +189,16 @@ export default {
       const minutes = Math.floor(totalSeconds / 60);
       const seconds = totalSeconds % 60;
       return `${minutes}m ${seconds}s`;
+    });
+
+    // Get workers info from occupied_workers for this object
+    const buildingWorkers = computed(() => {
+      if (!object.value || !isBuilding(object.value)) return null;
+      // Check if object has workers data from API
+      if (object.value.workers) {
+        return object.value.workers;
+      }
+      return null;
     });
 
     const goBackToParcel = () => {
@@ -317,6 +337,7 @@ export default {
       upgradeWorkerCount,
       people,
       upgradeTimeMinutes,
+      buildingWorkers,
       goBackToParcel,
       getObjectTypeName,
       isBuilding,

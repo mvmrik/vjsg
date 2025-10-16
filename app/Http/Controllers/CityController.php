@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\CityObject;
 use Illuminate\Support\Facades\Session;
-use Illuminate\Support\Facades\Log;
 use App\Models\ObjectType;
 use App\Models\Person;
 use App\Models\OccupiedWorker;
@@ -35,7 +34,14 @@ class CityController extends Controller
 
         // Annotate build_seconds for frontend convenience
         $types = ObjectType::all()->keyBy('type');
-        $objsArr = $objects->map(function ($o) use ($types) {
+        
+        // Get occupied workers for objects that are building
+        $occupiedWorkers = OccupiedWorker::where('user_id', $userId)
+            ->where('occupied_until', '>', time())
+            ->get()
+            ->keyBy('city_object_id');
+        
+        $objsArr = $objects->map(function ($o) use ($types, $occupiedWorkers) {
             $arr = $o->toArray();
             
             // ready_at is already an integer timestamp, no conversion needed
@@ -52,6 +58,15 @@ class CityController extends Controller
                 } else {
                     $arr['build_seconds'] = 60;
                 }
+            }
+            
+            // Add occupied workers info if building
+            if (isset($occupiedWorkers[$o->id])) {
+                $worker = $occupiedWorkers[$o->id];
+                $arr['workers'] = [
+                    'level' => $worker->level,
+                    'count' => $worker->count
+                ];
             }
             
             return $arr;
@@ -289,37 +304,17 @@ class CityController extends Controller
         $workerLevel = $request->input('worker_level');
         $workerCount = $request->input('worker_count');
 
-        Log::info('Upgrade request', [
-            'object_id' => $objectId,
-            'worker_level' => $workerLevel,
-            'worker_count' => $workerCount
-        ]);
-
         if (!$objectId || $workerLevel === null || $workerLevel < 0 || $workerCount === null || $workerCount <= 0) {
-            Log::error('Invalid parameters', [
-                'object_id' => $objectId,
-                'worker_level' => $workerLevel,
-                'worker_count' => $workerCount,
-                'checks' => [
-                    'no_object_id' => !$objectId,
-                    'level_null' => $workerLevel === null,
-                    'level_negative' => $workerLevel < 0,
-                    'count_null' => $workerCount === null,
-                    'count_zero_or_negative' => $workerCount <= 0
-                ]
-            ]);
             return response()->json(['success' => false, 'message' => 'Invalid parameters: Please select workers'], 400);
         }
 
         $object = CityObject::where('id', $objectId)->where('user_id', $userId)->first();
         if (!$object) {
-            Log::error('Object not found', ['object_id' => $objectId]);
             return response()->json(['success' => false, 'message' => 'Object not found'], 404);
         }
 
         // Check if object is already being upgraded/built
         if ($object->ready_at && $object->ready_at > time()) {
-            Log::error('Object already upgrading', ['ready_at' => $object->ready_at]);
             return response()->json(['success' => false, 'message' => 'Object is already being upgraded'], 400);
         }
 
@@ -329,16 +324,7 @@ class CityController extends Controller
                 ->where('level', intval($workerLevel))
                 ->first();
             
-            Log::info('Worker validation', [
-                'personGroup' => $personGroup ? $personGroup->toArray() : null,
-                'requested_count' => $workerCount
-            ]);
-            
             if (!$personGroup || $personGroup->count < intval($workerCount)) {
-                Log::error('Not enough workers', [
-                    'available' => $personGroup ? $personGroup->count : 0,
-                    'requested' => $workerCount
-                ]);
                 return response()->json([
                     'success' => false, 
                     'message' => 'Invalid workers: You do not have ' . $workerCount . ' workers at level ' . $workerLevel

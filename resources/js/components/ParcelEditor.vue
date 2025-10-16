@@ -42,9 +42,16 @@
                         :class="['placed-object-large', { 'building-large': isBuilding(obj) }]"
                         @click.stop="selectObject(obj)"
                       >
-                        <c-icon :name="getObjectIcon(obj.object_type)" />
-                        <div v-if="isBuilding(obj)" class="build-overlay-large">
-                          <div class="build-time-small">{{ getRemainingTimeText(obj) }}</div>
+                        <c-icon 
+                          :name="getObjectIcon(obj.object_type)" 
+                          :class="{ 'icon-building': isBuilding(obj) }"
+                        />
+                        <!-- Show time when building, level when ready (desktop only) -->
+                        <div v-if="isBuilding(obj)" class="object-info-badge d-none d-md-flex building-badge">
+                          {{ getRemainingTimeText(obj) }}
+                        </div>
+                        <div v-else class="object-info-badge d-none d-md-flex level-badge">
+                          Ниво {{ obj.level || 1 }}
                         </div>
                       </div>
                     </div>
@@ -411,12 +418,8 @@ export default {
 
     const selectObject = (obj) => {
       try {
-        console.log('selectObject called with obj:', obj);
-        console.log('parcelId.value:', parcelId.value);
         const url = `/city/${parcelId.value}/object/${obj.id}`;
-        console.log('navigating to:', url);
         router.push(url);
-        console.log('navigation successful');
       } catch (error) {
         console.error('Error in selectObject:', error);
       }
@@ -484,11 +487,13 @@ export default {
       return null;
     };
 
+    // Reactive current time for triggering re-renders
+    const currentTime = ref(Date.now());
+
     const getRemainingTimeText = (obj) => {
       const ready = getReadyTimestamp(obj);
       if (!ready) return '';
-      const now = Date.now();
-      const remainingMs = Math.max(0, ready - now);
+      const remainingMs = Math.max(0, ready - currentTime.value);
       const sec = Math.ceil(remainingMs / 1000);
       const m = Math.floor(sec / 60);
       const s = sec % 60;
@@ -498,9 +503,9 @@ export default {
     const isBuilding = (obj) => {
       const ready = getReadyTimestamp(obj);
       if (!ready) return false;
-      return ready > Date.now();
+      return ready > currentTime.value;
     };
-
+    
     // Tick every second to update progress displays
     let tickInterval = null;
     
@@ -519,7 +524,7 @@ export default {
       
       // Start tick interval after loading
       tickInterval = setInterval(() => {
-        cityObjects.value = cityObjects.value.slice();
+        currentTime.value = Date.now();
       }, 1000);
     });
 
@@ -616,6 +621,36 @@ export default {
   background: rgba(0, 123, 255, 0.1);
   border: 1px solid #007bff;
   cursor: pointer;
+}
+
+/* Red icon when building */
+.icon-building {
+  color: #dc3545 !important;
+}
+
+/* Info badge for level/time */
+.object-info-badge {
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 9px;
+  font-weight: 600;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+.building-badge {
+  color: #dc3545;
+  text-shadow: 0 0 2px rgba(255, 255, 255, 0.8);
+}
+
+.level-badge {
+  color: #28a745;
+  text-shadow: 0 0 2px rgba(255, 255, 255, 0.8);
 }
 
 .build-overlay-large { position:absolute; inset:0; display:flex; align-items:flex-end; }
