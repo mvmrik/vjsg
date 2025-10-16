@@ -18,7 +18,7 @@ class OccupiedWorker extends Model
     ];
 
     protected $casts = [
-        'occupied_until' => 'datetime',
+        // occupied_until is now an integer timestamp, no casting needed
     ];
 
     public function user()

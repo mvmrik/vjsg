@@ -82,6 +82,13 @@ export default {
     const message = ref('');
     const messageType = ref('');
     const cityObjects = ref([]);
+    
+    // Watch for route changes to refresh objects when returning to city
+    watch(() => route.path, async (newPath, oldPath) => {
+      if (newPath === '/city') {
+        await fetchCityObjects();
+      }
+    });
 
     const openParcelEditor = (parcel) => {
       router.push(`/city/${parcel.id}`);
@@ -151,16 +158,8 @@ export default {
       try {
         const res = await axios.get('/api/city-objects');
         if (res.data.success) {
-          // Post-process: if ready timestamp is in the past, null it locally so UI won't treat it as building
-          const objs = res.data.objects.map(o => {
-            const ready = getReadyTimestamp(o);
-            if (ready && ready <= Date.now()) {
-              // ensure expired builds are not shown as building
-              o.ready_at = null;
-            }
-            return o;
-          });
-          cityObjects.value = objs;
+          // Backend already handles clearing expired ready_at
+          cityObjects.value = res.data.objects;
         }
       } catch (e) {
         console.error('Failed to fetch city objects', e);

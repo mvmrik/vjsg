@@ -223,6 +223,13 @@ export default {
     const parcel = computed(() => {
       return gameStore.parcels?.find(p => p.id === parcelId.value && p.user_id === gameStore.user?.id);
     });
+    
+    // Watch for route changes to refresh objects when returning to parcel
+    watch(() => route.path, async (newPath, oldPath) => {
+      if (newPath.includes('/city/') && !newPath.includes('/object/')) {
+        await fetchCityObjects();
+      }
+    });
 
     const availableObjects = ref([]);
     const people = ref({ total: 0, by_level: {}, groups: [] });
@@ -349,7 +356,7 @@ export default {
         object_type: modalSelectedObjectType.value.type,
         x: cellX,
         y: cellY,
-        properties: props
+        properties: props  // Keep this for now, backend expects it
       };
       cityObjects.value.push(newObj);
 
@@ -377,15 +384,8 @@ export default {
           objects: objectsForThisParcel
         });
         if (res.data.success) {
-          // Post-process returned objects: null out ready_at for expired builds
-          const objs = res.data.objects.map(o => {
-            const ready = getReadyTimestamp(o);
-            if (ready && ready <= Date.now()) {
-              o.ready_at = null;
-            }
-            return o;
-          });
-          cityObjects.value = objs;
+          // Backend already handles clearing expired ready_at
+          cityObjects.value = res.data.objects;
           message.value = 'Промените са запазени успешно!';
           messageType.value = 'success';
         }
@@ -438,14 +438,8 @@ export default {
       try {
         const res = await axios.get('/api/city-objects');
         if (res.data.success) {
-          const objs = res.data.objects.map(o => {
-            const ready = getReadyTimestamp(o);
-            if (ready && ready <= Date.now()) {
-              o.ready_at = null;
-            }
-            return o;
-          });
-          cityObjects.value = objs;
+          // Backend already handles clearing expired ready_at
+          cityObjects.value = res.data.objects;
         }
       } catch (e) {
         console.error('Failed to fetch city objects', e);
@@ -514,11 +508,7 @@ export default {
 
     // Tick every second to update progress displays
     let tickInterval = null;
-    onMounted(() => {
-      tickInterval = setInterval(() => {
-        cityObjects.value = cityObjects.value.slice();
-      }, 1000);
-    });
+    
     // Clear interval when unmounted
     onUnmounted(() => {
       if (tickInterval) clearInterval(tickInterval);
@@ -531,6 +521,11 @@ export default {
         await fetchObjectTypes();
       }
       loading.value = false;
+      
+      // Start tick interval after loading
+      tickInterval = setInterval(() => {
+        cityObjects.value = cityObjects.value.slice();
+      }, 1000);
     });
 
     return {

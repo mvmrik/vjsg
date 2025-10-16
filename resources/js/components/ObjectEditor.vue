@@ -54,7 +54,7 @@
                       <p v-else class="mb-1"><strong>Оставащо време:</strong> {{ remainingTimeText }}</p>
                     </div>
                   </div>
-                  <div class="mt-3" v-if="!object.ready_at || remainingTimeText === ''">
+                  <div class="mt-3" v-if="!isBuilding(object)">
                     <c-button color="primary" @click="showUpgradeModal = true">
                       <c-icon name="cilArrowTop" class="me-1" />
                       Обновяване на ниво
@@ -101,7 +101,7 @@
           <button 
             type="button" 
             class="btn btn-primary" 
-            :disabled="upgradeWorkerCount === 0"
+            :disabled="!upgradeWorkerLevel || !upgradeWorkerCount || upgradeWorkerCount <= 0"
             @click="startUpgrade"
           >
             Започни обновяване
@@ -158,13 +158,14 @@ export default {
     };
 
     const isBuilding = (obj) => {
+      if (!obj) return false;
       const ready = getReadyTimestamp(obj);
       if (!ready) return false;
       return ready > Date.now();
     };
 
     const getReadyTimestamp = (obj) => {
-      if (!obj.ready_at) return null;
+      if (!obj || !obj.ready_at) return null;
       return new Date(obj.ready_at).getTime();
     };
 
@@ -172,8 +173,11 @@ export default {
       if (!object.value || !object.value.ready_at) return '';
       const ready = new Date(object.value.ready_at).getTime();
       const remaining = Math.max(0, ready - currentTime.value);
-      const minutes = Math.ceil(remaining / 60000);
-      return remaining > 0 ? `${minutes}m` : '';
+      if (remaining === 0) return '';
+      const totalSeconds = Math.ceil(remaining / 1000);
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      return `${minutes}m ${seconds}s`;
     });
 
     const goBackToParcel = () => {
@@ -184,14 +188,7 @@ export default {
       try {
         const res = await axios.get('/api/city-objects');
         if (res.data.success) {
-          const objs = res.data.objects.map(o => {
-            const ready = getReadyTimestamp(o);
-            if (ready && ready <= Date.now()) {
-              o.ready_at = null;
-            }
-            return o;
-          });
-          cityObjects.value = objs;
+          cityObjects.value = res.data.objects;
         }
       } catch (e) {
         console.error('Failed to fetch city objects', e);
@@ -243,11 +240,6 @@ export default {
     });
 
     const startUpgrade = async () => {
-      console.log('Starting upgrade with:', {
-        object_id: objectId.value,
-        worker_level: upgradeWorkerLevel.value,
-        worker_count: upgradeWorkerCount.value
-      });
       try {
         const res = await axios.post('/api/city-objects/upgrade', {
           object_id: objectId.value,
@@ -260,19 +252,29 @@ export default {
           upgradeWorkerLevel.value = null;
           upgradeWorkerCount.value = 0;
           
-          // Update object locally with new ready_at
+          // Update object locally with all data from response
           const objIndex = cityObjects.value.findIndex(obj => obj.id === objectId.value);
           if (objIndex !== -1) {
-            cityObjects.value[objIndex].ready_at = res.data.ready_at;
-            cityObjects.value[objIndex].level = (cityObjects.value[objIndex].level || 1) + 1;
+            cityObjects.value[objIndex].ready_at = res.data.object.ready_at;
+            cityObjects.value[objIndex].level = res.data.object.level;
+            cityObjects.value[objIndex].build_seconds = res.data.object.build_seconds;
             // Force reactivity update
             cityObjects.value = [...cityObjects.value];
           }
+          
+          // Refresh people data since workers are now occupied
+          await fetchPeople();
         } else {
           console.error('Upgrade failed:', res.data.message);
+          alert('Upgrade failed: ' + res.data.message);
         }
       } catch (e) {
         console.error('Failed to start upgrade', e);
+        if (e.response && e.response.data && e.response.data.message) {
+          alert('Error: ' + e.response.data.message);
+        } else {
+          alert('Failed to start upgrade. Check console for details.');
+        }
       }
     };
 

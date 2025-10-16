@@ -16,17 +16,15 @@ class CityObject extends Model
         'level',
         'x',
         'y',
-        'properties',
-        'ready_at'
+        'ready_at',
+        'build_seconds'
     ];
 
     protected $casts = [
-        'properties' => 'array'
+        // ready_at is now an integer timestamp, no casting needed
     ];
 
-    protected $dates = [
-        'ready_at'
-    ];
+    // No $dates array needed anymore
 
     public function user()
     {

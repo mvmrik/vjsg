@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\CityObject;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Facades\Log;
 use App\Models\ObjectType;
 use App\Models\Person;
 use App\Models\OccupiedWorker;
@@ -22,7 +23,7 @@ class CityController extends Controller
         // Clear ready_at for any objects whose ready_at is in the past (they are completed)
         $cleaned = CityObject::where('user_id', $userId)
             ->whereNotNull('ready_at')
-            ->where('ready_at', '<=', now())
+            ->where('ready_at', '<=', time())
             ->update(['ready_at' => null]);
 
         // FREE OCCUPIED WORKERS: Delete occupied_worker records for completed buildings
@@ -36,22 +37,23 @@ class CityController extends Controller
         $types = ObjectType::all()->keyBy('type');
         $objsArr = $objects->map(function ($o) use ($types) {
             $arr = $o->toArray();
-            $type = $types[$o->object_type] ?? null;
-            if ($type) {
-                $baseSeconds = intval($type->build_time_minutes) * 60;
-            } else {
-                $baseSeconds = 60; // fallback for single cell
+            
+            // ready_at is already an integer timestamp, no conversion needed
+            // Frontend expects milliseconds, so multiply by 1000
+            if ($o->ready_at) {
+                $arr['ready_at'] = $o->ready_at * 1000; // Convert to milliseconds
             }
-
-            // If object has workers info in properties, apply reduction
-            $workers = $o->properties['workers'] ?? null;
-            if ($workers && isset($workers['level']) && isset($workers['count'])) {
-                $reductionSeconds = intval($workers['level']) * intval($workers['count']) * 60;
-                $finalSeconds = max(60, $baseSeconds - $reductionSeconds);
-            } else {
-                $finalSeconds = $baseSeconds;
+            
+            // If build_seconds is missing, calculate it from object type
+            if (!isset($arr['build_seconds']) || $arr['build_seconds'] === null) {
+                $type = $types[$o->object_type] ?? null;
+                if ($type) {
+                    $arr['build_seconds'] = intval($type->build_time_minutes) * 60;
+                } else {
+                    $arr['build_seconds'] = 60;
+                }
             }
-            $arr['build_seconds'] = $finalSeconds;
+            
             return $arr;
         });
 
@@ -120,7 +122,7 @@ class CityController extends Controller
                     $existing->object_type = $objData['object_type'];
                     $existing->x = $objData['x'];
                     $existing->y = $objData['y'];
-                    $existing->properties = $objData['properties'] ?? [];
+                    // properties removed - no longer needed
                     $existing->save();
                     $objects[] = $existing;
                 }
@@ -161,8 +163,7 @@ class CityController extends Controller
                 }
 
                 // Check for workers info sent in properties (level & count)
-                $props = $objData['properties'] ?? [];
-                $workers = $props['workers'] ?? null;
+                $workers = ($objData['properties'] ?? [])['workers'] ?? null;
                 
                 // VALIDATION: Verify user actually has the claimed workers
                 if ($workers && isset($workers['level']) && isset($workers['count'])) {
@@ -187,7 +188,7 @@ class CityController extends Controller
                     $buildSeconds = $baseSeconds;
                 }
 
-                $readyAt = now()->addSeconds($buildSeconds);
+                $readyAt = time() + $buildSeconds; // UNIX timestamp
 
                 $created = CityObject::create([
                     'user_id' => $userId,
@@ -196,10 +197,11 @@ class CityController extends Controller
                     'level' => 1,
                     'x' => $objData['x'],
                     'y' => $objData['y'],
-                    'properties' => $props,
-                    'ready_at' => $readyAt
+                    'ready_at' => $readyAt,
+                    'build_seconds' => $buildSeconds
                 ]);
                 $arr = $created->toArray();
+                $arr['ready_at'] = $readyAt * 1000; // Convert to milliseconds for frontend
                 $arr['build_seconds'] = $buildSeconds;
                 $objects[] = (object)$arr;
 
@@ -219,35 +221,35 @@ class CityController extends Controller
         // After creating new objects, clear any expired ready_at values for the user
         CityObject::where('user_id', $userId)
             ->whereNotNull('ready_at')
-            ->where('ready_at', '<=', now())
+            ->where('ready_at', '<=', time())
             ->update(['ready_at' => null]);
 
         // Return the full, updated list of objects for the user so frontend stays consistent
         $cleanedAfter = CityObject::where('user_id', $userId)
             ->whereNotNull('ready_at')
-            ->where('ready_at', '<=', now())
+            ->where('ready_at', '<=', time())
             ->update(['ready_at' => null]);
 
         $allObjects = CityObject::where('user_id', $userId)->get();
         $types = ObjectType::all()->keyBy('type');
         $allArr = $allObjects->map(function ($o) use ($types) {
             $arr = $o->toArray();
-            $type = $types[$o->object_type] ?? null;
-            if ($type) {
-                $baseSeconds = intval($type->build_time_minutes) * 60;
-            } else {
-                $baseSeconds = 60; // single cell fallback
+            
+            // Convert ready_at timestamp to milliseconds for frontend
+            if ($o->ready_at) {
+                $arr['ready_at'] = $o->ready_at * 1000;
             }
-
-            // Apply workers reduction if present
-            $workers = $o->properties['workers'] ?? null;
-            if ($workers && isset($workers['level']) && isset($workers['count'])) {
-                $reductionSeconds = intval($workers['level']) * intval($workers['count']) * 60;
-                $finalSeconds = max(60, $baseSeconds - $reductionSeconds);
-            } else {
-                $finalSeconds = $baseSeconds;
+            
+            // If build_seconds is missing, calculate it from object type
+            if (!isset($arr['build_seconds']) || $arr['build_seconds'] === null) {
+                $type = $types[$o->object_type] ?? null;
+                if ($type) {
+                    $arr['build_seconds'] = intval($type->build_time_minutes) * 60;
+                } else {
+                    $arr['build_seconds'] = 60;
+                }
             }
-            $arr['build_seconds'] = $finalSeconds;
+            
             return $arr;
         });
 
@@ -287,38 +289,76 @@ class CityController extends Controller
         $workerLevel = $request->input('worker_level');
         $workerCount = $request->input('worker_count');
 
-        if (!$objectId || $workerLevel === null || $workerLevel < 0 || !$workerCount || $workerCount < 0) {
-            return response()->json(['success' => false, 'message' => 'Invalid parameters'], 400);
+        Log::info('Upgrade request', [
+            'object_id' => $objectId,
+            'worker_level' => $workerLevel,
+            'worker_count' => $workerCount
+        ]);
+
+        if (!$objectId || $workerLevel === null || $workerLevel < 0 || $workerCount === null || $workerCount <= 0) {
+            Log::error('Invalid parameters', [
+                'object_id' => $objectId,
+                'worker_level' => $workerLevel,
+                'worker_count' => $workerCount,
+                'checks' => [
+                    'no_object_id' => !$objectId,
+                    'level_null' => $workerLevel === null,
+                    'level_negative' => $workerLevel < 0,
+                    'count_null' => $workerCount === null,
+                    'count_zero_or_negative' => $workerCount <= 0
+                ]
+            ]);
+            return response()->json(['success' => false, 'message' => 'Invalid parameters: Please select workers'], 400);
         }
 
         $object = CityObject::where('id', $objectId)->where('user_id', $userId)->first();
         if (!$object) {
+            Log::error('Object not found', ['object_id' => $objectId]);
             return response()->json(['success' => false, 'message' => 'Object not found'], 404);
         }
 
         // Check if object is already being upgraded/built
-        if ($object->ready_at) {
+        if ($object->ready_at && $object->ready_at > time()) {
+            Log::error('Object already upgrading', ['ready_at' => $object->ready_at]);
             return response()->json(['success' => false, 'message' => 'Object is already being upgraded'], 400);
+        }
+
+        // VALIDATION: Verify user actually has the claimed workers
+        if ($workerLevel > 0 && $workerCount > 0) {
+            $personGroup = Person::where('user_id', $userId)
+                ->where('level', intval($workerLevel))
+                ->first();
+            
+            Log::info('Worker validation', [
+                'personGroup' => $personGroup ? $personGroup->toArray() : null,
+                'requested_count' => $workerCount
+            ]);
+            
+            if (!$personGroup || $personGroup->count < intval($workerCount)) {
+                Log::error('Not enough workers', [
+                    'available' => $personGroup ? $personGroup->count : 0,
+                    'requested' => $workerCount
+                ]);
+                return response()->json([
+                    'success' => false, 
+                    'message' => 'Invalid workers: You do not have ' . $workerCount . ' workers at level ' . $workerLevel
+                ], 400);
+            }
         }
 
         // Calculate upgrade time (same as build time of the object type)
         $objectType = ObjectType::where('type', $object->object_type)->first();
         $baseMinutes = $objectType ? $objectType->build_time_minutes : 10;
+        $baseSeconds = $baseMinutes * 60;
         $reduction = intval($workerLevel) * intval($workerCount);
         $finalMinutes = max(1, $baseMinutes - $reduction);
+        $finalSeconds = max(60, $baseSeconds - ($reduction * 60));
 
-        // Update object properties to increase level
-        $properties = $object->properties ?? [];
-        $properties['workers'] = [
-            'level' => $workerLevel,
-            'count' => $workerCount
-        ];
-        
+        // Update object to increase level and set build time
+        $readyAt = time() + $finalSeconds; // UNIX timestamp
         $object->level = ($object->level ?? 1) + 1;
-        $object->properties = $properties;
-
-        $object->properties = $properties;
-        $object->ready_at = now()->addMinutes($finalMinutes);
+        $object->build_seconds = $finalSeconds;
+        $object->ready_at = $readyAt;
         $object->save();
 
         // Create occupied workers record
@@ -326,14 +366,24 @@ class CityController extends Controller
             'user_id' => $userId,
             'level' => intval($workerLevel),
             'count' => intval($workerCount),
-            'occupied_until' => $object->ready_at,
+            'occupied_until' => $readyAt,
             'city_object_id' => $object->id
         ]);
 
         return response()->json([
             'success' => true,
             'message' => 'Upgrade started successfully',
-            'ready_at' => $object->ready_at,
+            'object' => [
+                'id' => $object->id,
+                'level' => $object->level,
+                'ready_at' => $object->ready_at * 1000, // Convert to milliseconds
+                'build_seconds' => $finalSeconds,
+                'object_type' => $object->object_type,
+                'x' => $object->x,
+                'y' => $object->y,
+                'parcel_id' => $object->parcel_id,
+                'user_id' => $object->user_id
+            ],
             'upgrade_time_minutes' => $finalMinutes
         ]);
     }
