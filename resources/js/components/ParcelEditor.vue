@@ -477,14 +477,9 @@ export default {
     };
 
     const getReadyTimestamp = (obj) => {
+      // ready_at is already a timestamp in milliseconds
       if (obj.ready_at) {
-        const t = Date.parse(obj.ready_at);
-        if (!isNaN(t)) return t;
-      }
-      if (obj.created_at) {
-        const created = Date.parse(obj.created_at);
-        const totalSeconds = obj.build_seconds || 60;
-        if (!isNaN(created) && totalSeconds) return created + totalSeconds * 1000;
+        return obj.ready_at;
       }
       return null;
     };

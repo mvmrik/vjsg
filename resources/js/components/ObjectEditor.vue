@@ -165,13 +165,14 @@ export default {
     };
 
     const getReadyTimestamp = (obj) => {
+      // ready_at is already a timestamp in milliseconds
       if (!obj || !obj.ready_at) return null;
-      return new Date(obj.ready_at).getTime();
+      return obj.ready_at;
     };
 
     const remainingTimeText = computed(() => {
       if (!object.value || !object.value.ready_at) return '';
-      const ready = new Date(object.value.ready_at).getTime();
+      const ready = object.value.ready_at; // Already in milliseconds
       const remaining = Math.max(0, ready - currentTime.value);
       if (remaining === 0) return '';
       const totalSeconds = Math.ceil(remaining / 1000);
