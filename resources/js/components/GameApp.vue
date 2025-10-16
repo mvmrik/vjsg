@@ -67,6 +67,26 @@
         <login-form @login-success="onLoginSuccess" />
       </c-modal-body>
     </c-modal>
+
+    <!-- Toast Notifications -->
+    <c-toaster placement="bottom-end" class="p-3">
+      <c-toast
+        v-for="toast in toasts"
+        :key="toast.id"
+        :visible="true"
+        :color="toast.color"
+        @close="removeToast(toast.id)"
+        autohide
+        :delay="5000"
+      >
+        <c-toast-header>
+          <strong class="me-auto">{{ toast.title }}</strong>
+        </c-toast-header>
+        <c-toast-body>
+          {{ toast.message }}
+        </c-toast-body>
+      </c-toast>
+    </c-toaster>
   </div>
 </template>
 
@@ -90,8 +110,9 @@ export default {
     const sidebarMinimize = ref(false);
     const showLoginModal = ref(false);
     const dropdownVisible = ref(false);
-    const appVersion = '0.5.0';
-    const unreadNotifications = ref(0);
+    const appVersion = '0.6.0';
+    const unreadNotifications = computed(() => gameStore.unreadNotificationsCount);
+    const toasts = ref([]);
 
     const currentUser = computed(() => gameStore.user);
     const isLoggedIn = computed(() => gameStore.isAuthenticated);
@@ -152,6 +173,31 @@ export default {
       return gameStore.parcels?.filter(p => p.user_id === gameStore.user?.id) || [];
     });
 
+    const addToast = (title, message, color = 'info') => {
+      const toast = {
+        id: Date.now(),
+        title,
+        message,
+        color
+      };
+      toasts.value.push(toast);
+    };
+
+    const removeToast = (id) => {
+      toasts.value = toasts.value.filter(toast => toast.id !== id);
+    };
+
+    const getNotificationColor = (type) => {
+      const colors = {
+        info: 'info',
+        success: 'success',
+        warning: 'warning',
+        danger: 'danger',
+        functional: 'primary'
+      };
+      return colors[type] || 'info';
+    };
+
     const logout = () => {
       gameStore.logout();
       router.push('/');
@@ -172,29 +218,25 @@ export default {
       }
     };
 
-    const fetchUnreadNotifications = async () => {
-      if (!isLoggedIn.value) return;
-
-      try {
-        const response = await fetch('/api/notifications/unread-count');
-        const data = await response.json();
-
-        if (data.success) {
-          unreadNotifications.value = data.count;
-        }
-      } catch (error) {
-        console.error('Failed to fetch unread notifications:', error);
-      }
-    };
-
     onMounted(async () => {
       await gameStore.checkAuthStatus();
-      await fetchUnreadNotifications();
       document.addEventListener('click', closeDropdown);
+      
+      // Listen for notification toast events
+      window.addEventListener('show-notification-toast', (event) => {
+        const notification = event.detail;
+        const color = getNotificationColor(notification.type);
+        const translatedTitle = $t(notification.title);
+        const translatedMessage = $t(notification.message, notification.data || {});
+        addToast(translatedTitle, translatedMessage, color);
+      });
     });
 
     onUnmounted(() => {
       document.removeEventListener('click', closeDropdown);
+      window.removeEventListener('show-notification-toast', () => {});
+      // Stop polling when component unmounts
+      gameStore.stopPolling();
     });
 
     return {
@@ -204,6 +246,9 @@ export default {
       currentUser,
       currentRoute,
       unreadNotifications,
+      toasts,
+      addToast,
+      removeToast,
       logout,
       onLoginSuccess,
       router,

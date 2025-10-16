@@ -77,6 +77,7 @@ use App\Http\Controllers\NotificationsController;
 Route::middleware(['game.auth'])->group(function () {
     Route::get('/notifications', [NotificationsController::class, 'index'])->name('api.notifications.index');
     Route::get('/notifications/unread-count', [NotificationsController::class, 'unreadCount'])->name('api.notifications.unread-count');
+    Route::get('/notifications/latest-unread', [NotificationsController::class, 'latestUnread'])->name('api.notifications.latest-unread');
     Route::get('/notifications/{id}', [NotificationsController::class, 'show'])->name('api.notifications.show');
     Route::patch('/notifications/{id}/read', [NotificationsController::class, 'markAsRead'])->name('api.notifications.mark-read');
     Route::patch('/notifications/mark-all-read', [NotificationsController::class, 'markAllAsRead'])->name('api.notifications.mark-all-read');

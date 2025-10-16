@@ -75,16 +75,8 @@ const currentLocale = ref(localStorage.getItem('app_language') || window.locale 
 // Load both languages
 const translations = reactive({
   en: window.translations,
-  bg: {}
+  bg: window.translations_bg || {},
 });
-
-// Load Bulgarian translations
-fetch('/api/translations/bg')
-  .then(res => res.json())
-  .then(data => {
-    translations.bg = data;
-  })
-  .catch(err => console.error('Failed to load BG translations:', err));
 
 const translate = computed(() => (key) => {
   const keys = key.split('.');

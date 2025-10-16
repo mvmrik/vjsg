@@ -44,7 +44,7 @@
                   </c-badge>
                 </c-table-data-cell>
                 <c-table-data-cell>
-                  <strong>{{ notification.title }}</strong>
+                  <strong>{{ $t(notification.title) }}</strong>
                   <c-icon
                     v-if="!notification.is_read"
                     name="cilCircle"
@@ -53,7 +53,7 @@
                   />
                 </c-table-data-cell>
                 <c-table-data-cell>
-                  <span v-html="notification.message"></span>
+                  <span v-html="$t(notification.message, notification.data || {})"></span>
                 </c-table-data-cell>
                 <c-table-data-cell>
                   {{ formatDate(notification.created_at) }}
@@ -112,12 +112,14 @@
 </template>
 
 <script>
-import { ref, onMounted, inject } from 'vue';
+import { ref, onMounted, inject, computed } from 'vue';
+import { useGameStore } from '../stores/gameStore';
 
 export default {
   name: 'NotificationsPage',
   setup() {
     const $t = inject('$t');
+    const gameStore = useGameStore();
     const loading = ref(false);
     const notifications = ref({
       data: [],
@@ -125,7 +127,7 @@ export default {
       last_page: 1,
       total: 0
     });
-    const unreadCount = ref(0);
+    const unreadCount = computed(() => gameStore.unreadNotificationsCount);
 
     const fetchNotifications = async (page = 1) => {
       try {
@@ -149,7 +151,7 @@ export default {
         const data = await response.json();
 
         if (data.success) {
-          unreadCount.value = data.count;
+          gameStore.unreadNotificationsCount = data.count;
         }
       } catch (error) {
         console.error('Failed to fetch unread count:', error);
@@ -168,7 +170,7 @@ export default {
 
         if (response.ok) {
           notification.is_read = true;
-          await fetchUnreadCount();
+          gameStore.unreadNotificationsCount = Math.max(0, gameStore.unreadNotificationsCount - 1);
         }
       } catch (error) {
         console.error('Failed to mark as read:', error);
@@ -189,7 +191,7 @@ export default {
 
         if (response.ok) {
           await fetchNotifications(notifications.value.current_page);
-          await fetchUnreadCount();
+          gameStore.unreadNotificationsCount = 0;
         }
       } catch (error) {
         console.error('Failed to mark all as read:', error);

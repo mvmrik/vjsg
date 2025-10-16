@@ -134,4 +134,24 @@ class NotificationsController extends Controller
             'count' => $count
         ]);
     }
+
+    public function latestUnread(Request $request): JsonResponse
+    {
+        $userId = $request->session()->get('user_id');
+        
+        if (!$userId) {
+            return response()->json(['success' => false, 'message' => 'Not authenticated'], 401);
+        }
+
+        $notification = Notification::where('user_id', $userId)
+            ->unread()
+            ->active()
+            ->orderBy('created_at', 'desc')
+            ->first();
+
+        return response()->json([
+            'success' => true,
+            'notification' => $notification
+        ]);
+    }
 }
