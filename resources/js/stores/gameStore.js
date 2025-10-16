@@ -40,16 +40,28 @@ export const useGameStore = defineStore('auth', {
       }
     },
 
-    async login(privateKey) {
+    async login(privateKey, rememberMe = false) {
       this.loading = true;
       this.error = null;
       
       try {
-        const response = await axios.post('/login', { private_key: privateKey });
+        const response = await axios.post('/login', { 
+          private_key: privateKey,
+          remember_me: rememberMe 
+        });
         
         if (response.data.success) {
           this.isAuthenticated = true;
-          localStorage.setItem('game_logged_in', 'true');
+          
+          // Use cookies for remember me, localStorage for session
+          if (rememberMe) {
+            // Set cookie that expires in 30 days
+            document.cookie = 'game_logged_in=true; path=/; max-age=' + (30 * 24 * 60 * 60);
+            document.cookie = 'game_private_key=' + encodeURIComponent(privateKey) + '; path=/; max-age=' + (30 * 24 * 60 * 60);
+          } else {
+            localStorage.setItem('game_logged_in', 'true');
+          }
+          
           await this.fetchUserData();
           return response.data;
         } else {
@@ -72,7 +84,11 @@ export const useGameStore = defineStore('auth', {
       
       this.user = null;
       this.isAuthenticated = false;
+      
+      // Clear both localStorage and cookies
       localStorage.removeItem('game_logged_in');
+      document.cookie = 'game_logged_in=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+      document.cookie = 'game_private_key=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
     },
 
     async fetchUserData() {
@@ -113,6 +129,25 @@ export const useGameStore = defineStore('auth', {
 
 
     checkAuthStatus() {
+      // Check cookies first (remember me)
+      const cookies = document.cookie.split(';').reduce((acc, cookie) => {
+        const [key, value] = cookie.trim().split('=');
+        acc[key] = decodeURIComponent(value || '');
+        return acc;
+      }, {});
+      
+      if (cookies.game_logged_in === 'true' && cookies.game_private_key) {
+        // Auto-login with remembered private key
+        this.login(cookies.game_private_key, true).catch(error => {
+          console.error('Auto-login failed:', error);
+          // Clear invalid cookies
+          document.cookie = 'game_logged_in=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+          document.cookie = 'game_private_key=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+        });
+        return;
+      }
+      
+      // Fallback to localStorage (session-based)
       const isLoggedIn = localStorage.getItem('game_logged_in') === 'true';
       if (isLoggedIn) {
         this.isAuthenticated = true;

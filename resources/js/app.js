@@ -1,7 +1,10 @@
-import { createApp, ref, computed } from 'vue';
+import { createApp, ref, computed, reactive } from 'vue';
 import { createRouter, createWebHistory } from 'vue-router';
 import { createPinia } from 'pinia';
 import axios from 'axios';
+
+// Import flag icons CSS
+import 'flag-icons/css/flag-icons.min.css';
 
 // Import CoreUI Vue components
 import CoreuiVue from '@coreui/vue';
@@ -65,13 +68,38 @@ app.component('CIcon', CIcon);
 app.config.globalProperties.$http = axios;
 
 // Add translations
-const currentLocale = ref(window.locale || 'en');
-const translate = computed(() => (key) => {
-  const [section, actualKey] = key.split('.');
-  return window.translations[section]?.[actualKey] || key;
+const currentLocale = ref(localStorage.getItem('app_language') || window.locale || 'en');
+
+// Load both languages
+const translations = reactive({
+  en: window.translations,
+  bg: {}
 });
 
+// Load Bulgarian translations
+fetch('/api/translations/bg')
+  .then(res => res.json())
+  .then(data => {
+    translations.bg = data;
+  })
+  .catch(err => console.error('Failed to load BG translations:', err));
+
+const translate = computed(() => (key) => {
+  const [section, actualKey] = key.split('.');
+  const currentTranslations = translations[currentLocale.value];
+  return currentTranslations?.[section]?.[actualKey] || key;
+});
+
+// Function to change language
+const changeLanguage = (lang) => {
+  currentLocale.value = lang;
+  localStorage.setItem('app_language', lang);
+};
+
 app.config.globalProperties.$t = translate.value;
+app.config.globalProperties.$changeLanguage = changeLanguage;
 app.provide('$t', translate.value);
+app.provide('$changeLanguage', changeLanguage);
+app.provide('currentLocale', currentLocale);
 
 app.mount('#app');

@@ -40,6 +40,18 @@
           />
         </c-input-group>
         
+        <div class="form-check mb-3">
+          <input 
+            class="form-check-input" 
+            type="checkbox" 
+            id="rememberMe" 
+            v-model="loginForm.rememberMe"
+          >
+          <label class="form-check-label" for="rememberMe">
+            {{ $t('global.remember_me') }}
+          </label>
+        </div>
+        
         <c-form-text class="mb-3 text-muted">
           <c-icon name="cilInfo" class="me-1" />
           Въведете вашия 64-символен частен ключ за вход в системата
@@ -113,6 +125,7 @@
 
 <script>
 import { ref } from 'vue';
+import { inject } from 'vue';
 import { useGameStore } from '../stores/gameStore';
 
 export default {
@@ -120,13 +133,15 @@ export default {
   emits: ['login-success'],
   setup(props, { emit }) {
     const gameStore = useGameStore();
+    const $t = inject('$t');
     const loading = ref(false);
     const message = ref('');
     const messageType = ref('');
     const activeTab = ref('login'); // Default to login tab
 
     const loginForm = ref({
-      privateKey: ''
+      privateKey: '',
+      rememberMe: false
     });
 
     const registerForm = ref({
@@ -138,7 +153,7 @@ export default {
       message.value = '';
 
       try {
-        await gameStore.login(loginForm.value.privateKey);
+        await gameStore.login(loginForm.value.privateKey, loginForm.value.rememberMe);
         message.value = 'Успешно влизане!';
         messageType.value = 'success';
         setTimeout(() => {
@@ -186,7 +201,8 @@ export default {
       message,
       messageType,
       handleLogin,
-      handleRegister
+      handleRegister,
+      $t
     };
   }
 }
