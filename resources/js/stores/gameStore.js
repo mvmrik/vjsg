@@ -103,6 +103,12 @@ export const useGameStore = defineStore('auth', {
         const response = await axios.get('/api/user-data');
         if (response.data.success) {
           this.user = response.data.user;
+          // Emit event to set user language
+          if (this.user.locale) {
+            window.dispatchEvent(new CustomEvent('set-user-language', { 
+              detail: { locale: this.user.locale } 
+            }));
+          }
           // Also fetch unread notifications count
           await this.fetchUnreadNotificationsCount();
         }

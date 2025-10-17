@@ -7,7 +7,7 @@
         <div class="container-fluid">
           <div class="d-flex justify-content-center align-items-center">
             <nav class="d-flex gap-4">
-              <a @click="$router.push('/map')" :class="['text-decoration-none d-flex flex-column align-items-center p-2 rounded', currentRoute === '/map' ? 'bg-light text-dark' : 'text-white']" style="cursor: pointer;">
+              <a @click="$router.push('/')" :class="['text-decoration-none d-flex flex-column align-items-center p-2 rounded', currentRoute === '/' ? 'bg-light text-dark' : 'text-white']" style="cursor: pointer;">
                 <c-icon name="cilHome" size="xl" class="mb-1" />
                 <small>{{ $t('menu.home') }}</small>
               </a>
@@ -110,7 +110,7 @@ export default {
     const sidebarMinimize = ref(false);
     const showLoginModal = ref(false);
     const dropdownVisible = ref(false);
-    const appVersion = '0.6.0';
+    const appVersion = '0.6.1';
     const unreadNotifications = computed(() => gameStore.unreadNotificationsCount);
     const toasts = ref([]);
 
