@@ -32,9 +32,18 @@
                       v-for="i in 100"
                       :key="i"
                       class="object-grid-cell"
+                      :class="{ 'has-tool': getToolAt(Math.floor((i-1)/10), (i-1)%10) }"
+                      @click="handleCellClick(Math.floor((i-1)/10), (i-1)%10)"
                     >
-                      <!-- Placeholder for future furniture -->
-                      <div class="empty-cell">
+                      <!-- Show placed tools -->
+                      <div
+                        v-if="getToolAt(Math.floor((i-1)/10), (i-1)%10)"
+                        class="placed-tool"
+                      >
+                        <c-icon :name="getToolIcon(getToolAt(Math.floor((i-1)/10), (i-1)%10))" />
+                      </div>
+                      <!-- Placeholder for empty cell -->
+                      <div v-else class="empty-cell">
                         <c-icon name="cilPlus" class="text-muted" />
                       </div>
                     </div>
@@ -119,6 +128,36 @@
         </div>
       </div>
     </div>
+
+    <!-- Tool Selection Modal -->
+    <div v-if="showToolModal" class="upgrade-modal-overlay" @click="showToolModal = false">
+      <div class="upgrade-modal-content" @click.stop>
+        <div class="modal-header">
+          <h5>{{ $t('tools.select_tool') }}</h5>
+          <button type="button" class="btn-close" @click="showToolModal = false"></button>
+        </div>
+        <div class="modal-body">
+          <div v-if="availableTools.length === 0" class="text-center">
+            {{ $t('tools.no_tools_available') }}
+          </div>
+          <div v-else class="row">
+            <div
+              v-for="tool in availableTools"
+              :key="tool.id"
+              class="col-md-4 mb-3"
+            >
+              <div class="card tool-card" @click="addTool(tool)">
+                <div class="card-body text-center">
+                  <c-icon :name="getToolIcon(tool)" size="2xl" class="mb-2" />
+                  <h6 class="card-title">{{ tool.name }}</h6>
+                  <p class="card-text small">{{ tool.description }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -144,6 +183,12 @@ export default {
     const people = ref({ total: 0, by_level: {}, groups: [] });
     const currentTime = ref(Date.now()); // For reactive time updates
     let tickInterval = null;
+
+    // Tool-related data
+    const tools = ref([]);
+    const showToolModal = ref(false);
+    const availableTools = ref([]);
+    const selectedPosition = ref({ x: 0, y: 0 });
 
     const parcelId = computed(() => parseInt(route.params.parcelId));
     const objectId = computed(() => parseInt(route.params.objectId));
@@ -300,12 +345,68 @@ export default {
       }
     };
 
+    // Tool methods
+    const openToolModal = async (x, y) => {
+      console.log('openToolModal called', x, y, objectId.value);
+      selectedPosition.value = { x, y };
+      try {
+        const res = await axios.get(`/api/objects/${objectId.value}/available-tools`);
+        console.log('available tools', res.data);
+        availableTools.value = res.data;
+        showToolModal.value = true;
+      } catch (e) {
+        console.error('Failed to fetch available tools', e);
+        alert('Failed to load available tools. Check console.');
+      }
+    };
+
+    const handleCellClick = (x, y) => {
+      if (!getToolAt(x, y)) {
+        openToolModal(x, y);
+      }
+    };
+
+    const addTool = async (tool) => {
+      try {
+        await axios.post('/api/objects/add-tool', {
+          object_id: objectId.value,
+          tool_type_id: tool.id,
+          position_x: selectedPosition.value.x,
+          position_y: selectedPosition.value.y,
+        });
+        showToolModal.value = false;
+        await loadTools();
+      } catch (e) {
+        console.error('Failed to add tool', e);
+        alert($t('tools.tool_add_failed'));
+      }
+    };
+
+    const loadTools = async () => {
+      try {
+        const res = await axios.get(`/api/objects/${objectId.value}/tools`);
+        console.log('loaded tools', res.data);
+        tools.value = res.data;
+      } catch (e) {
+        console.error('Failed to load tools', e);
+      }
+    };
+
+    const getToolAt = (x, y) => {
+      return tools.value.find(t => t.position_x === x && t.position_y === y);
+    };
+
+    const getToolIcon = (tool) => {
+      return tool?.toolType?.icon || tool?.icon || 'cilWrench';
+    };
+
     onMounted(async () => {
       if (gameStore.user) {
         await gameStore.fetchParcels();
         await fetchCityObjects();
         await fetchObjectTypes();
         await fetchPeople();
+        await loadTools();
       }
       loading.value = false;
 
@@ -345,7 +446,16 @@ export default {
       remainingTimeText,
       availableCountsForLevel,
       startUpgrade,
-      $t
+      // Tool-related
+      tools,
+      showToolModal,
+      availableTools,
+      openToolModal,
+      handleCellClick,
+      addTool,
+      loadTools,
+      getToolAt,
+      getToolIcon
     };
   }
 }
@@ -393,9 +503,27 @@ export default {
   min-height: 30px; /* Minimum touch target */
 }
 
+.has-tool {
+  background: rgba(40, 167, 69, 0.1) !important;
+}
+
 .empty-cell {
   color: #6c757d;
   font-size: 1.2rem;
+}
+
+.placed-tool {
+  color: black;
+  font-size: 1.2rem;
+}
+
+.tool-card {
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.tool-card:hover {
+  transform: scale(1.05);
 }
 
 .object-info {

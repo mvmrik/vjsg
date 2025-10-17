@@ -35,4 +35,9 @@ class CityObject extends Model
     {
         return $this->belongsTo(Parcel::class);
     }
+
+    public function tools()
+    {
+        return $this->hasMany(Tool::class, 'object_id');
+    }
 }
