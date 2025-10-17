@@ -19,6 +19,7 @@
             home: @json(__('home')),
             map: @json(__('map')),
             notifications: @json(__('notifications')),
+            tools: @json(__('tools')),
         };
         window.translations_bg = {
             global: @json(__('global', [], 'bg')),
@@ -28,6 +29,7 @@
             home: @json(__('home', [], 'bg')),
             map: @json(__('map', [], 'bg')),
             notifications: @json(__('notifications', [], 'bg')),
+            tools: @json(__('tools', [], 'bg')),
         };
     </script>
     @vite('resources/js/app.js')

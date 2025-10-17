@@ -32,11 +32,44 @@
                       v-for="i in 100"
                       :key="i"
                       class="object-grid-cell"
+                      :class="{ 'cell-empty': !getToolAt(Math.floor((i-1)/10), (i-1)%10), 'move-target': moveMode && !getToolAt(Math.floor((i-1)/10), (i-1)%10) }"
+                      @click="handleCellClick(Math.floor((i-1)/10), (i-1)%10)"
                     >
-                      <!-- Placeholder for future furniture -->
-                      <div class="empty-cell">
-                        <c-icon name="cilPlus" class="text-muted" />
+                      <!-- Show placed tools -->
+                      <div
+                        v-if="getToolAt(Math.floor((i-1)/10), (i-1)%10)"
+                        class="placed-tool"
+                        @click="handleToolClick(Math.floor((i-1)/10), (i-1)%10)"
+                        @touchstart="handleToolTouch(Math.floor((i-1)/10), (i-1)%10)"
+                      >
+                        <img :src="`/images/tools/${getToolAt(Math.floor((i-1)/10), (i-1)%10)?.tool_type_icon || 'default.png'}`" alt="Tool" style="width: 100%; height: 100%; object-fit: cover;" />
+
+                        <!-- Tool actions overlay -->
+                        <div v-if="hoveredCell && hoveredCell.x === Math.floor((i-1)/10) && hoveredCell.y === (i-1)%10" class="tool-actions">
+                          <div
+                            @click.stop="startMoveMode(getToolAt(Math.floor((i-1)/10), (i-1)%10))"
+                            class="action-icon move-icon"
+                            title="Премести tool"
+                          >
+                            <c-icon name="cil-move" size="xl" />
+                          </div>
+                          <div
+                            @click.stop="showToolInfo(getToolAt(Math.floor((i-1)/10), (i-1)%10))"
+                            class="action-icon info-icon"
+                            title="Информация за tool"
+                          >
+                            <c-icon name="cil-info" size="xl" />
+                          </div>
+                          <div
+                            @click.stop="hideToolActions()"
+                            class="action-icon close-icon"
+                            title="Затвори"
+                          >
+                            <c-icon name="cil-x" size="xl" />
+                          </div>
+                        </div>
                       </div>
+                      <!-- Empty cell, no plus icon -->
                     </div>
                   </div>
                 </div>
@@ -119,6 +152,36 @@
         </div>
       </div>
     </div>
+
+    <!-- Tool Selection Modal -->
+    <div v-if="showToolModal" class="upgrade-modal-overlay" @click="showToolModal = false">
+      <div class="upgrade-modal-content" @click.stop>
+        <div class="modal-header">
+          <h5>{{ $t('tools.select_tool') }}</h5>
+          <button type="button" class="btn-close" @click="showToolModal = false"></button>
+        </div>
+        <div class="modal-body">
+          <div v-if="availableTools.length === 0" class="text-center">
+            {{ $t('tools.no_tools_available') }}
+          </div>
+          <div v-else class="row">
+            <div
+              v-for="tool in availableTools"
+              :key="tool.id"
+              class="col-md-4 mb-3"
+            >
+              <div class="card tool-card" @click="addTool(tool)">
+                <div class="card-body text-center">
+                  <img :src="`/images/tools/${tool.icon || 'default.png'}`" alt="Tool" style="width: 40px; height: 40px;" class="mb-2" />
+                  <h6 class="card-title">{{ tool.name }}</h6>
+                  <p class="card-text small">{{ tool.description }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -144,6 +207,16 @@ export default {
     const people = ref({ total: 0, by_level: {}, groups: [] });
     const currentTime = ref(Date.now()); // For reactive time updates
     let tickInterval = null;
+
+    // Tool-related data
+    const tools = ref([]);
+    const showToolModal = ref(false);
+    const availableTools = ref([]);
+    const selectedPosition = ref({ x: 0, y: 0 });
+    const moveMode = ref(false);
+    const selectedTool = ref(null);
+    const hoveredCell = ref(null);
+    let longPressTimer = null;
 
     const parcelId = computed(() => parseInt(route.params.parcelId));
     const objectId = computed(() => parseInt(route.params.objectId));
@@ -300,14 +373,158 @@ export default {
       }
     };
 
+    // Tool methods
+    const openToolModal = async (x, y) => {
+      console.log('openToolModal called', x, y, objectId.value);
+      selectedPosition.value = { x, y };
+      try {
+        const res = await axios.get(`/api/objects/${objectId.value}/available-tools`);
+        console.log('available tools', res.data);
+        availableTools.value = res.data;
+        showToolModal.value = true;
+      } catch (e) {
+        console.error('Failed to fetch available tools', e);
+        alert('Failed to load available tools. Check console.');
+      }
+    };
+
+    const handleCellClick = (x, y) => {
+      if (moveMode.value) {
+        if (!getToolAt(x, y)) {
+          moveToolTo(x, y);
+        } else {
+          cancelMove();
+        }
+      } else if (getToolAt(x, y)) {
+        // If clicking on a tool, show actions
+        hoveredCell.value = {x, y};
+      } else {
+        // If clicking on empty cell, open tool modal
+        openToolModal(x, y);
+      }
+    };
+
+    const addTool = async (tool) => {
+      try {
+        await axios.post('/api/objects/add-tool', {
+          object_id: objectId.value,
+          tool_type_id: tool.id,
+          position_x: selectedPosition.value.x,
+          position_y: selectedPosition.value.y,
+        });
+        showToolModal.value = false;
+        await loadTools();
+      } catch (e) {
+        console.error('Failed to add tool', e);
+        alert($t('tools.tool_add_failed'));
+      }
+    };
+
+    const loadTools = async () => {
+      try {
+        const res = await axios.get(`/api/objects/${objectId.value}/tools`);
+        console.log('loaded tools', res.data);
+        tools.value = res.data;
+      } catch (e) {
+        console.error('Failed to load tools', e);
+      }
+    };
+
+    const getToolAt = (x, y) => {
+      const tool = tools.value.find(t => t.position_x === x && t.position_y === y);
+      if (tool) {
+        console.log('tool at', x, y, tool, tool.tool_type_icon);
+      }
+      return tool;
+    };
+
+    // Long press for move mode
+    const startLongPress = (tool) => {
+      longPressTimer = setTimeout(() => {
+        moveMode.value = true;
+        selectedTool.value = tool;
+      }, 500);
+    };
+
+    const cancelLongPress = () => {
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+      // Don't cancel moveMode here - let it stay active until user moves or cancels
+    };
+
+    const moveToolTo = async (x, y) => {
+      if (!moveMode.value || !selectedTool.value) return;
+      
+      try {
+        await axios.post('/api/objects/update-tool-position', {
+          tool_id: selectedTool.value.id,
+          x,
+          y
+        });
+        selectedTool.value.position_x = x;
+        selectedTool.value.position_y = y;
+        tools.value = [...tools.value]; // trigger reactivity
+        moveMode.value = false;
+        selectedTool.value = null;
+      } catch (error) {
+        console.error('Failed to move tool', error);
+        alert('Failed to move tool');
+        moveMode.value = false;
+        selectedTool.value = null;
+      }
+    };
+
+    const startMoveMode = (tool) => {
+      moveMode.value = true;
+      selectedTool.value = tool;
+      hoveredCell.value = null; // Hide actions after selecting move
+    };
+
+    const showToolInfo = (tool) => {
+      alert(`Tool: ${tool.name}\nType: ${tool.tool_type_name}\nLevel: ${tool.level || 1}\nPosition: (${tool.position_x}, ${tool.position_y})`);
+      hoveredCell.value = null; // Hide actions after showing info
+    };
+
+    const hideToolActions = () => {
+      hoveredCell.value = null; // Hide actions
+    };
+
+    const cancelMove = () => {
+      moveMode.value = false;
+      selectedTool.value = null;
+    };
+
+    const handleToolClick = (x, y) => {
+      // Toggle actions for tool on click (desktop)
+      if (hoveredCell.value && hoveredCell.value.x === x && hoveredCell.value.y === y) {
+        hoveredCell.value = null; // Hide if already shown
+      } else {
+        hoveredCell.value = {x, y}; // Show if not shown
+      }
+    };
+
+    const handleToolTouch = (x, y) => {
+      // Toggle actions for tool on touch (mobile)
+      if (hoveredCell.value && hoveredCell.value.x === x && hoveredCell.value.y === y) {
+        hoveredCell.value = null; // Hide if already shown
+      } else {
+        hoveredCell.value = {x, y}; // Show if not shown
+      }
+    };
+
     onMounted(async () => {
       if (gameStore.user) {
         await gameStore.fetchParcels();
         await fetchCityObjects();
         await fetchObjectTypes();
         await fetchPeople();
+        await loadTools();
       }
       loading.value = false;
+
+      // Don't hide tool actions automatically - let user control them
 
       // Tick every second to update countdown displays
       tickInterval = setInterval(() => {
@@ -323,10 +540,11 @@ export default {
           }
         });
       }, 1000);
-    });
-    // Clear interval when unmounted
-    onUnmounted(() => {
-      if (tickInterval) clearInterval(tickInterval);
+
+      // Store cleanup function
+      onUnmounted(() => {
+        if (tickInterval) clearInterval(tickInterval);
+      });
     });
 
     return {
@@ -345,7 +563,27 @@ export default {
       remainingTimeText,
       availableCountsForLevel,
       startUpgrade,
-      $t
+      // Tool-related
+      tools,
+      showToolModal,
+      availableTools,
+      openToolModal,
+      handleCellClick,
+      addTool,
+      loadTools,
+      getToolAt,
+      moveMode,
+      selectedTool,
+      hoveredCell,
+      startMoveMode,
+      showToolInfo,
+      hideToolActions,
+      startLongPress,
+      cancelLongPress,
+      moveToolTo,
+      cancelMove,
+      handleToolClick,
+      handleToolTouch
     };
   }
 }
@@ -391,11 +629,87 @@ export default {
   align-items: center;
   justify-content: center;
   min-height: 30px; /* Minimum touch target */
+  cursor: pointer;
+}
+
+.cell-empty:hover {
+  background: rgba(0, 123, 255, 0.1);
+}
+
+.move-target {
+  background: rgba(40, 167, 69, 0.3) !important;
+}
+
+.move-target:hover {
+  background: rgba(40, 167, 69, 0.3) !important;
 }
 
 .empty-cell {
   color: #6c757d;
   font-size: 1.2rem;
+}
+
+.placed-tool {
+  color: black;
+  font-size: 1.2rem;
+  position: relative;
+}
+
+.tool-actions {
+  position: absolute;
+  top: -50px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 4px;
+  z-index: 10;
+}
+
+.action-icon {
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 50%;
+  padding: 8px;
+  font-size: 20px;
+  color: #495057;
+  border: 2px solid #dee2e6;
+  transition: all 0.2s;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+}
+
+.action-icon:hover {
+  background: rgba(255, 255, 255, 1);
+  transform: scale(1.1);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.move-icon:hover {
+  color: #007bff;
+  border-color: #007bff;
+}
+
+.info-icon:hover {
+  color: #17a2b8;
+  border-color: #17a2b8;
+}
+
+.close-icon:hover {
+  color: #dc3545;
+  border-color: #dc3545;
+}
+
+.tool-card {
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.tool-card:hover {
+  transform: scale(1.05);
 }
 
 .object-info {

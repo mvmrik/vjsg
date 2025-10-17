@@ -20,4 +20,9 @@ class ObjectType extends Model
     protected $casts = [
         'meta' => 'array'
     ];
+
+    public function toolTypes()
+    {
+        return $this->belongsToMany(ToolType::class, 'object_type_tool_type');
+    }
 }

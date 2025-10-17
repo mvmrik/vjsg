@@ -83,3 +83,12 @@ Route::middleware(['game.auth'])->group(function () {
     Route::patch('/notifications/mark-all-read', [NotificationsController::class, 'markAllAsRead'])->name('api.notifications.mark-all-read');
     Route::patch('/notifications/{id}/confirm', [NotificationsController::class, 'confirm'])->name('api.notifications.confirm');
 });
+
+use App\Http\Controllers\ToolController;
+
+Route::middleware(['game.auth'])->group(function () {
+    Route::get('/objects/{objectId}/available-tools', [ToolController::class, 'getAvailableTools']);
+    Route::post('/objects/add-tool', [ToolController::class, 'addTool']);
+    Route::get('/objects/{objectId}/tools', [ToolController::class, 'getTools']);
+    Route::post('/objects/update-tool-position', [ToolController::class, 'updateToolPosition']);
+});

@@ -6,6 +6,9 @@ import axios from 'axios';
 // Import flag icons CSS
 import 'flag-icons/css/flag-icons.min.css';
 
+// Import CoreUI icons CSS
+import '@coreui/icons/css/all.min.css';
+
 // Import CoreUI Vue components
 import CoreuiVue from '@coreui/vue';
 import CIcon from '@coreui/icons-vue';

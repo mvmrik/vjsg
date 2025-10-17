@@ -40,7 +40,7 @@
         </div>
 
         <!-- CoreUI Footer -->
-        <c-footer :fixed="false">
+        <c-footer class="fixed-bottom">
           <div class="d-flex justify-content-between w-100">
             <div>
               <span>&copy; {{ new Date().getFullYear() }} Resource Legends. Всички права запазени.</span>
@@ -110,7 +110,7 @@ export default {
     const sidebarMinimize = ref(false);
     const showLoginModal = ref(false);
     const dropdownVisible = ref(false);
-    const appVersion = '0.6.1';
+    const appVersion = '0.6.2';
     const unreadNotifications = computed(() => gameStore.unreadNotificationsCount);
     const toasts = ref([]);
 
