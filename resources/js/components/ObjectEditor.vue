@@ -39,13 +39,35 @@
                       <div
                         v-if="getToolAt(Math.floor((i-1)/10), (i-1)%10)"
                         class="placed-tool"
-                        @mousedown="startLongPress(getToolAt(Math.floor((i-1)/10), (i-1)%10))"
-                        @mouseup="cancelLongPress"
-                        @mouseleave="cancelLongPress"
-                        @touchstart="startLongPress(getToolAt(Math.floor((i-1)/10), (i-1)%10))"
-                        @touchend="cancelLongPress"
+                        @click="handleToolClick(Math.floor((i-1)/10), (i-1)%10)"
+                        @touchstart="handleToolTouch(Math.floor((i-1)/10), (i-1)%10)"
                       >
                         <img :src="`/images/tools/${getToolAt(Math.floor((i-1)/10), (i-1)%10)?.tool_type_icon || 'default.png'}`" alt="Tool" style="width: 100%; height: 100%; object-fit: cover;" />
+
+                        <!-- Tool actions overlay -->
+                        <div v-if="hoveredCell && hoveredCell.x === Math.floor((i-1)/10) && hoveredCell.y === (i-1)%10" class="tool-actions">
+                          <div
+                            @click.stop="startMoveMode(getToolAt(Math.floor((i-1)/10), (i-1)%10))"
+                            class="action-icon move-icon"
+                            title="Премести tool"
+                          >
+                            <c-icon name="cil-move" size="xl" />
+                          </div>
+                          <div
+                            @click.stop="showToolInfo(getToolAt(Math.floor((i-1)/10), (i-1)%10))"
+                            class="action-icon info-icon"
+                            title="Информация за tool"
+                          >
+                            <c-icon name="cil-info" size="xl" />
+                          </div>
+                          <div
+                            @click.stop="hideToolActions()"
+                            class="action-icon close-icon"
+                            title="Затвори"
+                          >
+                            <c-icon name="cil-x" size="xl" />
+                          </div>
+                        </div>
                       </div>
                       <!-- Empty cell, no plus icon -->
                     </div>
@@ -193,6 +215,7 @@ export default {
     const selectedPosition = ref({ x: 0, y: 0 });
     const moveMode = ref(false);
     const selectedTool = ref(null);
+    const hoveredCell = ref(null);
     let longPressTimer = null;
 
     const parcelId = computed(() => parseInt(route.params.parcelId));
@@ -372,7 +395,11 @@ export default {
         } else {
           cancelMove();
         }
-      } else if (!getToolAt(x, y)) {
+      } else if (getToolAt(x, y)) {
+        // If clicking on a tool, show actions
+        hoveredCell.value = {x, y};
+      } else {
+        // If clicking on empty cell, open tool modal
         openToolModal(x, y);
       }
     };
@@ -449,9 +476,42 @@ export default {
       }
     };
 
+    const startMoveMode = (tool) => {
+      moveMode.value = true;
+      selectedTool.value = tool;
+      hoveredCell.value = null; // Hide actions after selecting move
+    };
+
+    const showToolInfo = (tool) => {
+      alert(`Tool: ${tool.name}\nType: ${tool.tool_type_name}\nLevel: ${tool.level || 1}\nPosition: (${tool.position_x}, ${tool.position_y})`);
+      hoveredCell.value = null; // Hide actions after showing info
+    };
+
+    const hideToolActions = () => {
+      hoveredCell.value = null; // Hide actions
+    };
+
     const cancelMove = () => {
       moveMode.value = false;
       selectedTool.value = null;
+    };
+
+    const handleToolClick = (x, y) => {
+      // Toggle actions for tool on click (desktop)
+      if (hoveredCell.value && hoveredCell.value.x === x && hoveredCell.value.y === y) {
+        hoveredCell.value = null; // Hide if already shown
+      } else {
+        hoveredCell.value = {x, y}; // Show if not shown
+      }
+    };
+
+    const handleToolTouch = (x, y) => {
+      // Toggle actions for tool on touch (mobile)
+      if (hoveredCell.value && hoveredCell.value.x === x && hoveredCell.value.y === y) {
+        hoveredCell.value = null; // Hide if already shown
+      } else {
+        hoveredCell.value = {x, y}; // Show if not shown
+      }
     };
 
     onMounted(async () => {
@@ -463,6 +523,8 @@ export default {
         await loadTools();
       }
       loading.value = false;
+
+      // Don't hide tool actions automatically - let user control them
 
       // Tick every second to update countdown displays
       tickInterval = setInterval(() => {
@@ -478,10 +540,11 @@ export default {
           }
         });
       }, 1000);
-    });
-    // Clear interval when unmounted
-    onUnmounted(() => {
-      if (tickInterval) clearInterval(tickInterval);
+
+      // Store cleanup function
+      onUnmounted(() => {
+        if (tickInterval) clearInterval(tickInterval);
+      });
     });
 
     return {
@@ -511,10 +574,16 @@ export default {
       getToolAt,
       moveMode,
       selectedTool,
+      hoveredCell,
+      startMoveMode,
+      showToolInfo,
+      hideToolActions,
       startLongPress,
       cancelLongPress,
       moveToolTo,
-      cancelMove
+      cancelMove,
+      handleToolClick,
+      handleToolTouch
     };
   }
 }
@@ -583,6 +652,55 @@ export default {
 .placed-tool {
   color: black;
   font-size: 1.2rem;
+  position: relative;
+}
+
+.tool-actions {
+  position: absolute;
+  top: -50px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 4px;
+  z-index: 10;
+}
+
+.action-icon {
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 50%;
+  padding: 8px;
+  font-size: 20px;
+  color: #495057;
+  border: 2px solid #dee2e6;
+  transition: all 0.2s;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+}
+
+.action-icon:hover {
+  background: rgba(255, 255, 255, 1);
+  transform: scale(1.1);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.move-icon:hover {
+  color: #007bff;
+  border-color: #007bff;
+}
+
+.info-icon:hover {
+  color: #17a2b8;
+  border-color: #17a2b8;
+}
+
+.close-icon:hover {
+  color: #dc3545;
+  border-color: #dc3545;
 }
 
 .tool-card {
