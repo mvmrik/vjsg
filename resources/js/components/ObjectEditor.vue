@@ -32,20 +32,22 @@
                       v-for="i in 100"
                       :key="i"
                       class="object-grid-cell"
-                      :class="{ 'has-tool': getToolAt(Math.floor((i-1)/10), (i-1)%10) }"
+                      :class="{ 'cell-empty': !getToolAt(Math.floor((i-1)/10), (i-1)%10), 'move-target': moveMode && !getToolAt(Math.floor((i-1)/10), (i-1)%10) }"
                       @click="handleCellClick(Math.floor((i-1)/10), (i-1)%10)"
                     >
                       <!-- Show placed tools -->
                       <div
                         v-if="getToolAt(Math.floor((i-1)/10), (i-1)%10)"
                         class="placed-tool"
+                        @mousedown="startLongPress(getToolAt(Math.floor((i-1)/10), (i-1)%10))"
+                        @mouseup="cancelLongPress"
+                        @mouseleave="cancelLongPress"
+                        @touchstart="startLongPress(getToolAt(Math.floor((i-1)/10), (i-1)%10))"
+                        @touchend="cancelLongPress"
                       >
-                        <c-icon :name="getToolIcon(getToolAt(Math.floor((i-1)/10), (i-1)%10))" />
+                        <img :src="`/images/tools/${getToolAt(Math.floor((i-1)/10), (i-1)%10)?.tool_type_icon || 'default.png'}`" alt="Tool" style="width: 100%; height: 100%; object-fit: cover;" />
                       </div>
-                      <!-- Placeholder for empty cell -->
-                      <div v-else class="empty-cell">
-                        <c-icon name="cilPlus" class="text-muted" />
-                      </div>
+                      <!-- Empty cell, no plus icon -->
                     </div>
                   </div>
                 </div>
@@ -148,7 +150,7 @@
             >
               <div class="card tool-card" @click="addTool(tool)">
                 <div class="card-body text-center">
-                  <c-icon :name="getToolIcon(tool)" size="2xl" class="mb-2" />
+                  <img :src="`/images/tools/${tool.icon || 'default.png'}`" alt="Tool" style="width: 40px; height: 40px;" class="mb-2" />
                   <h6 class="card-title">{{ tool.name }}</h6>
                   <p class="card-text small">{{ tool.description }}</p>
                 </div>
@@ -189,6 +191,9 @@ export default {
     const showToolModal = ref(false);
     const availableTools = ref([]);
     const selectedPosition = ref({ x: 0, y: 0 });
+    const moveMode = ref(false);
+    const selectedTool = ref(null);
+    let longPressTimer = null;
 
     const parcelId = computed(() => parseInt(route.params.parcelId));
     const objectId = computed(() => parseInt(route.params.objectId));
@@ -361,7 +366,13 @@ export default {
     };
 
     const handleCellClick = (x, y) => {
-      if (!getToolAt(x, y)) {
+      if (moveMode.value) {
+        if (!getToolAt(x, y)) {
+          moveToolTo(x, y);
+        } else {
+          cancelMove();
+        }
+      } else if (!getToolAt(x, y)) {
         openToolModal(x, y);
       }
     };
@@ -393,11 +404,54 @@ export default {
     };
 
     const getToolAt = (x, y) => {
-      return tools.value.find(t => t.position_x === x && t.position_y === y);
+      const tool = tools.value.find(t => t.position_x === x && t.position_y === y);
+      if (tool) {
+        console.log('tool at', x, y, tool, tool.tool_type_icon);
+      }
+      return tool;
     };
 
-    const getToolIcon = (tool) => {
-      return tool?.toolType?.icon || tool?.icon || 'cilWrench';
+    // Long press for move mode
+    const startLongPress = (tool) => {
+      longPressTimer = setTimeout(() => {
+        moveMode.value = true;
+        selectedTool.value = tool;
+      }, 500);
+    };
+
+    const cancelLongPress = () => {
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+      // Don't cancel moveMode here - let it stay active until user moves or cancels
+    };
+
+    const moveToolTo = async (x, y) => {
+      if (!moveMode.value || !selectedTool.value) return;
+      
+      try {
+        await axios.post('/api/objects/update-tool-position', {
+          tool_id: selectedTool.value.id,
+          x,
+          y
+        });
+        selectedTool.value.position_x = x;
+        selectedTool.value.position_y = y;
+        tools.value = [...tools.value]; // trigger reactivity
+        moveMode.value = false;
+        selectedTool.value = null;
+      } catch (error) {
+        console.error('Failed to move tool', error);
+        alert('Failed to move tool');
+        moveMode.value = false;
+        selectedTool.value = null;
+      }
+    };
+
+    const cancelMove = () => {
+      moveMode.value = false;
+      selectedTool.value = null;
     };
 
     onMounted(async () => {
@@ -455,7 +509,12 @@ export default {
       addTool,
       loadTools,
       getToolAt,
-      getToolIcon
+      moveMode,
+      selectedTool,
+      startLongPress,
+      cancelLongPress,
+      moveToolTo,
+      cancelMove
     };
   }
 }
@@ -501,10 +560,19 @@ export default {
   align-items: center;
   justify-content: center;
   min-height: 30px; /* Minimum touch target */
+  cursor: pointer;
 }
 
-.has-tool {
-  background: rgba(40, 167, 69, 0.1) !important;
+.cell-empty:hover {
+  background: rgba(0, 123, 255, 0.1);
+}
+
+.move-target {
+  background: rgba(40, 167, 69, 0.3) !important;
+}
+
+.move-target:hover {
+  background: rgba(40, 167, 69, 0.3) !important;
 }
 
 .empty-cell {

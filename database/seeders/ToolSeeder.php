@@ -10,6 +10,8 @@ class ToolSeeder extends Seeder
 {
     public function run()
     {
+        // Clear pivot table to avoid duplicates
+        DB::table('object_type_tool_type')->truncate();
         // Ensure object types exist
         $objectTypes = [
             'house' => ObjectType::firstOrCreate(['type' => 'house'], ['name' => 'Къща', 'icon' => 'cilHome', 'build_time_minutes' => 5, 'meta' => json_encode(['width' => 3, 'height' => 3]), 'created_at' => now(), 'updated_at' => now()]),
@@ -21,13 +23,13 @@ class ToolSeeder extends Seeder
 
         // Tool types
         $toolTypes = [
-            ['name' => 'Student Materials', 'description' => 'Materials for students', 'icon' => 'cilBook'],
-            ['name' => 'Medical Equipment', 'description' => 'Equipment for medical use', 'icon' => 'cilMedicalCross'],
-            ['name' => 'Food Production', 'description' => 'Production of food', 'icon' => 'cilApple'],
-            ['name' => 'Food Raw Materials', 'description' => 'Raw materials for food', 'icon' => 'cilGrain'],
-            ['name' => 'Building Raw Materials', 'description' => 'Raw materials for building', 'icon' => 'cilBuilding'],
-            ['name' => 'Heating Device', 'description' => 'Device for heating', 'icon' => 'cilHot'],
-            ['name' => 'Security System', 'description' => 'System for security', 'icon' => 'cilShieldAlt'],
+            ['name' => 'Student Materials', 'description' => 'Materials for students', 'icon' => 'student_materials.png'],
+            ['name' => 'Medical Equipment', 'description' => 'Equipment for medical use', 'icon' => 'medical_equipment.png'],
+            ['name' => 'Food Production', 'description' => 'Production of food', 'icon' => 'food_production.png'],
+            ['name' => 'Food Raw Materials', 'description' => 'Raw materials for food', 'icon' => 'food_raw_materials.png'],
+            ['name' => 'Building Raw Materials', 'description' => 'Raw materials for building', 'icon' => 'building_raw_materials.png'],
+            ['name' => 'Heating Device', 'description' => 'Device for heating', 'icon' => 'heating_device.png'],
+            ['name' => 'Security System', 'description' => 'System for security', 'icon' => 'security_system.png'],
         ];
 
         $toolTypeIds = [];

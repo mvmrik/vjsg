@@ -45,7 +45,38 @@ class ToolController extends Controller
 
     public function getTools($objectId)
     {
-        $tools = Tool::where('object_id', $objectId)->with('toolType')->get();
+        $tools = Tool::join('tool_types', 'tools.tool_type_id', '=', 'tool_types.id')
+            ->where('tools.object_id', $objectId)
+            ->select('tools.*', 'tool_types.name as tool_type_name', 'tool_types.icon as tool_type_icon')
+            ->get();
         return response()->json($tools);
+    }
+
+    public function updateToolPosition(Request $request)
+    {
+        $request->validate([
+            'tool_id' => 'required|exists:tools,id',
+            'x' => 'required|integer|min:0|max:9',
+            'y' => 'required|integer|min:0|max:9',
+        ]);
+
+        $tool = Tool::findOrFail($request->tool_id);
+
+        // Check if position is occupied
+        $existing = Tool::where('object_id', $tool->object_id)
+            ->where('position_x', $request->x)
+            ->where('position_y', $request->y)
+            ->where('id', '!=', $tool->id)
+            ->first();
+
+        if ($existing) {
+            return response()->json(['error' => 'Position already occupied'], 400);
+        }
+
+        $tool->position_x = $request->x;
+        $tool->position_y = $request->y;
+        $tool->save();
+
+        return response()->json(['success' => true]);
     }
 }

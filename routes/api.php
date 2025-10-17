@@ -90,4 +90,5 @@ Route::middleware(['game.auth'])->group(function () {
     Route::get('/objects/{objectId}/available-tools', [ToolController::class, 'getAvailableTools']);
     Route::post('/objects/add-tool', [ToolController::class, 'addTool']);
     Route::get('/objects/{objectId}/tools', [ToolController::class, 'getTools']);
+    Route::post('/objects/update-tool-position', [ToolController::class, 'updateToolPosition']);
 });
