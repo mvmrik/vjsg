@@ -2,7 +2,7 @@
   <c-row class="justify-content-center">
     <c-col md="12">
       <!-- Language Selector -->
-      <div class="d-flex justify-content-end mb-3">
+      <div v-if="!gameStore.isAuthenticated" class="d-flex justify-content-end mb-3">
         <div class="btn-group" role="group">
           <button 
             type="button" 
@@ -23,217 +23,125 @@
         </div>
       </div>
 
-      <!-- Welcome Section -->
-      <c-row class="mb-4">
-        <c-col md="8">
-          <c-card class="mb-4">
-            <c-card-body>
-              <h1 class="display-5 fw-bold text-primary">{{ $t('home.welcome_title') }}</h1>
-              <p class="lead">
-                {{ $t('home.welcome_description') }}
-              </p>
-              <div class="d-flex gap-2">
-                <c-button 
-                  color="primary" 
-                  size="lg"
-                  @click="$router.push('/map')" 
-                  v-if="gameStore.isAuthenticated"
-                >
-                  <c-icon name="cilMap" class="me-2" />
-                  {{ $t('home.go_to_map') }}
-                </c-button>
-                <c-button 
-                  color="success" 
-                  size="lg"
-                  @click="$router.push('/settings')" 
-                  v-if="gameStore.isAuthenticated"
-                >
-                  <c-icon name="cilUser" class="me-2" />
-                  {{ $t('home.my_settings') }}
-                </c-button>
-              </div>
-            </c-card-body>
-          </c-card>
-        </c-col>
+      <!-- Map for authenticated users -->
+      <div v-if="gameStore.isAuthenticated">
+        <c-card class="mb-4">
+          <c-card-header class="d-flex justify-content-between align-items-center">
+            <strong>
+              <c-icon name="cilMap" class="me-2" />
+              {{ $t('map.game_map') }}
+            </strong>
+            <div>
+              <c-button 
+                color="primary" 
+                size="sm" 
+                @click="centerOnUserParcels"
+                :disabled="!userParcels.length"
+                class="me-2"
+              >
+                <c-icon name="cilLocationPin" class="me-1" />
+                {{ $t('map.my_parcels') }}
+              </c-button>
+              <c-button 
+                color="success" 
+                size="sm" 
+                @click="refreshMap"
+                :disabled="loading"
+              >
+                <c-spinner v-if="loading" size="sm" class="me-1" />
+                <c-icon v-else name="cilReload" class="me-1" />
+                {{ $t('map.refresh') }}
+              </c-button>
+            </div>
+          </c-card-header>
+          <c-card-body class="p-0">
+            <div id="map" style="height: 600px; width: 100%;"></div>
+          </c-card-body>
+        </c-card>
 
-        <c-col md="4">
-          <c-card class="h-100">
-            <c-card-body class="d-flex flex-column justify-content-center text-center">
-              <c-icon name="cilGamepad" size="3xl" class="text-primary mb-3" />
-              <h5>{{ $t('home.game_status') }}</h5>
-              <p v-if="gameStore.isAuthenticated" class="text-success">
-                <c-icon name="cilCheckCircle" class="me-1" />
-                {{ $t('home.logged_in_as') }} {{ gameStore.user?.username }}
-              </p>
-              <p v-else class="text-muted">
-                <c-icon name="cilAccountLogout" class="me-1" />
-                {{ $t('home.not_logged_in') }}
-              </p>
-            </c-card-body>
-          </c-card>
-        </c-col>
-      </c-row>
+        <c-row>
+          <c-col md="4">
+            <c-card class="mb-4">
+              <c-card-header>
+                <strong>{{ $t('map.statistics') }}</strong>
+              </c-card-header>
+              <c-card-body>
+                <c-list-group flush>
+                  <c-list-group-item class="d-flex justify-content-between align-items-center">
+                    <span>
+                      <c-icon name="cilHome" class="me-2 text-primary" />
+                      {{ $t('map.my_parcels') }}
+                    </span>
+                    <c-badge color="primary">{{ userParcels.length }}</c-badge>
+                  </c-list-group-item>
+                  <c-list-group-item class="d-flex justify-content-between align-items-center">
+                    <span>
+                      <c-icon name="cilGlobeAlt" class="me-2 text-success" />
+                      {{ $t('map.total_parcels') }}
+                    </span>
+                    <c-badge color="success">{{ parcels.length }}</c-badge>
+                  </c-list-group-item>
+                  <c-list-group-item class="d-flex justify-content-between align-items-center">
+                    <span>
+                      <c-icon name="cilUser" class="me-2 text-info" />
+                      {{ $t('map.active_players') }}
+                    </span>
+                    <c-badge color="info">{{ uniqueOwners }}</c-badge>
+                  </c-list-group-item>
+                </c-list-group>
+              </c-card-body>
+            </c-card>
+          </c-col>
 
-      <!-- Game Stats Dashboard -->
-      <c-row class="mb-4" v-if="gameStore.isAuthenticated">
-        <c-col sm="6" md="3">
-          <c-card class="mb-4 text-white bg-primary">
-            <c-card-body class="pb-0 d-flex justify-content-between align-items-start">
-              <div>
-                <div class="fs-4 fw-semibold">
-                  {{ gameStats.resources || 0 }}
-                  <span class="fs-6 ms-2 fw-normal">ресурси</span>
-                </div>
-                <div>Общо ресурси</div>
-              </div>
-              <c-dropdown>
-                <template #toggler="{ on }">
-                  <c-button
-                    color="transparent"
-                    size="sm"
-                    v-on="on"
-                  >
-                    <c-icon name="cilOptions" />
-                  </c-button>
-                </template>
-                <c-dropdown-item>Действие</c-dropdown-item>
-                <c-dropdown-item>Още действие</c-dropdown-item>
-              </c-dropdown>
-            </c-card-body>
-          </c-card>
-        </c-col>
-
-        <c-col sm="6" md="3">
-          <c-card class="mb-4 text-white bg-info">
-            <c-card-body class="pb-0 d-flex justify-content-between align-items-start">
-              <div>
-                <div class="fs-4 fw-semibold">
-                  {{ gameStats.level || 1 }}
-                  <span class="fs-6 ms-2 fw-normal">ниво</span>
-                </div>
-                <div>Текущо ниво</div>
-              </div>
-              <c-dropdown>
-                <template #toggler="{ on }">
-                  <c-button
-                    color="transparent"
-                    size="sm"
-                    v-on="on"
-                  >
-                    <c-icon name="cilOptions" />
-                  </c-button>
-                </template>
-                <c-dropdown-item>Действие</c-dropdown-item>
-              </c-dropdown>
-            </c-card-body>
-          </c-card>
-        </c-col>
-
-        <c-col sm="6" md="3">
-          <c-card class="mb-4 text-white bg-warning">
-            <c-card-body class="pb-0 d-flex justify-content-between align-items-start">
-              <div>
-                <div class="fs-4 fw-semibold">
-                  {{ people.total || 0 }}
-                  <span class="fs-6 ms-2 fw-normal">популация</span>
-                </div>
-                <div>Хора (по нива)</div>
-                <div class="small text-white-50 mt-1" v-if="people.by_level">
-                  <span v-for="(count, lvl) in people.by_level" :key="lvl" class="me-2">LV {{ lvl }}: {{ count }}</span>
-                </div>
-              </div>
-              <c-dropdown>
-                <template #toggler="{ on }">
-                  <c-button
-                    color="transparent"
-                    size="sm"
-                    v-on="on"
-                  >
-                    <c-icon name="cilOptions" />
-                  </c-button>
-                </template>
-                <c-dropdown-item>Управление</c-dropdown-item>
-              </c-dropdown>
-            </c-card-body>
-          </c-card>
-        </c-col>
-
-        <c-col sm="6" md="3">
-          <c-card class="mb-4 text-white bg-danger">
-            <c-card-body class="pb-0 d-flex justify-content-between align-items-start">
-              <div>
-                <div class="fs-4 fw-semibold">
-                  {{ gameStats.parcels || 0 }}
-                  <span class="fs-6 ms-2 fw-normal">парцели</span>
-                </div>
-                <div>Мои парцели</div>
-              </div>
-              <c-dropdown>
-                <template #toggler="{ on }">
-                  <c-button
-                    color="transparent"
-                    size="sm"
-                    v-on="on"
-                  >
-                    <c-icon name="cilOptions" />
-                  </c-button>
-                </template>
-                <c-dropdown-item>Управление</c-dropdown-item>
-              </c-dropdown>
-            </c-card-body>
-          </c-card>
-        </c-col>
-      </c-row>
-
-      <!-- Recent Activity -->
-      <c-row v-if="gameStore.isAuthenticated">
-        <c-col md="8">
-          <c-card class="mb-4">
-            <c-card-header>
-              <strong>Последна активност</strong>
-            </c-card-header>
-            <c-card-body>
-              <c-list-group flush>
-                <c-list-group-item 
-                  v-for="activity in recentActivity" 
-                  :key="activity.id"
-                  class="d-flex justify-content-between align-items-center"
-                >
-                  <div>
-                    <c-icon :name="activity.icon" class="me-2" :class="activity.iconColor" />
-                    {{ activity.message }}
+          <c-col md="4">
+            <c-card class="mb-4">
+              <c-card-header>
+                <strong>{{ $t('map.legend') }}</strong>
+              </c-card-header>
+              <c-card-body>
+                <div class="mb-3">
+                  <div class="d-flex align-items-center mb-2">
+                    <div class="legend-color me-2" style="background: #059669;"></div>
+                    <span>{{ $t('map.your_parcels') }}</span>
                   </div>
-                  <c-badge :color="activity.badgeColor">{{ activity.time }}</c-badge>
-                </c-list-group-item>
-              </c-list-group>
-            </c-card-body>
-          </c-card>
-        </c-col>
+                  <div class="d-flex align-items-center mb-2">
+                    <div class="legend-color me-2" style="background: #dc2626;"></div>
+                    <span>{{ $t('map.other_parcels') }}</span>
+                  </div>
+                  <div class="d-flex align-items-center mb-2">
+                    <div class="legend-color dashed me-2" style="border: 1px dashed #cccccc; background: rgba(204,204,204,0.1);"></div>
+                    <span>{{ $t('map.available_for_claim') }}</span>
+                  </div>
+                </div>
+              </c-card-body>
+            </c-card>
+          </c-col>
 
-        <c-col md="4">
-          <c-card class="mb-4">
-            <c-card-header>
-              <strong>Бързи действия</strong>
-            </c-card-header>
-            <c-card-body>
-              <div class="d-grid gap-2">
-                <c-button color="primary" @click="$router.push('/map')">
-                  <c-icon name="cilMap" class="me-2" />
-                  Отвори картата
-                </c-button>
-                <c-button color="success" @click="collectResources">
-                  <c-icon name="cilStorage" class="me-2" />
-                  Събери ресурси
-                </c-button>
-                <c-button color="info" @click="$router.push('/settings')">
-                  <c-icon name="cilUser" class="me-2" />
-                  Настройки
-                </c-button>
-              </div>
-            </c-card-body>
-          </c-card>
-        </c-col>
-      </c-row>
+          <c-col md="4">
+            <c-card class="mb-4">
+              <c-card-header>
+                <strong>{{ $t('map.instructions') }}</strong>
+              </c-card-header>
+              <c-card-body>
+                <ul class="mb-0 ps-3">
+                  <li v-if="!userParcels.length" class="mb-2">
+                    <strong>{{ $t('map.first_parcel') }}</strong>
+                  </li>
+                  <li v-else class="mb-2">
+                    <strong>{{ $t('map.new_parcels') }}</strong>
+                  </li>
+                  <li class="mb-2">
+                    <strong>{{ $t('map.parcel_info') }}</strong>
+                  </li>
+                  <li class="mb-0">
+                    <strong>{{ $t('map.navigation') }}</strong>
+                  </li>
+                </ul>
+              </c-card-body>
+            </c-card>
+          </c-col>
+        </c-row>
+      </div>
 
       <!-- Login/Register section for non-authenticated users -->
       <c-row v-else>
@@ -372,9 +280,12 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, inject } from 'vue';
+import { ref, computed, onMounted, watch, nextTick, inject } from 'vue';
 import { useRouter } from 'vue-router';
 import { useGameStore } from '../stores/gameStore';
+import axios from 'axios';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
 export default {
   name: 'HomePage',
@@ -399,51 +310,18 @@ export default {
       username: ''
     });
 
-    
-    // Mock game stats - replace with real data from store
-    const gameStats = ref({
-      resources: 1250,
-      level: 15,
-      experience: 3450,
-      parcels: 3
+    // Map related
+    const parcels = computed(() => gameStore.parcels || []);
+    const userParcels = computed(() => 
+      parcels.value.filter(p => p.user_id === gameStore.user?.id)
+    );
+    const uniqueOwners = computed(() => {
+      const owners = new Set(parcels.value.map(p => p.user_id));
+      return owners.size;
     });
-
-    const people = ref({ total: 0, by_level: null, groups: [] });
-
-    const recentActivity = ref([
-      {
-        id: 1,
-        message: 'Събрахте 50 дърво от парцел #123',
-        time: '2 мин',
-        icon: 'cilStorage',
-        iconColor: 'text-success',
-        badgeColor: 'success'
-      },
-      {
-        id: 2,
-        message: 'Качихте се на ниво 15',
-        time: '1 час',
-        icon: 'cilStar',
-        iconColor: 'text-warning',
-        badgeColor: 'warning'
-      },
-      {
-        id: 3,
-        message: 'Закупихте нов парцел',
-        time: '3 часа',
-        icon: 'cilMap',
-        iconColor: 'text-info',
-        badgeColor: 'info'
-      },
-      {
-        id: 4,
-        message: 'Влязохте в играта',
-        time: '5 часа',
-        icon: 'cilAccountLogout',
-        iconColor: 'text-primary',
-        badgeColor: 'primary'
-      }
-    ]);
+    let map = null;
+    let territories = [];
+    let ghosts = [];
     
     const showMessage = (msg, type) => {
       message.value = msg;
@@ -466,8 +344,8 @@ export default {
 
       try {
         await gameStore.login(loginForm.value.privateKey, loginForm.value.rememberMe);
-        // Login successful, redirect to map
-        await router.push('/map');
+        // Login successful, redirect to home
+        await router.push('/');
       } catch (error) {
         showMessage(gameStore.error || 'Грешка при влизане', 'error');
       } finally {
@@ -489,30 +367,208 @@ export default {
         loading.value = false;
       }
     };
+
+    // Map functions
+    const fetchParcels = async () => {
+      await gameStore.fetchParcels();
+      updateMap();
+    };
+
+    const updateMap = () => {
+      // Clear existing territories
+      territories.forEach(terr => terr.remove());
+      territories = [];
+      ghosts.forEach(ghost => ghost.remove());
+      ghosts = [];
+
+      // Draw all parcels
+      parcels.value.forEach(parcel => {
+        if (!parcel || parcel.lat == null || parcel.lng == null) return;
+        const bounds = getSquareBounds(parcel.lat, parcel.lng);
+        const color = parcel.user_id === gameStore.user?.id ? '#059669' : '#dc2626'; // green for own, red for others
+        const rect = L.rectangle(bounds, {
+          color: color,
+          weight: 1,
+          fillOpacity: 0.5
+        }).addTo(map);
+        rect.bindPopup(`${$t('map.parcel')}: ${parseFloat(parcel.lat)}, ${parseFloat(parcel.lng)}<br>${$t('map.owner')}: ${parcel.user.username}`);
+        territories.push(rect);
+      });
+
+      // Generate ghost squares adjacent to user's parcels
+      const userParcels = parcels.value.filter(p => p.user_id === gameStore.user?.id);
+      if (userParcels.length > 0) {
+        const potentialSquares = new Set();
+        userParcels.forEach(parcel => {
+          if (!parcel || parcel.lat == null || parcel.lng == null) return;
+          const lat = parseFloat(parcel.lat);
+          const lng = parseFloat(parcel.lng);
+          const directions = [
+            { dlat: 10 / 111000, dlng: 0 }, // North
+            { dlat: -10 / 111000, dlng: 0 }, // South
+            { dlat: 0, dlng: 10 / (111000 * Math.cos(lat * Math.PI / 180)) }, // East
+            { dlat: 0, dlng: -10 / (111000 * Math.cos(lat * Math.PI / 180)) }, // West
+          ];
+          directions.forEach(dir => {
+            const newLat = lat + dir.dlat;
+            const newLng = lng + dir.dlng;
+            const key = `${newLat.toFixed(6)},${newLng.toFixed(6)}`;
+            if (!isClaimed(newLat, newLng)) {
+              potentialSquares.add(key);
+            }
+          });
+        });
+
+        potentialSquares.forEach(key => {
+          const [lat, lng] = key.split(',').map(Number);
+          const bounds = getSquareBounds(lat, lng);
+          const ghost = L.rectangle(bounds, {
+            color: '#cccccc',
+            dashArray: '5,5',
+            weight: 1,
+            fillOpacity: 0.1
+          }).addTo(map);
+          ghost.bindPopup(`Available: ${lat}, ${lng}`);
+          ghosts.push(ghost);
+
+          // Hover effects
+          ghost.on('mouseover', function() {
+            this.setStyle({ dashArray: null, fillOpacity: 0.3 });
+          });
+          ghost.on('mouseout', function() {
+            this.setStyle({ dashArray: '5,5', fillOpacity: 0.1 });
+          });
+
+          // Click to claim
+          ghost.on('click', function(e) {
+            L.DomEvent.stopPropagation(e);
+            claimParcel(lat, lng);
+          });
+        });
+      }
+    };
+
+    const getSquareBounds = (lat, lng) => {
+      lat = parseFloat(lat);
+      lng = parseFloat(lng);
+      const delta_lat = 10 / 111000; // approx 10 meters
+      const cos_lat = Math.cos(lat * Math.PI / 180);
+      const delta_lng = 10 / (111000 * cos_lat);
+      const sw = L.latLng(lat - delta_lat / 2, lng - delta_lng / 2);
+      const ne = L.latLng(lat + delta_lat / 2, lng + delta_lng / 2);
+      return L.latLngBounds(sw, ne);
+    };
+
+    const isClaimed = (lat, lng) => {
+      return parcels.value.some(p => Math.abs(p.lat - lat) < 0.00005 && Math.abs(p.lng - lng) < 0.00005);
+    };
+
+    const claimParcel = async (lat, lng) => {
+      loading.value = true;
+      try {
+        const res = await axios.post('/api/parcels/claim', { lat, lng });
+        if (res.data.success) {
+          await gameStore.fetchParcels(); // Update game store
+          updateMap();
+          message.value = $t('map.parcel_claimed_successfully');
+          messageType.value = 'success';
+          // Center on user's parcels
+          centerOnUserParcels();
+        } else {
+          message.value = res.data.message || $t('map.claim_failed');
+          messageType.value = 'error';
+        }
+      } catch (e) {
+        message.value = e.response?.data?.message || $t('map.claim_error');
+        messageType.value = 'error';
+      } finally {
+        loading.value = false;
+      }
+    };
+
+    const centerOnUserParcels = () => {
+      if (userParcels.value.length > 0) {
+        const bounds = userParcels.value.map(p => [p.lat, p.lng]);
+        map.fitBounds(L.latLngBounds(bounds), { maxZoom: 18 });
+      }
+    };
+
+    const refreshMap = () => {
+      fetchParcels();
+    };
     
     // Load user stats on mount
     onMounted(() => {
       if (gameStore.isAuthenticated) {
         // Load real game stats here
         gameStore.checkAuthStatus();
-        // fetch people info
-        fetchPeople();
+        // Initialize map
+        map = L.map('map').setView([42.6977, 23.3219], 13); // Default center
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Handle map click for first claim
+        map.on('click', function(e) {
+          const latlng = e.latlng;
+          if (isClaimed(latlng.lat, latlng.lng)) {
+            alert($t('map.area_already_claimed'));
+            return;
+          }
+          const userParcels = parcels.value.filter(p => p.user_id === gameStore.user?.id);
+          if (userParcels.length === 0) {
+            // First claim anywhere
+            claimParcel(latlng.lat, latlng.lng);
+          }
+        });
+
+        fetchParcels().then(() => {
+          // Center on user's parcels if any
+          const userParcels = parcels.value.filter(p => p.user_id === gameStore.user?.id);
+          if (userParcels.length > 0) {
+            const bounds = userParcels.map(p => [p.lat, p.lng]);
+            map.fitBounds(L.latLngBounds(bounds), { maxZoom: 18 });
+          }
+        });
       }
     });
 
-    const fetchPeople = async () => {
-      try {
-        const res = await fetch('/api/people');
-        const data = await res.json();
-        if (data.success) {
-          people.value.total = data.total || 0;
-          people.value.by_level = data.by_level || {};
-          people.value.groups = data.groups || [];
-        }
-      } catch (e) {
-        console.error('Failed to fetch people', e);
+    // Watch for authentication changes to initialize map when user logs in
+    watch(() => gameStore.isAuthenticated, async (isAuthenticated) => {
+      if (isAuthenticated && !map) {
+        // Wait for DOM to update before initializing map
+        await nextTick();
+        
+        // Initialize map when user becomes authenticated
+        map = L.map('map').setView([42.6977, 23.3219], 13); // Default center
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Handle map click for first claim
+        map.on('click', function(e) {
+          const latlng = e.latlng;
+          if (isClaimed(latlng.lat, latlng.lng)) {
+            alert($t('map.area_already_claimed'));
+            return;
+          }
+          const userParcels = parcels.value.filter(p => p.user_id === gameStore.user?.id);
+          if (userParcels.length === 0) {
+            // First claim anywhere
+            claimParcel(latlng.lat, latlng.lng);
+          }
+        });
+
+        fetchParcels().then(() => {
+          // Center on user's parcels if any
+          const userParcels = parcels.value.filter(p => p.user_id === gameStore.user?.id);
+          if (userParcels.length > 0) {
+            const bounds = userParcels.map(p => [p.lat, p.lng]);
+            map.fitBounds(L.latLngBounds(bounds), { maxZoom: 18 });
+          }
+        });
       }
-    };
+    });
 
     const changeLanguage = (lang) => {
       $changeLanguage(lang);
@@ -525,10 +581,12 @@ export default {
       activeAuthTab,
       loginForm,
       registerForm,
-      gameStats,
-      people,
-      recentActivity,
       gameStore,
+      parcels,
+      userParcels,
+      uniqueOwners,
+      centerOnUserParcels,
+      refreshMap,
       currentLocale,
       showMessage,
       collectResources,
@@ -540,3 +598,19 @@ export default {
   }
 }
 </script>
+
+<style scoped>
+.legend-color {
+  width: 20px;
+  height: 15px;
+  border-radius: 2px;
+}
+
+.legend-color.dashed {
+  background: rgba(204,204,204,0.1) !important;
+}
+
+#map {
+  border-radius: 0 0 0.375rem 0.375rem;
+}
+</style>
