@@ -200,11 +200,12 @@ export default {
           if (!parcel || parcel.lat == null || parcel.lng == null) return;
           const lat = parseFloat(parcel.lat);
           const lng = parseFloat(parcel.lng);
+          const parcelSize = 500; // 500 meters
           const directions = [
-            { dlat: 10 / 111000, dlng: 0 }, // North
-            { dlat: -10 / 111000, dlng: 0 }, // South
-            { dlat: 0, dlng: 10 / (111000 * Math.cos(lat * Math.PI / 180)) }, // East
-            { dlat: 0, dlng: -10 / (111000 * Math.cos(lat * Math.PI / 180)) }, // West
+            { dlat: parcelSize / 111000, dlng: 0 }, // North
+            { dlat: -parcelSize / 111000, dlng: 0 }, // South
+            { dlat: 0, dlng: parcelSize / (111000 * Math.cos(lat * Math.PI / 180)) }, // East
+            { dlat: 0, dlng: -parcelSize / (111000 * Math.cos(lat * Math.PI / 180)) }, // West
           ];
           directions.forEach(dir => {
             const newLat = lat + dir.dlat;
@@ -248,29 +249,32 @@ export default {
     const getSquareBounds = (lat, lng) => {
       lat = parseFloat(lat);
       lng = parseFloat(lng);
-      const delta_lat = 10 / 111000; // approx 10 meters
+      const delta_lat = 500 / 111000; // approx 500 meters
       const cos_lat = Math.cos(lat * Math.PI / 180);
-      const delta_lng = 10 / (111000 * cos_lat);
+      const delta_lng = 500 / (111000 * cos_lat);
       const sw = L.latLng(lat - delta_lat / 2, lng - delta_lng / 2);
       const ne = L.latLng(lat + delta_lat / 2, lng + delta_lng / 2);
       return L.latLngBounds(sw, ne);
     };
 
     const isClaimed = (lat, lng) => {
-      return parcels.value.some(p => Math.abs(p.lat - lat) < 0.00005 && Math.abs(p.lng - lng) < 0.00005);
+      // Check if a parcel exists within a 500m range
+      const delta = 500 / 111000 / 2;
+      return parcels.value.some(p => Math.abs(p.lat - lat) < delta && Math.abs(p.lng - lng) < delta);
     };
 
     const canClaim = (lat, lng) => {
       const myParcels = parcels.value.filter(p => p.user_id === gameStore.user?.id);
       if (myParcels.length === 0) return true;
-      // Check if adjacent to any of my parcels
+      // Check if adjacent to any of my parcels (within 500m range)
       return myParcels.some(p => {
         const dist_lat = Math.abs(p.lat - lat);
         const dist_lng = Math.abs(p.lng - lng);
-        const delta_lat = 10 / 111000;
+        const delta_lat = 500 / 111000;
         const cos_lat = Math.cos(lat * Math.PI / 180);
-        const delta_lng = 10 / (111000 * cos_lat);
-        return dist_lat <= delta_lat * 1.1 && dist_lng <= delta_lng * 1.1;
+        const delta_lng = 500 / (111000 * cos_lat);
+        // Check for adjacency (touching edges)
+        return dist_lat < delta_lat * 1.1 && dist_lng < delta_lng * 1.1;
       });
     };
 
@@ -299,12 +303,10 @@ export default {
 
     const centerOnUserParcels = () => {
       if (userParcels.value.length > 0) {
-        const bounds = userParcels.value.map(p => [p.lat, p.lng]);
-        map.fitBounds(L.latLngBounds(bounds), { maxZoom: 18 });
+        const bounds = L.latLngBounds(userParcels.value.map(p => [p.lat, p.lng]));
+        map.fitBounds(bounds.pad(0.1)); // Add small padding to see all parcels
       }
-    };
-
-    const refreshMap = () => {
+    };    const refreshMap = () => {
       fetchParcels();
     };
 

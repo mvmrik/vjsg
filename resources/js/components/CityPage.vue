@@ -136,7 +136,7 @@ export default {
       
       const minY = Math.min(...allParcels.map(p => p.city_y));
       const maxY = Math.max(...allParcels.map(p => p.city_y));
-      const parcelSize = Math.max(60, Math.min(110, cityMapWidth.value / 10));
+      const parcelSize = Math.max(60, Math.min(110, cityMapWidth.value / 4));
       const streetWidth = 10;
       
       return (maxY - minY + 1) * (parcelSize + streetWidth) + 40; // +40 for padding

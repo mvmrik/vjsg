@@ -31,9 +31,10 @@ class ParcelsController extends Controller
         $lat = $request->lat;
         $lng = $request->lng;
 
-        // Check if parcel already exists within ~5m (rough approximation)
-        $existing = Parcel::whereRaw("ABS(lat - ?) < 0.00005", [$lat]) // ~5m lat difference
-            ->whereRaw("ABS(lng - ?) < 0.00005", [$lng]) // ~5m lng difference at equator
+        // Check if parcel already exists within ~250m (half of 500m)
+        $lng_delta = 0.00225 / cos(deg2rad($lat)); // Adjust for longitude
+        $existing = Parcel::whereRaw("ABS(lat - ?) < 0.00225", [$lat]) // ~250m lat difference
+            ->whereRaw("ABS(lng - ?) < ?", [$lng, $lng_delta]) // ~250m lng difference
             ->first();
         if ($existing) {
             return response()->json(['success' => false, 'message' => 'This area is already claimed'], 409);
@@ -51,11 +52,12 @@ class ParcelsController extends Controller
             // First parcel at (0,0)
             \Log::info("First parcel for user {$userId}");
         } else {
-            // Find the closest adjacent parcel
+                        // Find the closest adjacent parcel (within ~550m range to be safe)
+            $lng_delta_adj = 0.005 / cos(deg2rad($lat)); // Adjust for longitude
             $adjacent = Parcel::where('user_id', $userId)
+                ->whereRaw("ABS(lat - ?) <= 0.005", [$lat]) // ~550m
+                ->whereRaw("ABS(lng - ?) <= ?", [$lng, $lng_delta_adj]) // ~550m
                 ->selectRaw("*, ABS(lat - ?) + ABS(lng - ?) as distance", [$lat, $lng])
-                ->havingRaw("ABS(lat - ?) <= 0.00015", [$lat])
-                ->havingRaw("ABS(lng - ?) <= 0.00015", [$lng])
                 ->orderBy('distance')
                 ->first();
 

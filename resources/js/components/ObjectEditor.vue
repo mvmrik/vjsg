@@ -8,12 +8,12 @@
               <div class="d-flex justify-content-between align-items-center">
                 <h5 class="card-title mb-0">
                   <c-icon name="cilBuilding" class="me-2" />
-                  {{ $t('city.object_editing') }}
+                  {{ $t("city.object_editing") }}
                 </h5>
                 <div class="d-flex gap-2">
                   <c-button color="secondary" @click="goBackToParcel">
                     <c-icon name="cilArrowLeft" class="me-1" />
-                    {{ $t('city.back_to_parcel') }}
+                    {{ $t("city.back_to_parcel") }}
                   </c-button>
                 </div>
               </div>
@@ -21,7 +21,7 @@
             <c-card-body>
               <div v-if="loading" class="text-center">
                 <c-spinner />
-                <p>{{ $t('city.loading') }}</p>
+                <p>{{ $t("city.loading") }}</p>
               </div>
 
               <div v-else-if="object" class="object-editor-content">
@@ -29,32 +29,60 @@
                 <div class="object-grid-container">
                   <div class="object-grid">
                     <div
-                      v-for="i in 100"
+                      v-for="i in 16"
                       :key="i"
                       class="object-grid-cell"
-                      :class="{ 'cell-empty': !getToolAt(Math.floor((i-1)/10), (i-1)%10), 'move-target': moveMode && !getToolAt(Math.floor((i-1)/10), (i-1)%10) }"
-                      @click="handleCellClick(Math.floor((i-1)/10), (i-1)%10)"
+                      :class="{
+                        'cell-empty': !getToolAt(Math.floor((i - 1) / 4), (i - 1) % 4),
+                        'move-target':
+                          moveMode && !getToolAt(Math.floor((i - 1) / 4), (i - 1) % 4),
+                      }"
+                      @click="handleCellClick(Math.floor((i - 1) / 4), (i - 1) % 4)"
                     >
                       <!-- Show placed tools -->
                       <div
-                        v-if="getToolAt(Math.floor((i-1)/10), (i-1)%10)"
+                        v-if="getToolAt(Math.floor((i - 1) / 4), (i - 1) % 4)"
                         class="placed-tool"
-                        @click="handleToolClick(Math.floor((i-1)/10), (i-1)%10)"
-                        @touchstart="handleToolTouch(Math.floor((i-1)/10), (i-1)%10)"
+                        @click="handleToolClick(Math.floor((i - 1) / 4), (i - 1) % 4)"
+                        @touchstart="
+                          handleToolTouch(Math.floor((i - 1) / 4), (i - 1) % 4)
+                        "
                       >
-                        <img :src="`/images/tools/${getToolAt(Math.floor((i-1)/10), (i-1)%10)?.tool_type_icon || 'default.png'}`" alt="Tool" style="width: 100%; height: 100%; object-fit: cover;" />
+                        <img
+                          :src="`/images/tools/${
+                            getToolAt(Math.floor((i - 1) / 4), (i - 1) % 4)
+                              ?.tool_type_icon || 'student_materials.png'
+                          }`"
+                          alt="Tool"
+                          style="width: 100%; height: 100%; object-fit: cover"
+                        />
 
                         <!-- Tool actions overlay -->
-                        <div v-if="hoveredCell && hoveredCell.x === Math.floor((i-1)/10) && hoveredCell.y === (i-1)%10" class="tool-actions">
+                        <div
+                          v-if="
+                            hoveredCell &&
+                            hoveredCell.x === Math.floor((i - 1) / 4) &&
+                            hoveredCell.y === (i - 1) % 4
+                          "
+                          class="tool-actions"
+                        >
                           <div
-                            @click.stop="startMoveMode(getToolAt(Math.floor((i-1)/10), (i-1)%10))"
+                            @click.stop="
+                              startMoveMode(
+                                getToolAt(Math.floor((i - 1) / 4), (i - 1) % 4)
+                              )
+                            "
                             class="action-icon move-icon"
                             title="Премести tool"
                           >
                             <c-icon name="cil-move" size="xl" />
                           </div>
                           <div
-                            @click.stop="showToolInfo(getToolAt(Math.floor((i-1)/10), (i-1)%10))"
+                            @click.stop="
+                              showToolInfo(
+                                getToolAt(Math.floor((i - 1) / 4), (i - 1) % 4)
+                              )
+                            "
                             class="action-icon info-icon"
                             title="Информация за tool"
                           >
@@ -76,31 +104,44 @@
 
                 <!-- Object info -->
                 <div class="object-info mt-4">
-                  <h6>{{ $t('city.object_info') }}</h6>
+                  <h6>{{ $t("city.object_info") }}</h6>
                   <div class="row">
                     <div class="col-md-6">
-                      <p class="mb-1"><strong>{{ $t('city.type') }}:</strong> {{ getObjectTypeName(object.object_type) }}</p>
-                      <p class="mb-1"><strong>{{ $t('city.level') }}:</strong> {{ object.level || 1 }}</p>
+                      <p class="mb-1">
+                        <strong>{{ $t("city.type") }}:</strong>
+                        {{ getObjectTypeName(object.object_type) }}
+                      </p>
+                      <p class="mb-1">
+                        <strong>{{ $t("city.level") }}:</strong> {{ object.level || 1 }}
+                      </p>
                     </div>
                     <div class="col-md-6">
                       <p v-if="!object.ready_at || remainingTimeText === ''" class="mb-1">
-                        <strong>{{ $t('city.status') }}:</strong> <span class="text-success">{{ $t('city.ready') }}</span>
+                        <strong>{{ $t("city.status") }}:</strong>
+                        <span class="text-success">{{ $t("city.ready") }}</span>
                       </p>
                       <p v-else class="mb-1">
-                        <strong>{{ $t('city.status') }}:</strong> <span class="text-danger">{{ $t('city.building') }}</span> - {{ remainingTimeText }}
+                        <strong>{{ $t("city.status") }}:</strong>
+                        <span class="text-danger">{{ $t("city.building") }}</span> -
+                        {{ remainingTimeText }}
                       </p>
                     </div>
                   </div>
                   <!-- Show workers info if building -->
-                  <div v-if="isBuilding(object) && buildingWorkers" class="mt-2 alert alert-info py-2">
+                  <div
+                    v-if="isBuilding(object) && buildingWorkers"
+                    class="mt-2 alert alert-info py-2"
+                  >
                     <small>
-                      <strong>{{ $t('city.workers') }}:</strong> {{ buildingWorkers.count }} х {{ $t('city.level') }} {{ buildingWorkers.level }}
+                      <strong>{{ $t("city.workers") }}:</strong>
+                      {{ buildingWorkers.count }} х {{ $t("city.level") }}
+                      {{ buildingWorkers.level }}
                     </small>
                   </div>
                   <div class="mt-3" v-if="!isBuilding(object)">
                     <c-button color="primary" @click="showUpgradeModal = true">
                       <c-icon name="cilArrowTop" class="me-1" />
-                      {{ $t('city.upgrade_level') }}
+                      {{ $t("city.upgrade_level") }}
                     </c-button>
                   </div>
                 </div>
@@ -112,67 +153,97 @@
     </c-container>
 
     <!-- Upgrade Modal -->
-    <div v-if="showUpgradeModal" class="upgrade-modal-overlay" @click="showUpgradeModal = false">
+    <div
+      v-if="showUpgradeModal"
+      class="upgrade-modal-overlay"
+      @click="showUpgradeModal = false"
+    >
       <div class="upgrade-modal-content" @click.stop>
         <div class="modal-header">
-          <h5>{{ $t('city.upgrade_level') }}</h5>
-          <button type="button" class="btn-close" @click="showUpgradeModal = false"></button>
+          <h5>{{ $t("city.upgrade_level") }}</h5>
+          <button
+            type="button"
+            class="btn-close"
+            @click="showUpgradeModal = false"
+          ></button>
         </div>
         <div class="modal-body">
-          <p class="mb-3">{{ $t('city.select_workers_upgrade') }}</p>
+          <p class="mb-3">{{ $t("city.select_workers_upgrade") }}</p>
           <div class="d-flex gap-2 mb-3">
             <div>
-              <label class="form-label small mb-1">{{ $t('city.worker_level') }}</label>
+              <label class="form-label small mb-1">{{ $t("city.worker_level") }}</label>
               <select class="form-select" v-model="upgradeWorkerLevel">
-                <option v-for="(count, lvl) in people.by_level" :key="lvl" :value="lvl">LV {{ lvl }} ({{ count }})</option>
+                <option v-for="(count, lvl) in people.by_level" :key="lvl" :value="lvl">
+                  LV {{ lvl }} ({{ count }})
+                </option>
               </select>
             </div>
             <div>
-              <label class="form-label small mb-1">{{ $t('city.worker_count') }}</label>
+              <label class="form-label small mb-1">{{ $t("city.worker_count") }}</label>
               <select class="form-select" v-model.number="upgradeWorkerCount">
                 <option :value="0">0</option>
-                <option v-for="n in availableCountsForLevel(upgradeWorkerLevel)" :key="n" :value="n">{{ n }}</option>
+                <option
+                  v-for="n in availableCountsForLevel(upgradeWorkerLevel)"
+                  :key="n"
+                  :value="n"
+                >
+                  {{ n }}
+                </option>
               </select>
             </div>
           </div>
           <div v-if="upgradeWorkerLevel && upgradeWorkerCount" class="alert alert-info">
-            <strong>{{ $t('city.upgrade_time') }}:</strong> {{ upgradeTimeMinutes }} {{ $t('city.minutes') }}
+            <strong>{{ $t("city.upgrade_time") }}:</strong> {{ upgradeTimeMinutes }}
+            {{ $t("city.minutes") }}
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" @click="showUpgradeModal = false">{{ $t('city.cancel') }}</button>
-          <button 
-            type="button" 
-            class="btn btn-primary" 
-            :disabled="!upgradeWorkerLevel || !upgradeWorkerCount || upgradeWorkerCount <= 0"
+          <button
+            type="button"
+            class="btn btn-secondary"
+            @click="showUpgradeModal = false"
+          >
+            {{ $t("city.cancel") }}
+          </button>
+          <button
+            type="button"
+            class="btn btn-primary"
+            :disabled="
+              !upgradeWorkerLevel || !upgradeWorkerCount || upgradeWorkerCount <= 0
+            "
             @click="startUpgrade"
           >
-            {{ $t('city.start_upgrade') }}
+            {{ $t("city.start_upgrade") }}
           </button>
         </div>
       </div>
     </div>
 
     <!-- Tool Selection Modal -->
-    <div v-if="showToolModal" class="upgrade-modal-overlay" @click="showToolModal = false">
+    <div
+      v-if="showToolModal"
+      class="upgrade-modal-overlay"
+      @click="showToolModal = false"
+    >
       <div class="upgrade-modal-content" @click.stop>
         <div class="modal-header">
-          <h5>{{ $t('tools.select_tool') }}</h5>
+          <h5>{{ $t("tools.select_tool") }}</h5>
           <button type="button" class="btn-close" @click="showToolModal = false"></button>
         </div>
         <div class="modal-body">
           <div v-if="availableTools.length === 0" class="text-center">
-            {{ $t('tools.no_tools_available') }}
+            {{ $t("tools.no_tools_available") }}
           </div>
           <div v-else class="row">
-            <div
-              v-for="tool in availableTools"
-              :key="tool.id"
-              class="col-md-4 mb-3"
-            >
+            <div v-for="tool in availableTools" :key="tool.id" class="col-md-4 mb-3">
               <div class="card tool-card" @click="addTool(tool)">
                 <div class="card-body text-center">
-                  <img :src="`/images/tools/${tool.icon || 'default.png'}`" alt="Tool" style="width: 40px; height: 40px;" class="mb-2" />
+                  <img
+                    :src="`/images/tools/${tool.icon || 'student_materials.png'}`"
+                    alt="Tool"
+                    style="width: 40px; height: 40px"
+                    class="mb-2"
+                  />
                   <h6 class="card-title">{{ tool.name }}</h6>
                   <p class="card-text small">{{ tool.description }}</p>
                 </div>
@@ -186,18 +257,18 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, onUnmounted, inject } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
-import { useGameStore } from '../stores/gameStore';
-import axios from 'axios';
+import { ref, computed, onMounted, onUnmounted, inject } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { useGameStore } from "../stores/gameStore";
+import axios from "axios";
 
 export default {
-  name: 'ObjectEditor',
+  name: "ObjectEditor",
   setup() {
     const route = useRoute();
     const router = useRouter();
     const gameStore = useGameStore();
-    const $t = inject('$t');
+    const $t = inject("$t");
 
     const loading = ref(true);
     const cityObjects = ref([]);
@@ -222,23 +293,25 @@ export default {
     const objectId = computed(() => parseInt(route.params.objectId));
 
     const parcel = computed(() => {
-      return gameStore.parcels?.find(p => p.id === parcelId.value && p.user_id === gameStore.user?.id);
+      return gameStore.parcels?.find(
+        (p) => p.id === parcelId.value && p.user_id === gameStore.user?.id
+      );
     });
 
     const object = computed(() => {
-      return cityObjects.value.find(obj => obj.id === objectId.value);
+      return cityObjects.value.find((obj) => obj.id === objectId.value);
     });
 
     const getObjectIcon = (type) => {
       // This would need to be implemented if we want icons
-      return 'cilQuestion';
+      return "cilQuestion";
     };
 
     const availableObjects = ref([]);
 
     const getObjectTypeName = (type) => {
-      const obj = availableObjects.value.find(o => o.type === type);
-      return obj ? obj.name : $t('city.unknown');
+      const obj = availableObjects.value.find((o) => o.type === type);
+      return obj ? obj.name : $t("city.unknown");
     };
 
     const isBuilding = (obj) => {
@@ -255,10 +328,10 @@ export default {
     };
 
     const remainingTimeText = computed(() => {
-      if (!object.value || !object.value.ready_at) return '';
+      if (!object.value || !object.value.ready_at) return "";
       const ready = object.value.ready_at; // Already in milliseconds
       const remaining = Math.max(0, ready - currentTime.value);
-      if (remaining === 0) return '';
+      if (remaining === 0) return "";
       const totalSeconds = Math.ceil(remaining / 1000);
       const minutes = Math.floor(totalSeconds / 60);
       const seconds = totalSeconds % 60;
@@ -281,36 +354,36 @@ export default {
 
     const fetchCityObjects = async () => {
       try {
-        const res = await axios.get('/api/city-objects');
+        const res = await axios.get("/api/city-objects");
         if (res.data.success) {
           cityObjects.value = res.data.objects;
         }
       } catch (e) {
-        console.error('Failed to fetch city objects', e);
+        console.error("Failed to fetch city objects", e);
       }
     };
 
     const fetchObjectTypes = async () => {
       try {
-        const res = await axios.get('/api/object-types');
+        const res = await axios.get("/api/object-types");
         if (res.data.success) {
           availableObjects.value = res.data.types || [];
         }
       } catch (e) {
-        console.error('Failed to fetch object types', e);
+        console.error("Failed to fetch object types", e);
       }
     };
 
     const fetchPeople = async () => {
       try {
-        const res = await axios.get('/api/people');
+        const res = await axios.get("/api/people");
         if (res.data.success) {
           people.value.total = res.data.total || 0;
           people.value.by_level = res.data.by_level || {};
           people.value.groups = res.data.groups || [];
         }
       } catch (e) {
-        console.error('Failed to fetch people', e);
+        console.error("Failed to fetch people", e);
       }
     };
 
@@ -323,7 +396,9 @@ export default {
 
     const upgradeTimeMinutes = computed(() => {
       // Base time is the same as build time of the object type (same as building)
-      const objectType = availableObjects.value.find(o => o.type === object.value?.object_type);
+      const objectType = availableObjects.value.find(
+        (o) => o.type === object.value?.object_type
+      );
       const baseTime = objectType ? objectType.build_time_minutes : 10;
       const lvl = upgradeWorkerLevel.value ? parseInt(upgradeWorkerLevel.value) : 0;
       const cnt = upgradeWorkerCount.value ? parseInt(upgradeWorkerCount.value) : 0;
@@ -336,19 +411,21 @@ export default {
 
     const startUpgrade = async () => {
       try {
-        const res = await axios.post('/api/city-objects/upgrade', {
+        const res = await axios.post("/api/city-objects/upgrade", {
           object_id: objectId.value,
           worker_level: upgradeWorkerLevel.value,
-          worker_count: upgradeWorkerCount.value
+          worker_count: upgradeWorkerCount.value,
         });
-        
+
         if (res.data.success) {
           showUpgradeModal.value = false;
           upgradeWorkerLevel.value = null;
           upgradeWorkerCount.value = 0;
-          
+
           // Update object locally with all data from response
-          const objIndex = cityObjects.value.findIndex(obj => obj.id === objectId.value);
+          const objIndex = cityObjects.value.findIndex(
+            (obj) => obj.id === objectId.value
+          );
           if (objIndex !== -1) {
             cityObjects.value[objIndex].ready_at = res.data.object.ready_at;
             cityObjects.value[objIndex].level = res.data.object.level;
@@ -356,35 +433,35 @@ export default {
             // Force reactivity update
             cityObjects.value = [...cityObjects.value];
           }
-          
+
           // Refresh people data since workers are now occupied
           await fetchPeople();
         } else {
-          console.error('Upgrade failed:', res.data.message);
-          alert('Upgrade failed: ' + res.data.message);
+          console.error("Upgrade failed:", res.data.message);
+          alert("Upgrade failed: " + res.data.message);
         }
       } catch (e) {
-        console.error('Failed to start upgrade', e);
+        console.error("Failed to start upgrade", e);
         if (e.response && e.response.data && e.response.data.message) {
-          alert('Error: ' + e.response.data.message);
+          alert("Error: " + e.response.data.message);
         } else {
-          alert('Failed to start upgrade. Check console for details.');
+          alert("Failed to start upgrade. Check console for details.");
         }
       }
     };
 
     // Tool methods
     const openToolModal = async (x, y) => {
-      console.log('openToolModal called', x, y, objectId.value);
+      console.log("openToolModal called", x, y, objectId.value);
       selectedPosition.value = { x, y };
       try {
         const res = await axios.get(`/api/objects/${objectId.value}/available-tools`);
-        console.log('available tools', res.data);
+        console.log("available tools", res.data);
         availableTools.value = res.data;
         showToolModal.value = true;
       } catch (e) {
-        console.error('Failed to fetch available tools', e);
-        alert('Failed to load available tools. Check console.');
+        console.error("Failed to fetch available tools", e);
+        alert("Failed to load available tools. Check console.");
       }
     };
 
@@ -397,7 +474,7 @@ export default {
         }
       } else if (getToolAt(x, y)) {
         // If clicking on a tool, show actions
-        hoveredCell.value = {x, y};
+        hoveredCell.value = { x, y };
       } else {
         // If clicking on empty cell, open tool modal
         openToolModal(x, y);
@@ -406,7 +483,7 @@ export default {
 
     const addTool = async (tool) => {
       try {
-        await axios.post('/api/objects/add-tool', {
+        await axios.post("/api/objects/add-tool", {
           object_id: objectId.value,
           tool_type_id: tool.id,
           position_x: selectedPosition.value.x,
@@ -415,25 +492,25 @@ export default {
         showToolModal.value = false;
         await loadTools();
       } catch (e) {
-        console.error('Failed to add tool', e);
-        alert($t('tools.tool_add_failed'));
+        console.error("Failed to add tool", e);
+        alert($t("tools.tool_add_failed"));
       }
     };
 
     const loadTools = async () => {
       try {
         const res = await axios.get(`/api/objects/${objectId.value}/tools`);
-        console.log('loaded tools', res.data);
+        console.log("loaded tools", res.data);
         tools.value = res.data;
       } catch (e) {
-        console.error('Failed to load tools', e);
+        console.error("Failed to load tools", e);
       }
     };
 
     const getToolAt = (x, y) => {
-      const tool = tools.value.find(t => t.position_x === x && t.position_y === y);
+      const tool = tools.value.find((t) => t.position_x === x && t.position_y === y);
       if (tool) {
-        console.log('tool at', x, y, tool, tool.tool_type_icon);
+        console.log("tool at", x, y, tool, tool.tool_type_icon);
       }
       return tool;
     };
@@ -456,12 +533,12 @@ export default {
 
     const moveToolTo = async (x, y) => {
       if (!moveMode.value || !selectedTool.value) return;
-      
+
       try {
-        await axios.post('/api/objects/update-tool-position', {
+        await axios.post("/api/objects/update-tool-position", {
           tool_id: selectedTool.value.id,
           x,
-          y
+          y,
         });
         selectedTool.value.position_x = x;
         selectedTool.value.position_y = y;
@@ -469,8 +546,8 @@ export default {
         moveMode.value = false;
         selectedTool.value = null;
       } catch (error) {
-        console.error('Failed to move tool', error);
-        alert('Failed to move tool');
+        console.error("Failed to move tool", error);
+        alert("Failed to move tool");
         moveMode.value = false;
         selectedTool.value = null;
       }
@@ -483,7 +560,11 @@ export default {
     };
 
     const showToolInfo = (tool) => {
-      alert(`Tool: ${tool.name}\nType: ${tool.tool_type_name}\nLevel: ${tool.level || 1}\nPosition: (${tool.position_x}, ${tool.position_y})`);
+      alert(
+        `Tool: ${tool.name}\nType: ${tool.tool_type_name}\nLevel: ${
+          tool.level || 1
+        }\nPosition: (${tool.position_x}, ${tool.position_y})`
+      );
       hoveredCell.value = null; // Hide actions after showing info
     };
 
@@ -501,7 +582,7 @@ export default {
       if (hoveredCell.value && hoveredCell.value.x === x && hoveredCell.value.y === y) {
         hoveredCell.value = null; // Hide if already shown
       } else {
-        hoveredCell.value = {x, y}; // Show if not shown
+        hoveredCell.value = { x, y }; // Show if not shown
       }
     };
 
@@ -510,7 +591,7 @@ export default {
       if (hoveredCell.value && hoveredCell.value.x === x && hoveredCell.value.y === y) {
         hoveredCell.value = null; // Hide if already shown
       } else {
-        hoveredCell.value = {x, y}; // Show if not shown
+        hoveredCell.value = { x, y }; // Show if not shown
       }
     };
 
@@ -529,9 +610,9 @@ export default {
       // Tick every second to update countdown displays
       tickInterval = setInterval(() => {
         currentTime.value = Date.now();
-        
+
         // Clear ready_at when time expires
-        cityObjects.value.forEach(obj => {
+        cityObjects.value.forEach((obj) => {
           if (obj.ready_at) {
             const ready = new Date(obj.ready_at).getTime();
             if (ready <= Date.now()) {
@@ -583,10 +664,10 @@ export default {
       moveToolTo,
       cancelMove,
       handleToolClick,
-      handleToolTouch
+      handleToolTouch,
     };
-  }
-}
+  },
+};
 </script>
 
 <style scoped>
@@ -610,8 +691,8 @@ export default {
 
 .object-grid {
   display: grid;
-  grid-template-columns: repeat(10, 1fr);
-  grid-template-rows: repeat(10, 1fr);
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(4, 1fr);
   gap: 1px;
   background: #e9ecef;
   padding: 1px;
@@ -674,7 +755,7 @@ export default {
   color: #495057;
   border: 2px solid #dee2e6;
   transition: all 0.2s;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -685,7 +766,7 @@ export default {
 .action-icon:hover {
   background: rgba(255, 255, 255, 1);
   transform: scale(1.1);
-  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
 .move-icon:hover {
