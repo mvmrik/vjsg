@@ -297,6 +297,10 @@ export default {
       username: ''
     });
 
+    // Message display
+    const message = ref('');
+    const messageType = ref('');
+
     // Map related
     const parcels = computed(() => gameStore.parcels || []);
     const userParcels = computed(() => 
@@ -311,12 +315,13 @@ export default {
     let ghosts = [];
     
     const showMessage = (msg, type) => {
-      message.value = msg;
-      messageType.value = type;
-      
-      setTimeout(() => {
-        message.value = '';
-      }, 5000);
+      // Dispatch toast event for GameApp to handle
+      window.dispatchEvent(new CustomEvent('show-toast', { 
+        detail: { 
+          message: msg,
+          type: type
+        }
+      }));
     };
 
     const collectResources = () => {
@@ -327,7 +332,6 @@ export default {
 
     const handleLogin = async () => {
       loading.value = true;
-      message.value = '';
 
       try {
         await gameStore.login(loginForm.value.privateKey, loginForm.value.rememberMe);
@@ -342,7 +346,6 @@ export default {
 
     const handleRegister = async () => {
       loading.value = true;
-      message.value = '';
 
       try {
         await gameStore.register(registerForm.value.username);
