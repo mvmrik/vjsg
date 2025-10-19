@@ -131,11 +131,43 @@ export const useGameStore = defineStore('auth', {
       return [];
     },
 
-    async claimParcel(x, y) {
+    async claimParcel(lat, lng) {
       try {
-        const res = await axios.post('/api/parcels/claim', { x, y });
-        return res.data;
+        // First call to check balance and get price
+        const initialRes = await axios.post('/api/parcels/claim', { lat, lng });
+        if (!initialRes.data.success) {
+          // Not enough balance or other error
+          return initialRes.data;
+        }
+        
+        if (initialRes.data.needsConfirm) {
+          // Emit event to show confirm dialog
+          return new Promise((resolve) => {
+            window.dispatchEvent(new CustomEvent('show-confirm-dialog', { 
+              detail: { 
+                message: initialRes.data.message,
+                onConfirm: async () => {
+                  try {
+                    // Second call with confirmed
+                    const confirmRes = await axios.post('/api/parcels/claim', { lat, lng, confirmed: true });
+                    resolve(confirmRes.data);
+                  } catch (e) {
+                    resolve({ success: false, message: e.response?.data?.message || 'Claim failed' });
+                  }
+                },
+                onCancel: () => {
+                  resolve({ success: false, message: 'Claim cancelled' });
+                }
+              }
+            }));
+          });
+        }
+        return initialRes.data;
       } catch (e) {
+        // Handle 400 errors as normal responses (insufficient balance, etc.)
+        if (e.response && e.response.status === 400) {
+          return e.response.data;
+        }
         console.error('Claim failed', e);
         throw e;
       }

@@ -264,17 +264,6 @@
           </c-card>
         </c-col>
       </c-row>
-
-      <!-- Messages -->
-      <c-alert
-        v-if="message"
-        :color="messageType === 'success' ? 'success' : 'danger'"
-        :visible="true"
-        dismissible
-        @close="message = ''"
-      >
-        <div v-html="message"></div>
-      </c-alert>
     </c-col>
   </c-row>
 </template>
@@ -296,8 +285,6 @@ export default {
     const $changeLanguage = inject('$changeLanguage');
     const currentLocale = inject('currentLocale');
     
-    const message = ref('');
-    const messageType = ref('');
     const loading = ref(false);
     const activeAuthTab = ref('login'); // Default to login tab
 
@@ -469,19 +456,35 @@ export default {
     const claimParcel = async (lat, lng) => {
       loading.value = true;
       try {
-        const res = await axios.post('/api/parcels/claim', { lat, lng });
-        if (res.data.success) {
+        const res = await gameStore.claimParcel(lat, lng);
+        console.log('Claim result:', res);
+        if (res.success) {
           await gameStore.fetchParcels(); // Update game store
+          await gameStore.fetchUserData(); // Update user balance
+          // Update map after reactivity updates
+          await nextTick();
           updateMap();
-          message.value = $t('map.parcel_claimed_successfully');
-          messageType.value = 'success';
+          // Show success toast
+          window.dispatchEvent(new CustomEvent('show-toast', { 
+            detail: { 
+              message: $t('map.parcel_claimed_successfully'),
+              type: 'success'
+            }
+          }));
           // Center on user's parcels
           centerOnUserParcels();
         } else {
-          message.value = res.data.message || $t('map.claim_failed');
-          messageType.value = 'error';
+          console.log('Claim failed with message:', res.message);
+          // Show toast notification
+          window.dispatchEvent(new CustomEvent('show-toast', { 
+            detail: { 
+              message: res.message,
+              type: 'error'
+            }
+          }));
         }
       } catch (e) {
+        console.log('Claim error:', e);
         message.value = e.response?.data?.message || $t('map.claim_error');
         messageType.value = 'error';
       } finally {
@@ -576,8 +579,6 @@ export default {
     };
     
     return {
-      message,
-      messageType,
       loading,
       activeAuthTab,
       loginForm,

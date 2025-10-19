@@ -31,7 +31,8 @@ class GameController extends Controller
                 'username' => $user->username,
                 'public_key' => $user->public_key,
                 'private_key' => $user->private_key,
-                'locale' => $user->locale
+                'locale' => $user->locale,
+                'balance' => $user->balance
             ]
         ]);
     }
@@ -67,7 +68,8 @@ class GameController extends Controller
                 'username' => $user->username,
                 'public_key' => $user->public_key,
                 'private_key' => $user->private_key,
-                'locale' => $user->locale
+                'locale' => $user->locale,
+                'balance' => $user->balance
             ]
         ]);
     }

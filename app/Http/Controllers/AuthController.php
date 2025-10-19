@@ -37,6 +37,7 @@ class AuthController extends Controller
             'public_key' => $keys['public_key'],
             'private_key' => $keys['private_key'],
             'last_active' => now(),
+            'balance' => 1000,
         ]);
 
         // Add 2 level 1 people as one record

@@ -41,11 +41,14 @@
 
         <!-- CoreUI Footer -->
         <c-footer class="fixed-bottom">
-          <div class="d-flex justify-content-between w-100">
-            <div>
+          <div class="d-flex justify-content-between w-100 align-items-center">
+            <div class="bg-light px-3 py-2 rounded">
               <span>&copy; {{ new Date().getFullYear() }} Resource Legends. Всички права запазени.</span>
             </div>
-            <div class="ms-auto">
+            <div v-if="isLoggedIn" class="bg-warning text-dark px-3 py-2 rounded fw-bold">
+              <span style="color: #FFD700;">💰</span> {{ currentUser.balance }}
+            </div>
+            <div class="bg-light px-3 py-2 rounded">
               <span>{{ $t('global.version') }} {{ appVersion }}</span>
             </div>
           </div>
@@ -66,6 +69,21 @@
       <c-modal-body>
         <login-form @login-success="onLoginSuccess" />
       </c-modal-body>
+    </c-modal>
+
+    <!-- Confirm Modal -->
+        <!-- Confirmation Modal -->
+    <c-modal :visible="showConfirmModal" @close="() => {}">
+      <c-modal-header>
+        <c-modal-title>Потвърждение</c-modal-title>
+      </c-modal-header>
+      <c-modal-body>
+        {{ confirmMessage }}
+      </c-modal-body>
+      <c-modal-footer>
+        <c-button color="secondary" @click="onConfirmCancel">Отказ</c-button>
+        <c-button color="primary" @click="onConfirmAccept">Потвърди</c-button>
+      </c-modal-footer>
     </c-modal>
 
     <!-- Toast Notifications -->
@@ -110,9 +128,12 @@ export default {
     const sidebarMinimize = ref(false);
     const showLoginModal = ref(false);
     const dropdownVisible = ref(false);
-    const appVersion = '0.6.3';
+    const appVersion = '0.7.0';
     const unreadNotifications = computed(() => gameStore.unreadNotificationsCount);
     const toasts = ref([]);
+    const showConfirmModal = ref(false);
+    const confirmMessage = ref('');
+    const confirmCallbacks = ref({ onConfirm: null, onCancel: null });
 
     const currentUser = computed(() => gameStore.user);
     const isLoggedIn = computed(() => gameStore.isAuthenticated);
@@ -211,6 +232,26 @@ export default {
       }
     };
 
+    const onConfirmCancel = () => {
+      console.log('Confirm cancel clicked');
+      showConfirmModal.value = false;
+      if (confirmCallbacks.value.onCancel) {
+        confirmCallbacks.value.onCancel();
+      }
+      // Clear callbacks
+      confirmCallbacks.value = { onConfirm: null, onCancel: null };
+    };
+
+    const onConfirmAccept = () => {
+      console.log('Confirm accept clicked, callbacks:', confirmCallbacks.value);
+      showConfirmModal.value = false;
+      if (confirmCallbacks.value.onConfirm) {
+        confirmCallbacks.value.onConfirm();
+      }
+      // Clear callbacks
+      confirmCallbacks.value = { onConfirm: null, onCancel: null };
+    };
+
     const closeDropdown = (event) => {
       const dropdown = event.target.closest('.dropdown');
       if (!dropdown) {
@@ -229,6 +270,22 @@ export default {
         const translatedTitle = $t(notification.title);
         const translatedMessage = $t(notification.message, notification.data || {});
         addToast(translatedTitle, translatedMessage, color);
+      });
+
+      // Listen for confirm dialog events
+      window.addEventListener('show-confirm-dialog', (event) => {
+        console.log('Confirm dialog event received:', event.detail);
+        const { message, onConfirm, onCancel } = event.detail;
+        confirmMessage.value = message;
+        confirmCallbacks.value = { onConfirm, onCancel };
+        showConfirmModal.value = true;
+      });
+
+      // Listen for general toast events
+      window.addEventListener('show-toast', (event) => {
+        const { message, type } = event.detail;
+        const color = type === 'error' ? 'danger' : type === 'success' ? 'success' : 'info';
+        addToast('Известие', message, color);
       });
     });
 
@@ -253,7 +310,11 @@ export default {
       onLoginSuccess,
       router,
       appVersion,
-      $t
+      $t,
+      showConfirmModal,
+      confirmMessage,
+      onConfirmCancel,
+      onConfirmAccept
     };
   }
 }

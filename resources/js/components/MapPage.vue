@@ -281,8 +281,8 @@ export default {
     const claimParcel = async (lat, lng) => {
       loading.value = true;
       try {
-        const res = await axios.post('/api/parcels/claim', { lat, lng });
-        if (res.data.success) {
+        const res = await gameStore.claimParcel(lat, lng);
+        if (res.success) {
           await gameStore.fetchParcels(); // Update game store
           updateMap();
           message.value = $t('map.parcel_claimed_successfully');
@@ -290,7 +290,7 @@ export default {
           // Center on user's parcels
           centerOnUserParcels();
         } else {
-          message.value = res.data.message || $t('map.claim_failed');
+          message.value = res.message || $t('map.claim_failed');
           messageType.value = 'error';
         }
       } catch (e) {

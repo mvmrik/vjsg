@@ -23,6 +23,7 @@ class User extends Authenticatable
         'private_key',
         'last_active',
         'locale',
+        'balance',
     ];
 
     /**
@@ -42,6 +43,7 @@ class User extends Authenticatable
      */
     protected $casts = [
         'last_active' => 'datetime',
+        'balance' => 'integer',
     ];
 
     /**
