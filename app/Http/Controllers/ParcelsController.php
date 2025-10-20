@@ -49,13 +49,15 @@ class ParcelsController extends Controller
                 'confirmed' => $confirmed
             ]);
 
-            $price = 1000; // Price for claiming a parcel
-
             $user = User::find($userId);
             if (!$user) {
                 \Log::error("User not found for parcel claim", ['user_id' => $userId]);
                 return response()->json(['success' => false, 'message' => 'User not found'], 400);
             }
+
+            // Check if user has any parcels to determine price
+            $userHasAny = Parcel::where('user_id', $userId)->exists();
+            $price = $userHasAny ? 1000 : 0; // First parcel is free
 
             \Log::info("User balance check", [
                 'user_id' => $userId,
@@ -65,7 +67,7 @@ class ParcelsController extends Controller
 
             // If not confirmed, check if user has enough balance and return confirm dialog
             if (!$confirmed) {
-                if (!isset($user->balance) || $user->balance < $price) {
+                if ($price > 0 && (!isset($user->balance) || $user->balance < $price)) {
                     \Log::info("Insufficient balance for initial check", [
                         'user_id' => $userId,
                         'balance' => $user->balance,
@@ -77,12 +79,12 @@ class ParcelsController extends Controller
                     'success' => true,
                     'needsConfirm' => true,
                     'price' => $price,
-                    'message' => "Claiming this parcel costs {$price} coins. Confirm?"
+                    'message' => $price > 0 ? "Claiming this parcel costs {$price} coins. Confirm?" : "Your first parcel is free! Confirm?"
                 ]);
             }
 
             // Double-check balance before proceeding (security check)
-            if (!isset($user->balance) || $user->balance < $price) {
+            if ($price > 0 && (!isset($user->balance) || $user->balance < $price)) {
                 \Log::info("Insufficient balance for confirmed claim", [
                     'user_id' => $userId,
                     'balance' => $user->balance,
@@ -91,22 +93,31 @@ class ParcelsController extends Controller
                 return response()->json(['success' => false, 'message' => 'Insufficient balance'], 400);
             }
 
-            // Deduct balance
-            $user->balance -= $price;
-            $user->save();
+            // Deduct balance only if price > 0
+            if ($price > 0) {
+                $user->balance -= $price;
+                $user->save();
+            }
 
-            // Check if parcel already exists within ~250m (half of 500m)
-            $lng_delta = 0.00225 / cos(deg2rad($lat)); // Adjust for longitude
-            $existing = Parcel::whereRaw("ABS(lat - ?) < 0.00225", [$lat]) // ~250m lat difference
-                ->whereRaw("ABS(lng - ?) < ?", [$lng, $lng_delta]) // ~250m lng difference
-                ->first();
-            if ($existing) {
-                return response()->json(['success' => false, 'message' => 'This area is already claimed'], 409);
+            // Prevent parcels within 500m of any existing parcel (avoid overlap)
+            $delta_lat = 500 / 111000; // ~0.0045 degrees
+            $lng_delta = $delta_lat / cos(deg2rad($lat)); // adjust for longitude
+
+            $candidates = Parcel::whereRaw("ABS(lat - ?) <= ?", [$lat, $delta_lat])
+                ->whereRaw("ABS(lng - ?) <= ?", [$lng, $lng_delta])
+                ->get();
+
+            foreach ($candidates as $p) {
+                // Approximate meter distances
+                $latDiff = ($lat - $p->lat) * 111000;
+                $lngDiff = ($lng - $p->lng) * 111000 * cos(deg2rad(($lat + $p->lat) / 2));
+                $distance = sqrt($latDiff * $latDiff + $lngDiff * $lngDiff);
+                if ($distance < 500) {
+                    return response()->json(['success' => false, 'message' => 'This area is too close to an existing parcel'], 409);
+                }
             }
 
             // Allow claim only if adjacent to an existing parcel of the user OR user has no parcels yet
-            $userHasAny = Parcel::where('user_id', $userId)->exists();
-
             $allowed = false;
             $cityX = 0;
             $cityY = 0;

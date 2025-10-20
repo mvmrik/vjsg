@@ -313,6 +313,7 @@ export default {
     let map = null;
     let territories = [];
     let ghosts = [];
+  let previewRect = null;
     
     const showMessage = (msg, type) => {
       // Dispatch toast event for GameApp to handle
@@ -370,6 +371,11 @@ export default {
       territories = [];
       ghosts.forEach(ghost => ghost.remove());
       ghosts = [];
+      // Remove preview rectangle if present
+      if (previewRect) {
+        try { previewRect.remove(); } catch (e) {}
+        previewRect = null;
+      }
 
       // Draw all parcels
       parcels.value.forEach(parcel => {
@@ -437,6 +443,7 @@ export default {
           });
         });
       }
+
     };
 
     const getSquareBounds = (lat, lng) => {
@@ -529,12 +536,35 @@ export default {
           }
         });
 
+        // Preview rectangle on mouse move (show where parcel would be placed)
+        map.on('mousemove', function(e) {
+          const latlng = e.latlng;
+          const userParcels = parcels.value.filter(p => p.user_id === gameStore.user?.id);
+          if (userParcels.length > 0) return; // only for new users placing first parcel
+
+          // remove previous preview
+          if (previewRect) { try { previewRect.remove(); } catch (err) {} previewRect = null; }
+
+          // show preview only if area is not already claimed
+          if (!isClaimed(latlng.lat, latlng.lng)) {
+            const bounds = getSquareBounds(latlng.lat, latlng.lng);
+            previewRect = L.rectangle(bounds, { color: '#0000ff', weight: 1, dashArray: '4,4', fillOpacity: 0.15 }).addTo(map);
+          }
+        });
+
+        map.on('mouseout', function() {
+          if (previewRect) { try { previewRect.remove(); } catch (err) {} previewRect = null; }
+        });
+
         fetchParcels().then(() => {
-          // Center on user's parcels if any
+          // Center on user's parcels if any, otherwise show world view for new users
           const userParcels = parcels.value.filter(p => p.user_id === gameStore.user?.id);
           if (userParcels.length > 0) {
             const bounds = L.latLngBounds(userParcels.map(p => [p.lat, p.lng]));
             map.fitBounds(bounds.pad(0.1)); // Add small padding to see all parcels
+          } else {
+            // No parcels: show world view (center at 0,0, zoom 2)
+            map.setView([0, 0], 2);
           }
         });
       }
@@ -566,12 +596,35 @@ export default {
           }
         });
 
+        // Preview rectangle on mouse move (show where parcel would be placed)
+        map.on('mousemove', function(e) {
+          const latlng = e.latlng;
+          const userParcels = parcels.value.filter(p => p.user_id === gameStore.user?.id);
+          if (userParcels.length > 0) return; // only for new users placing first parcel
+
+          // remove previous preview
+          if (previewRect) { try { previewRect.remove(); } catch (err) {} previewRect = null; }
+
+          // show preview only if area is not already claimed
+          if (!isClaimed(latlng.lat, latlng.lng)) {
+            const bounds = getSquareBounds(latlng.lat, latlng.lng);
+            previewRect = L.rectangle(bounds, { color: '#0000ff', weight: 1, dashArray: '4,4', fillOpacity: 0.15 }).addTo(map);
+          }
+        });
+
+        map.on('mouseout', function() {
+          if (previewRect) { try { previewRect.remove(); } catch (err) {} previewRect = null; }
+        });
+
         fetchParcels().then(() => {
-          // Center on user's parcels if any
+          // Center on user's parcels if any, otherwise show world view for new users
           const userParcels = parcels.value.filter(p => p.user_id === gameStore.user?.id);
           if (userParcels.length > 0) {
             const bounds = L.latLngBounds(userParcels.map(p => [p.lat, p.lng]));
             map.fitBounds(bounds.pad(0.1)); // Add small padding to see all parcels
+          } else {
+            // No parcels: show world view (center at 0,0, zoom 2)
+            map.setView([0, 0], 2);
           }
         });
       }
