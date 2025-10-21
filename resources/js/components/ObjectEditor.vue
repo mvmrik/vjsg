@@ -143,6 +143,15 @@
                       <c-icon name="cilArrowTop" class="me-1" />
                       {{ $t("city.upgrade_level") }}
                     </c-button>
+                    <c-button
+                      color="success"
+                      class="ms-2"
+                      v-if="objectHasProduction()"
+                      @click="openProduceModal"
+                    >
+                      <c-icon name="cilFactory" class="me-1" />
+                      {{ $t("city.start_production") }}
+                    </c-button>
                   </div>
                 </div>
               </div>
@@ -219,6 +228,60 @@
       </div>
     </div>
 
+    <!-- Production Modal -->
+    <div
+      v-if="showProduceModal"
+      class="upgrade-modal-overlay"
+      @click="showProduceModal = false"
+    >
+      <div class="upgrade-modal-content" @click.stop>
+        <div class="modal-header">
+          <h5>{{ $t('city.start_production') }}</h5>
+          <button type="button" class="btn-close" @click="showProduceModal = false"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-3">{{ $t('city.select_workers_production') }}</p>
+          <div class="d-flex gap-2 mb-3">
+            <div>
+              <label class="form-label small mb-1">{{ $t('city.worker_level') }}</label>
+              <select class="form-select" v-model="produceWorkerLevel" @change="calculateProductionPreview">
+                <option v-for="(count, lvl) in people.by_level" :key="lvl" :value="lvl">
+                  LV {{ lvl }} ({{ count }})
+                </option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label small mb-1">{{ $t('city.worker_count') }}</label>
+              <select class="form-select" v-model.number="produceWorkerCount" @change="calculateProductionPreview">
+                <option :value="0">0</option>
+                <option v-for="n in availableCountsForLevel(produceWorkerLevel)" :key="n" :value="n">{{ n }}</option>
+              </select>
+            </div>
+          </div>
+
+          <div v-if="productionPreview.length === 0" class="text-center">
+            {{ $t('city.no_production_materials') }}
+          </div>
+          <div v-else class="list-group">
+            <div v-for="item in productionPreview" :key="item.tool_type_id" class="list-group-item d-flex justify-content-between align-items-center">
+              <div>
+                <strong>{{ item.tool_type_name }}</strong>
+                <div class="small text-muted">{{ item.fieldsCount }} {{ $t('city.fields') }}</div>
+              </div>
+              <div class="text-end">
+                <div>{{ item.perHour }} / {{ $t('city.hour') }}</div>
+                <div><strong>{{ item.totalProduced }}</strong> / 24 {{ $t('city.hours') }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" @click="showProduceModal = false">{{ $t('city.cancel') }}</button>
+          <button type="button" class="btn btn-success" :disabled="produceWorkerCount <= 0" @click="startProduction">{{ $t('city.start_production') }}</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Tool Selection Modal -->
     <div
       v-if="showToolModal"
@@ -273,6 +336,10 @@ export default {
     const loading = ref(true);
     const cityObjects = ref([]);
     const showUpgradeModal = ref(false);
+  const showProduceModal = ref(false);
+  const produceWorkerLevel = ref(null);
+  const produceWorkerCount = ref(0);
+  const productionPreview = ref([]); // [{tool_type_name, fieldsCount, perHour, totalProduced, produces_tool_type_id}]
     const upgradeWorkerLevel = ref(null);
     const upgradeWorkerCount = ref(0);
     const people = ref({ total: 0, by_level: {}, groups: [] });
@@ -321,6 +388,12 @@ export default {
       return ready > Date.now();
     };
 
+    const objectHasProduction = () => {
+      if (!object.value) return false;
+      // check tools for this object to see if any have units_per_hour set (units/hour) and produce an output
+      return tools.value.some((t) => (t.units_per_hour || t.units_per_hour === 0) && t.produces_tool_type_id);
+    };
+
     const getReadyTimestamp = (obj) => {
       // ready_at is already a timestamp in milliseconds
       if (!obj || !obj.ready_at) return null;
@@ -333,9 +406,14 @@ export default {
       const remaining = Math.max(0, ready - currentTime.value);
       if (remaining === 0) return "";
       const totalSeconds = Math.ceil(remaining / 1000);
-      const minutes = Math.floor(totalSeconds / 60);
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
       const seconds = totalSeconds % 60;
-      return `${minutes}m ${seconds}s`;
+      const two = (n) => String(n).padStart(2, '0');
+      if (hours > 0) {
+        return `${hours}:${two(minutes)}:${two(seconds)}`;
+      }
+      return `${minutes}:${two(seconds)}`;
     });
 
     // Get workers info from occupied_workers for this object
@@ -447,6 +525,72 @@ export default {
         } else {
           alert("Failed to start upgrade. Check console for details.");
         }
+      }
+    };
+
+    const openProduceModal = async () => {
+      // Prepare preview based on current workers selection (default to first level if available)
+      produceWorkerLevel.value = Object.keys(people.value.by_level || {})[0] || null;
+      produceWorkerCount.value = 1;
+      await calculateProductionPreview();
+      showProduceModal.value = true;
+    };
+
+    const calculateProductionPreview = async () => {
+      productionPreview.value = [];
+      if (!object.value) return;
+
+      const byToolType = {};
+      tools.value.forEach((t) => {
+        if (!t.units_per_hour || !t.produces_tool_type_id) return;
+        const key = t.tool_type_id;
+        byToolType[key] = byToolType[key] || { tool: t, count: 0 };
+        byToolType[key].count++;
+      });
+
+      const lvl = produceWorkerLevel.value ? parseInt(produceWorkerLevel.value) : 1;
+      const cnt = produceWorkerCount.value ? parseInt(produceWorkerCount.value) : 1;
+
+      for (const key in byToolType) {
+        const entry = byToolType[key];
+        const fieldsCount = entry.count;
+  const basePerHour = entry.tool.units_per_hour ? parseInt(entry.tool.units_per_hour) : 0; // units/hour/field from DB
+        const perHour = fieldsCount * basePerHour * Math.max(1, lvl) * Math.max(1, cnt);
+        const total = perHour * 24;
+        productionPreview.value.push({
+          tool_type_id: entry.tool.tool_type_id,
+          tool_type_name: entry.tool.tool_type_name,
+          fieldsCount,
+          perHour,
+          totalProduced: total,
+          produces_tool_type_id: entry.tool.produces_tool_type_id,
+        });
+      }
+    };
+
+    const startProduction = async () => {
+      try {
+        const res = await axios.post('/api/city-objects/produce', {
+          object_id: objectId.value,
+          worker_level: produceWorkerLevel.value,
+          worker_count: produceWorkerCount.value,
+        });
+
+        if (res.data.success) {
+          showProduceModal.value = false;
+          // Update object ready_at locally
+          const objIndex = cityObjects.value.findIndex((o) => o.id === objectId.value);
+          if (objIndex !== -1) {
+            cityObjects.value[objIndex].ready_at = res.data.object.ready_at;
+            cityObjects.value = [...cityObjects.value];
+          }
+          await fetchPeople();
+        } else {
+          alert('Production failed: ' + res.data.message);
+        }
+      } catch (e) {
+        console.error('Failed to start production', e);
+        alert($t('city.production_failed') || 'Failed to start production');
       }
     };
 
@@ -665,6 +809,15 @@ export default {
       cancelMove,
       handleToolClick,
       handleToolTouch,
+  // Production
+  showProduceModal,
+  produceWorkerLevel,
+  produceWorkerCount,
+  productionPreview,
+  objectHasProduction,
+  openProduceModal,
+  calculateProductionPreview,
+  startProduction,
     };
   },
 };

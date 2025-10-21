@@ -42,5 +42,22 @@ return [
     'select_workers_upgrade' => 'Изберете работници за обновяване на нивото на обекта.',
     'upgrade_time' => 'Време за обновяване',
     'start_upgrade' => 'Започни обновяване',
+    'start_production' => 'Започни производство',
+    'select_workers_production' => 'Изберете работници за започване на производството за този обект.',
+    'no_production_materials' => 'Няма материали за производство към този обект.',
+    'fields' => 'полета',
+    'hour' => 'час',
+    'hours' => 'часа',
+    'production_failed' => 'Производството се провали',
     'unknown' => 'Непознат',
+    // Inventory
+    'inventory' => [
+        'resource' => 'Ресурс',
+        'available' => 'Налично',
+        'pending' => 'В производство',
+        'expected' => 'Очаквани'
+    ],
+    'menu' => [
+        'inventory' => 'Инвентар'
+    ],
 ];

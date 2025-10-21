@@ -9,7 +9,7 @@ class ToolType extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name', 'description', 'icon'];
+    protected $fillable = ['name', 'description', 'icon', 'units_per_hour', 'produces_tool_type_id'];
 
     public function objectTypes()
     {
@@ -19,5 +19,10 @@ class ToolType extends Model
     public function tools()
     {
         return $this->hasMany(Tool::class);
+    }
+
+    public function produces()
+    {
+        return $this->belongsTo(ToolType::class, 'produces_tool_type_id');
     }
 }

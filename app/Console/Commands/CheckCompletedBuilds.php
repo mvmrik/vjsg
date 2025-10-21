@@ -79,6 +79,24 @@ class CheckCompletedBuilds extends Command
                 ]);
             }
 
+            // Finalize production: transfer inventories.temp_count -> count for produced tool types attached to this object
+            $tools = \App\Models\Tool::where('object_id', $object->id)
+                ->join('tool_types', 'tools.tool_type_id', '=', 'tool_types.id')
+                ->select('tool_types.units_per_hour', 'tool_types.produces_tool_type_id')
+                ->get();
+
+            foreach ($tools as $t) {
+                if (!$t->units_per_hour || !$t->produces_tool_type_id) continue;
+                $inventory = \App\Models\Inventory::where('user_id', $object->user_id)
+                    ->where('tool_type_id', $t->produces_tool_type_id)
+                    ->first();
+                if ($inventory && intval($inventory->temp_count) > 0) {
+                    $inventory->count = intval($inventory->count) + intval($inventory->temp_count);
+                    $inventory->temp_count = 0;
+                    $inventory->save();
+                }
+            }
+
             // Clear ready_at
             $object->ready_at = null;
             $object->save();

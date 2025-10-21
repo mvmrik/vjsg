@@ -373,4 +373,138 @@ class CityController extends Controller
             'upgrade_time_minutes' => $finalMinutes
         ]);
     }
+
+    /**
+     * Start production on an object (similar to upgrade/build)
+     */
+    public function produce(Request $request)
+    {
+        $userId = Session::get('user_id');
+        if (!$userId) {
+            return response()->json(['success' => false, 'message' => 'Not authenticated'], 401);
+        }
+
+        $objectId = $request->input('object_id');
+        $workerLevel = $request->input('worker_level');
+        $workerCount = $request->input('worker_count');
+
+        if (!$objectId || $workerLevel === null || $workerLevel < 0 || $workerCount === null || $workerCount <= 0) {
+            return response()->json(['success' => false, 'message' => 'Invalid parameters: Please select workers'], 400);
+        }
+
+        $object = CityObject::where('id', $objectId)->where('user_id', $userId)->first();
+        if (!$object) {
+            return response()->json(['success' => false, 'message' => 'Object not found'], 404);
+        }
+
+        // Check if object is already running production/build
+        if ($object->ready_at && $object->ready_at > time()) {
+            return response()->json(['success' => false, 'message' => 'Object is already busy'], 400);
+        }
+
+        // Validate workers
+        if ($workerLevel > 0 && $workerCount > 0) {
+            $personGroup = Person::where('user_id', $userId)
+                ->where('level', intval($workerLevel))
+                ->first();
+
+            if (!$personGroup || $personGroup->count < intval($workerCount)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid workers: You do not have ' . $workerCount . ' workers at level ' . $workerLevel
+                ], 400);
+            }
+        }
+
+        // Find tools attached to this object that have production_seconds set
+        $tools = \App\Models\Tool::where('object_id', $object->id)
+            ->join('tool_types', 'tools.tool_type_id', '=', 'tool_types.id')
+            ->select('tools.*', 'tool_types.units_per_hour', 'tool_types.produces_tool_type_id', 'tool_types.name as tool_type_name')
+            ->get();
+
+        if ($tools->isEmpty()) {
+            return response()->json(['success' => false, 'message' => 'No materials/tools attached to this object for production'], 400);
+        }
+
+        // Production duration fixed to 24 hours (per requirements)
+        $durationSeconds = 24 * 3600;
+
+        // Compute production per tool field
+        // Formula: perHourPerField = worker_level * worker_count
+        // totalPerField = perHourPerField * 24 (hours)
+        $perHourMultiplier = intval($workerLevel) * intval($workerCount);
+        if ($perHourMultiplier <= 0) $perHourMultiplier = 1; // baseline
+
+        // Prepare inventory updates (temp_count)
+        // Group tools by tool_type_id to avoid double-counting
+        $groups = [];
+        foreach ($tools as $tool) {
+            if (!$tool->units_per_hour || !$tool->produces_tool_type_id) continue;
+            $tid = $tool->tool_type_id;
+            if (!isset($groups[$tid])) {
+                $groups[$tid] = [
+                    'tool_type_id' => $tid,
+                    'fieldsCount' => 0,
+                    'units_per_hour' => intval($tool->units_per_hour),
+                    'produces_tool_type_id' => $tool->produces_tool_type_id,
+                    'tool_type_name' => $tool->tool_type_name ?? null,
+                ];
+            }
+            $groups[$tid]['fieldsCount'] += 1;
+        }
+
+        $lvl = max(1, intval($workerLevel));
+        $cnt = max(1, intval($workerCount));
+
+        foreach ($groups as $g) {
+            $fieldsCount = $g['fieldsCount'];
+            $basePerHour = max(0, intval($g['units_per_hour'])); // units per hour per field from DB
+
+            // Per hour production = fieldsCount * basePerHour * workerLevel * workerCount
+            $perHour = $fieldsCount * $basePerHour * $lvl * $cnt;
+            $totalProduced = $perHour * 24; // for 24 hours
+
+            // Atomically insert or increment temp_count to avoid races and ensure accumulation
+            // Use INSERT ... ON DUPLICATE KEY UPDATE (works on MySQL). The unique index on (user_id, tool_type_id)
+            // guarantees correct behavior.
+            $now = date('Y-m-d H:i:s');
+            $userIdEsc = intval($userId);
+            $toolTypeIdEsc = intval($g['produces_tool_type_id']);
+            $toAdd = intval($totalProduced);
+
+            \Illuminate\Support\Facades\DB::statement(
+                'INSERT INTO inventories (user_id, tool_type_id, count, temp_count, created_at, updated_at) VALUES (?, ?, 0, ?, ?, ?) '
+                . 'ON DUPLICATE KEY UPDATE temp_count = temp_count + ?, updated_at = ?;',
+                [$userIdEsc, $toolTypeIdEsc, $toAdd, $now, $now, $toAdd, $now]
+            );
+        }
+
+        // Set object ready_at and create occupied_workers record
+        $readyAt = time() + $durationSeconds;
+        $object->ready_at = $readyAt;
+        $object->save();
+
+        OccupiedWorker::create([
+            'user_id' => $userId,
+            'level' => intval($workerLevel),
+            'count' => intval($workerCount),
+            'occupied_until' => $readyAt,
+            'city_object_id' => $object->id
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Production started successfully',
+            'object' => [
+                'id' => $object->id,
+                'ready_at' => $object->ready_at * 1000,
+                'object_type' => $object->object_type,
+                'x' => $object->x,
+                'y' => $object->y,
+                'parcel_id' => $object->parcel_id,
+                'user_id' => $object->user_id
+            ],
+            'production_length_hours' => 24
+        ]);
+    }
 }

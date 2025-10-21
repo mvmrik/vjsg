@@ -47,7 +47,13 @@ class ToolController extends Controller
     {
         $tools = Tool::join('tool_types', 'tools.tool_type_id', '=', 'tool_types.id')
             ->where('tools.object_id', $objectId)
-            ->select('tools.*', 'tool_types.name as tool_type_name', 'tool_types.icon as tool_type_icon')
+            ->select(
+                'tools.*',
+                'tool_types.name as tool_type_name',
+                'tool_types.icon as tool_type_icon',
+                'tool_types.units_per_hour',
+                'tool_types.produces_tool_type_id'
+            )
             ->get();
         return response()->json($tools);
     }

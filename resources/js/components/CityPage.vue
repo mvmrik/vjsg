@@ -203,9 +203,14 @@ export default {
   const now = Date.now();
   const remainingMs = Math.max(0, ready - now);
       const sec = Math.ceil(remainingMs / 1000);
-      const m = Math.floor(sec / 60);
-      const s = sec % 60;
-      return `${m}${m === 1 ? $t('city.minutes').slice(0, -1) : $t('city.minutes')} ${s}${s === 1 ? $t('city.seconds').slice(0, -1) : $t('city.seconds')}`;
+      const hours = Math.floor(sec / 3600);
+      const minutes = Math.floor((sec % 3600) / 60);
+      const seconds = sec % 60;
+      const two = (n) => String(n).padStart(2, '0');
+      if (hours > 0) {
+        return `${hours}:${two(minutes)}:${two(seconds)}`;
+      }
+      return `${minutes}:${two(seconds)}`;
     };
 
     const isBuilding = (obj) => {

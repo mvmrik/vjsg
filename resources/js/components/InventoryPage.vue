@@ -7,18 +7,6 @@
             <c-icon name="cilStorage" class="me-2" />
             Инвентар
           </strong>
-          <div>
-            <c-button 
-              color="success" 
-              size="sm" 
-              @click="collectAllResources"
-              :disabled="loading"
-            >
-              <c-spinner v-if="loading" size="sm" class="me-1" />
-              <c-icon v-else name="cilPlus" class="me-1" />
-              Събери всички
-            </c-button>
-          </div>
         </c-card-header>
         <c-card-body>
           <!-- Resource Categories -->
@@ -61,55 +49,34 @@
             </c-nav-item>
           </c-nav>
 
-          <!-- Resource Grid -->
-          <c-row>
-            <c-col
-              v-for="resource in filteredResources"
-              :key="resource.id"
-              md="4"
-              lg="3"
-              class="mb-3"
-            >
-              <c-card class="h-100 resource-card" :class="{ 'border-primary': resource.selected }">
-                <c-card-body class="text-center">
-                  <div class="resource-icon mb-2">
-                    <c-icon :name="resource.icon" size="2xl" :class="resource.iconColor" />
+          <!-- Unified Inventory Table -->
+          <c-table hover responsive>
+            <thead>
+              <tr>
+                <th>{{ tr('inventory.resource', 'Resource') }}</th>
+                <th class="text-end">{{ tr('inventory.available', 'Available') }}</th>
+                <th class="text-end">{{ tr('inventory.pending', 'Pending') }}</th>
+                <th class="text-end">{{ tr('inventory.expected', 'Expected') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="resource in resources" :key="resource.id">
+                <td>
+                  <div class="d-flex align-items-center gap-2">
+                    <img v-if="resource.icon" :src="`/images/tools/${resource.icon}`" alt="icon" style="width:36px;height:36px;object-fit:contain" />
+                    <c-icon v-else name="cilStorage" />
+                    <div>{{ resource.name }}</div>
                   </div>
-                  <h6 class="mb-1">{{ resource.name }}</h6>
-                  <c-badge 
-                    :color="getQuantityBadgeColor(resource.quantity)" 
-                    class="mb-2"
-                  >
-                    {{ resource.quantity }}
-                  </c-badge>
-                  <p class="text-muted small mb-2">{{ resource.description }}</p>
-                  
-                  <div class="d-flex justify-content-between align-items-center">
-                    <small class="text-muted">{{ resource.category }}</small>
-                    <c-dropdown v-if="resource.actions && resource.actions.length">
-                      <template #toggler="{ on }">
-                        <c-button
-                          color="outline-secondary"
-                          size="sm"
-                          v-on="on"
-                        >
-                          <c-icon name="cilOptions" />
-                        </c-button>
-                      </template>
-                      <c-dropdown-item 
-                        v-for="action in resource.actions"
-                        :key="action.name"
-                        @click="performAction(action, resource)"
-                      >
-                        <c-icon :name="action.icon" class="me-2" />
-                        {{ action.label }}
-                      </c-dropdown-item>
-                    </c-dropdown>
-                  </div>
-                </c-card-body>
-              </c-card>
-            </c-col>
-          </c-row>
+                </td>
+                <td class="text-end"><strong>{{ resource.quantity }}</strong></td>
+                <td class="text-end"><span class="text-warning">{{ resource.temp_quantity || 0 }}</span></td>
+                <td class="text-end"><strong>{{ (parseInt(resource.quantity) || 0) + (parseInt(resource.temp_quantity) || 0) }}</strong></td>
+              </tr>
+              <tr v-if="resources.length === 0">
+                <td colspan="4" class="text-center text-muted">Няма ресурси в инвентара</td>
+              </tr>
+            </tbody>
+          </c-table>
 
           <!-- Empty State -->
           <div v-if="filteredResources.length === 0" class="text-center py-5">
@@ -189,8 +156,9 @@
 </template>
 
 <script>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, inject } from 'vue';
 import { useGameStore } from '../stores/gameStore';
+import axios from 'axios';
 
 export default {
   name: 'InventoryPage',
@@ -203,97 +171,49 @@ export default {
     const showResourceModal = ref(false);
     const selectedResource = ref(null);
 
-    const resources = ref([
-      {
-        id: 1,
-        name: 'Дърво',
-        quantity: 150,
-        category: 'materials',
-        description: 'Основен строителен материал, добиван от дървета.',
-        icon: 'cilStorage',
-        iconColor: 'text-success',
-        weight: 2,
-        value: 5,
-        actions: [
-          { name: 'use', label: 'Използвай', icon: 'cilCheckCircle' },
-          { name: 'sell', label: 'Продай', icon: 'cilMoney' }
-        ]
-      },
-      {
-        id: 2,
-        name: 'Камък',
-        quantity: 75,
-        category: 'materials',
-        description: 'Твърд материал за строителство и занаяти.',
-        icon: 'cilIndustry',
-        iconColor: 'text-secondary',
-        weight: 5,
-        value: 8,
-        actions: [
-          { name: 'use', label: 'Използвай', icon: 'cilCheckCircle' },
-          { name: 'sell', label: 'Продай', icon: 'cilMoney' }
-        ]
-      },
-      {
-        id: 3,
-        name: 'Метал',
-        quantity: 25,
-        category: 'materials',
-        description: 'Ценен материал за направа на инструменти.',
-        icon: 'cilIndustry',
-        iconColor: 'text-primary',
-        weight: 8,
-        value: 15,
-        actions: [
-          { name: 'craft', label: 'Изработи', icon: 'cilWrench' },
-          { name: 'sell', label: 'Продай', icon: 'cilMoney' }
-        ]
-      },
-      {
-        id: 4,
-        name: 'Кирка',
-        quantity: 2,
-        category: 'tools',
-        description: 'Инструмент за добиване на камък и метал.',
-        icon: 'cilWrench',
-        iconColor: 'text-warning',
-        weight: 3,
-        value: 50,
-        actions: [
-          { name: 'equip', label: 'Екипирай', icon: 'cilShieldAlt' },
-          { name: 'repair', label: 'Поправи', icon: 'cilWrench' }
-        ]
-      },
-      {
-        id: 5,
-        name: 'Брадва',
-        quantity: 1,
-        category: 'tools',
-        description: 'Инструмент за сечене на дърво.',
-        icon: 'cilWrench',
-        iconColor: 'text-success',
-        weight: 4,
-        value: 45,
-        actions: [
-          { name: 'equip', label: 'Екипирай', icon: 'cilShieldAlt' },
-          { name: 'repair', label: 'Поправи', icon: 'cilWrench' }
-        ]
-      },
-      {
-        id: 6,
-        name: 'Храна',
-        quantity: 10,
-        category: 'consumables',
-        description: 'Възстановява енергия и здраве.',
-        icon: 'cilMedical',
-        iconColor: 'text-danger',
-        weight: 1,
-        value: 3,
-        actions: [
-          { name: 'consume', label: 'Консумирай', icon: 'cilCheckCircle' }
-        ]
+    const resources = ref([]);
+
+    const $t = inject('$t');
+
+    const tr = (key, fallback) => {
+      try {
+        const v = $t(key);
+        return typeof v === 'string' && v !== key ? v : fallback;
+      } catch (e) {
+        return fallback;
       }
-    ]);
+    };
+
+    const fetchInventories = async () => {
+      loading.value = true;
+      try {
+        const res = await axios.get('/api/inventories');
+        const data = res.data;
+        console.log('inventories API response', data);
+        if (data && data.success) {
+          resources.value = data.items.map((it) => ({
+            id: it.id,
+            tool_type_id: it.tool_type_id,
+            name: it.tool_name || 'Unknown',
+            quantity: parseInt(it.count) || 0,
+            temp_quantity: parseInt(it.temp_count) || 0,
+            description: it.tool_description || '',
+            icon: it.tool_icon || null,
+            category: 'materials',
+            actions: []
+          }));
+        } else if (data && data.success === false) {
+          message.value = data.message || 'Failed to load inventory';
+          messageType.value = 'error';
+        }
+      } catch (e) {
+        console.error('Failed to load inventories', e);
+        message.value = 'Failed to load inventories';
+        messageType.value = 'error';
+      } finally {
+        loading.value = false;
+      }
+    };
 
     const filteredResources = computed(() => {
       if (activeCategory.value === 'all') {
@@ -309,20 +229,7 @@ export default {
       return 'success';
     };
 
-    const collectAllResources = () => {
-      loading.value = true;
-      setTimeout(() => {
-        // Simulate collection
-        resources.value.forEach(resource => {
-          if (resource.category === 'materials') {
-            resource.quantity += Math.floor(Math.random() * 10) + 5;
-          }
-        });
-        loading.value = false;
-        message.value = 'Всички ресурси са събрани успешно!';
-        messageType.value = 'success';
-      }, 1500);
-    };
+    // collectAllResources removed: collection should only happen when production completes on server
 
     const performAction = (action, resource) => {
       switch (action.name) {
@@ -358,7 +265,7 @@ export default {
     };
 
     onMounted(() => {
-      // Load user inventory from API
+      fetchInventories();
     });
 
     return {
@@ -371,9 +278,10 @@ export default {
       resources,
       filteredResources,
       getQuantityBadgeColor,
-      collectAllResources,
       performAction,
-      openResourceDetails
+      openResourceDetails,
+      fetchInventories
+      ,tr
     };
   }
 }

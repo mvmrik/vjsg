@@ -68,6 +68,7 @@ Route::middleware(['game.auth'])->group(function () {
     Route::get('/city-objects', [CityController::class, 'index'])->name('api.city-objects.index');
     Route::post('/city-objects/save', [CityController::class, 'save'])->name('api.city-objects.save');
     Route::post('/city-objects/upgrade', [CityController::class, 'upgrade'])->name('api.city-objects.upgrade');
+    Route::post('/city-objects/produce', [CityController::class, 'produce'])->name('api.city-objects.produce');
     Route::get('/object-types', [CityController::class, 'types'])->name('api.object-types.index');
     Route::get('/people', [\App\Http\Controllers\PeopleController::class, 'index'])->name('api.people.index');
 });
@@ -91,4 +92,7 @@ Route::middleware(['game.auth'])->group(function () {
     Route::post('/objects/add-tool', [ToolController::class, 'addTool']);
     Route::get('/objects/{objectId}/tools', [ToolController::class, 'getTools']);
     Route::post('/objects/update-tool-position', [ToolController::class, 'updateToolPosition']);
+    
+    // Inventory
+    Route::get('/inventories', [\App\Http\Controllers\InventoryController::class, 'index']);
 });

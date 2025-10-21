@@ -178,7 +178,7 @@ export default {
     const sidebarMinimize = ref(false);
     const showLoginModal = ref(false);
     const dropdownVisible = ref(false);
-    const appVersion = "0.8.0"
+    const appVersion = "0.7.1";
     const unreadNotifications = computed(() => gameStore.unreadNotificationsCount);
     const toasts = ref([]);
     const showConfirmModal = ref(false);

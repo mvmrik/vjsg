@@ -42,5 +42,22 @@ return [
     'select_workers_upgrade' => 'Select workers to upgrade the object level.',
     'upgrade_time' => 'Upgrade time',
     'start_upgrade' => 'Start Upgrade',
+    'start_production' => 'Start Production',
+    'select_workers_production' => 'Select workers to start production for this object.',
+    'no_production_materials' => 'No production materials attached to this object.',
+    'fields' => 'fields',
+    'hour' => 'hour',
+    'hours' => 'hours',
+    'production_failed' => 'Production failed',
     'unknown' => 'Unknown',
+    // Inventory
+    'inventory' => [
+        'resource' => 'Resource',
+        'available' => 'Available',
+        'pending' => 'Pending',
+        'expected' => 'Expected'
+    ],
+    'menu' => [
+        'inventory' => 'Inventory'
+    ],
 ];
