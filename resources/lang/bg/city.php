@@ -49,6 +49,7 @@ return [
     'hour' => 'час',
     'hours' => 'часа',
     'production_failed' => 'Производството се провали',
+    'production_length_hours' => 'Продължителност на производството (часове)',
     'unknown' => 'Непознат',
     // Inventory
     'inventory' => [

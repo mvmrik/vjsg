@@ -53,6 +53,10 @@ Route::get('/translations/{locale}', function ($locale) {
 Route::middleware(['game.auth'])->group(function () {
     Route::get('/user-data', [GameController::class, 'getUserData'])->name('api.user-data');
     Route::post('/user-data', [GameController::class, 'updateUserData'])->name('api.user-data.update');
+    Route::get('/game-settings', [GameController::class, 'getGameSettings'])->name('api.game-settings.get');
+    Route::post('/game-settings', [GameController::class, 'setGameSetting'])->name('api.game-settings.set');
+    Route::get('/game-settings', [GameController::class, 'getGameSettings'])->name('api.game-settings.get');
+    Route::post('/game-settings', [GameController::class, 'setGameSetting'])->name('api.game-settings.set');
 });
 
 use App\Http\Controllers\ParcelsController;

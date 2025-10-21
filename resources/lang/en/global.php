@@ -11,4 +11,5 @@ return [
     'language' => 'Language',
     'english' => 'English',
     'bulgarian' => 'Bulgarian',
+    'notification' => 'Notice',
 ];

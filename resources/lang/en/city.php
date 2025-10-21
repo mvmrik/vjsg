@@ -49,6 +49,7 @@ return [
     'hour' => 'hour',
     'hours' => 'hours',
     'production_failed' => 'Production failed',
+    'production_length_hours' => 'Production length (hours)',
     'unknown' => 'Unknown',
     // Inventory
     'inventory' => [

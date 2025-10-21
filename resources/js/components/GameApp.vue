@@ -176,11 +176,11 @@ export default {
     const $t = inject("$t");
     const sidebarShow = ref(true);
     const sidebarMinimize = ref(false);
-    const showLoginModal = ref(false);
-    const dropdownVisible = ref(false);
-    const appVersion = "0.8.0"
-    const unreadNotifications = computed(() => gameStore.unreadNotificationsCount);
-    const toasts = ref([]);
+  const showLoginModal = ref(false);
+  const dropdownVisible = ref(false);
+  const appVersion = "0.9.0";
+  const unreadNotifications = computed(() => gameStore.unreadNotificationsCount);
+  const toasts = ref([]);
     const showConfirmModal = ref(false);
     const confirmMessage = ref("");
     const confirmCallbacks = ref({ onConfirm: null, onCancel: null });
@@ -339,7 +339,7 @@ export default {
         const { message, type } = event.detail;
         const color =
           type === "error" ? "danger" : type === "success" ? "success" : "info";
-        addToast("Известие", message, color);
+        addToast($t('global.notification'), message, color);
       });
     });
 

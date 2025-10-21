@@ -9,4 +9,5 @@ return [
     'language' => 'Език',
     'english' => 'Английски',
     'bulgarian' => 'Български',
+    'notification' => 'Известие',
 ];

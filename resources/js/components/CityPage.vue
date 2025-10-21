@@ -38,9 +38,6 @@
                           :class="['placed-object', { 'building': isBuilding(obj) }]"
                         >
                           <c-icon :name="getObjectIcon(obj.object_type)" />
-                          <div v-if="isBuilding(obj)" class="build-overlay">
-                            <div class="build-time">{{ getRemainingTimeText(obj) }}</div>
-                          </div>
                         </div>
                       </div>
                     </div>

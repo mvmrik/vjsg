@@ -38,14 +38,16 @@
                 </c-nav-link>
             </c-nav-item>
             <c-nav-item>
-                              <c-nav-link
-                  href="#settings-tab"
-                  :active="activeTab === 'settings'"
-                  @click="activeTab = 'settings'"
-                >
-                  <c-icon name="cilSettings" class="me-2" />
-                  {{ $t('settings.settings') }}
-                </c-nav-link>
+              <c-nav-link href="#display-tab" :active="activeTab === 'display'" @click="activeTab = 'display'">
+                <c-icon name="cilScreenDesktop" class="me-2" />
+                {{ $t('settings.display') }}
+              </c-nav-link>
+            </c-nav-item>
+            <c-nav-item>
+              <c-nav-link href="#game-settings-tab" :active="activeTab === 'game_settings'" @click="activeTab = 'game_settings'">
+                <c-icon name="cilGamepad" class="me-2" />
+                {{ $t('settings.game_settings') }}
+              </c-nav-link>
             </c-nav-item>
             <c-nav-item>
                               <c-nav-link
@@ -132,6 +134,13 @@
               </c-col>
             </c-row>
 
+            <div class="mt-3 d-flex justify-content-center">
+              <c-button color="danger" variant="outline" @click="showDeleteConfirm">
+                <c-icon name="cilTrash" class="me-2" />
+                {{ $t('settings.delete_account') }}
+              </c-button>
+            </div>
+
           </c-form>
         </c-card-body>
       </c-card>
@@ -206,37 +215,13 @@
         </c-card-body>
       </c-card>
 
-      <!-- Settings Tab Content -->
-      <c-card v-show="activeTab === 'settings'">
+      <!-- Display Tab Content (was Settings) -->
+      <c-card v-show="activeTab === 'display'">
         <c-card-header>
-          <strong>{{ $t('settings.profile_settings') }}</strong>
+          <strong>{{ $t('settings.display_settings') }}</strong>
         </c-card-header>
         <c-card-body>
           <c-form>
-            <div class="mb-4">
-              <h6>{{ $t('settings.notifications') }}</h6>
-              <c-form-check>
-                <c-form-check-input v-model="settings.emailNotifications" />
-                <c-form-check-label>{{ $t('settings.email_notifications') }}</c-form-check-label>
-              </c-form-check>
-              <c-form-check>
-                <c-form-check-input v-model="settings.gameNotifications" />
-                <c-form-check-label>{{ $t('settings.game_notifications') }}</c-form-check-label>
-              </c-form-check>
-            </div>
-
-            <div class="mb-4">
-              <h6>{{ $t('settings.privacy') }}</h6>
-              <c-form-check>
-                <c-form-check-input v-model="settings.profileVisible" />
-                <c-form-check-label>{{ $t('settings.visible_profile') }}</c-form-check-label>
-              </c-form-check>
-              <c-form-check>
-                <c-form-check-input v-model="settings.showStats" />
-                <c-form-check-label>{{ $t('settings.show_stats') }}</c-form-check-label>
-              </c-form-check>
-            </div>
-
             <div class="mb-4">
               <h6>{{ $t('global.language') }}</h6>
               <c-form-select v-model="settings.language">
@@ -250,10 +235,24 @@
                 <c-icon name="cilSave" class="me-2" />
                 {{ $t('settings.save_settings') }}
               </c-button>
-              <c-button color="danger" variant="outline" @click="confirmDelete = true">
-                <c-icon name="cilTrash" class="me-2" />
-                {{ $t('settings.delete_account') }}
-              </c-button>
+            </div>
+          </c-form>
+        </c-card-body>
+      </c-card>
+
+      <!-- Game Settings Tab Content -->
+      <c-card v-show="activeTab === 'game_settings'">
+        <c-card-header>
+          <strong>{{ $t('settings.game_settings') }}</strong>
+        </c-card-header>
+        <c-card-body>
+          <c-form>
+            <div class="mb-3">
+              <c-form-label>{{ $t('settings.production_length_hours') }}</c-form-label>
+              <div class="d-flex align-items-center gap-3">
+                <input type="range" min="1" max="24" v-model.number="gameSettings.production_length_hours" @change="saveGameSetting('production_length_hours', gameSettings.production_length_hours)" class="form-range" />
+                <div class="fw-bold">{{ gameSettings.production_length_hours }}h</div>
+              </div>
             </div>
           </c-form>
         </c-card-body>
@@ -292,23 +291,7 @@
     </c-col>
   </c-row>
 
-  <!-- Delete Confirmation Modal -->
-  <c-modal v-model="confirmDelete">
-    <c-modal-header>
-      <c-modal-title>{{ $t('settings.confirmation_delete') }}</c-modal-title>
-    </c-modal-header>
-    <c-modal-body>
-      {{ $t('settings.sure_delete_account') }}
-    </c-modal-body>
-    <c-modal-footer>
-      <c-button color="secondary" @click="confirmDelete = false">
-        {{ $t('cancel') }}
-      </c-button>
-      <c-button color="danger" @click="deleteAccount">
-        {{ $t('settings.delete_account_btn') }}
-      </c-button>
-    </c-modal-footer>
-  </c-modal>
+  <!-- Delete confirmation removed: delete button is no-op and logs to console -->
 </template>
 
 <script>
@@ -324,10 +307,9 @@ export default {
     const $t = inject('$t');
     
     const activeTab = ref('profile');
-    const copied = ref(false);
-    const message = ref('');
-    const messageType = ref('');
-    const confirmDelete = ref(false);
+  const copied = ref(false);
+  const message = ref('');
+  const messageType = ref('');
 
     const showPrivateKey = ref(false);
     
@@ -350,6 +332,10 @@ export default {
       profileVisible: true,
       showStats: true,
       language: 'en' // default
+    });
+
+    const gameSettings = ref({
+      production_length_hours: 12
     });
 
     const userLanguage = computed(() => {
@@ -457,14 +443,47 @@ export default {
 
     const deleteAccount = async () => {
       try {
-        // Delete account logic
+        // Currently a no-op server-side; keep logout behavior but do not show modal
         await gameStore.logout();
         router.push('/');
       } catch (error) {
         message.value = $t('settings.error_deleting_account');
         messageType.value = 'error';
       }
-      confirmDelete.value = false;
+    };
+
+    const showDeleteConfirm = () => {
+      // For now just log the click (no modal or server-side deletion yet)
+      console.log('Delete account clicked (no-op)');
+    };
+
+    const saveGameSetting = async (key, value) => {
+      try {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+        if (!csrfToken) return;
+        await fetch('/api/game-settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
+          body: JSON.stringify({ key, value: String(value) })
+        });
+        // Dispatch global toast handled by GameApp.vue (bottom-right)
+        try {
+          window.dispatchEvent(new CustomEvent('show-toast', { detail: { message: $t('settings.settings_saved') || 'Saved', type: 'success' } }));
+        } catch (e) {
+          // fallback to inline message
+          message.value = $t('settings.settings_saved') || 'Saved';
+          messageType.value = 'success';
+          setTimeout(() => { message.value = ''; }, 1800);
+        }
+      } catch (e) {
+        console.error('Failed to save game setting', key, e);
+        try {
+          window.dispatchEvent(new CustomEvent('show-toast', { detail: { message: 'Error saving setting', type: 'error' } }));
+        } catch (e) {
+          message.value = 'Error saving setting';
+          messageType.value = 'error';
+        }
+      }
     };
 
     const logout = async () => {
@@ -477,22 +496,34 @@ export default {
       }
     };
     
-    onMounted(() => {
+    onMounted(async () => {
       // If not authenticated, redirect to home
       if (!gameStore.isAuthenticated) {
         router.push('/');
         return;
       }
-      
-      // Fetch fresh user data
+      // Fetch fresh user data and wait for it so we can read user-specific settings
       if (gameStore.fetchUserData) {
-        gameStore.fetchUserData();
+        await gameStore.fetchUserData();
       }
 
-      // Load user settings and stats
+      // Load user settings and stats (after user is available)
       if (gameStore.user) {
         profileForm.value.username = gameStore.user.username;
         settings.value.language = userLanguage.value;
+        // load per-user game settings
+        try {
+          const r = await fetch('/api/game-settings');
+          const data = await r.json();
+          if (data.success && data.settings) {
+            const s = data.settings;
+            gameSettings.value.production_length_hours = s.production_length_hours ? parseInt(s.production_length_hours) : 12;
+          } else {
+            gameSettings.value.production_length_hours = 12;
+          }
+        } catch (e) {
+          gameSettings.value.production_length_hours = 12;
+        }
       }
     });
 
@@ -505,9 +536,8 @@ export default {
       gameStore,
       activeTab,
       copied,
-      message,
-      messageType,
-      confirmDelete,
+  message,
+  messageType,
       showPrivateKey,
       profileForm,
       gameStats,
@@ -518,7 +548,10 @@ export default {
       copyToClipboard,
       updateProfile,
       saveSettings,
+      gameSettings,
+      saveGameSetting,
       deleteAccount,
+      showDeleteConfirm,
       logout
     };
   }

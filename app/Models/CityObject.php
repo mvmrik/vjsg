@@ -40,4 +40,28 @@ class CityObject extends Model
     {
         return $this->hasMany(Tool::class, 'object_id');
     }
+
+    /**
+     * Calculate build seconds for an object given baseSeconds and workers.
+     * Uses the 'next level' logic: nextLevel = max(1, currentLevel + 1).
+     * reductionMinutes = (workerLevel * workerCount) - 1 (min 0)
+     * finalSeconds = max(60, baseSeconds * nextLevel - reductionMinutes*60)
+     *
+     * @param int $baseSeconds
+     * @param int $currentLevel
+     * @param int $workerLevel
+     * @param int $workerCount
+     * @return int
+     */
+    public static function calculateBuildSeconds(int $baseSeconds, int $currentLevel = 0, int $workerLevel = 0, int $workerCount = 0): int
+    {
+        $nextLevel = max(1, intval($currentLevel) + 1);
+        $levelAdjustedSeconds = intval($baseSeconds) * $nextLevel;
+        $reductionMinutes = ($workerLevel * $workerCount) - 1;
+        if ($reductionMinutes < 0) {
+            $reductionMinutes = 0;
+        }
+        $reductionSeconds = intval($reductionMinutes) * 60;
+        return max(60, $levelAdjustedSeconds - $reductionSeconds);
+    }
 }

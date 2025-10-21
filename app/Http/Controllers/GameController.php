@@ -73,4 +73,41 @@ class GameController extends Controller
             ]
         ]);
     }
+
+    // Get per-user game settings
+    public function getGameSettings(Request $request)
+    {
+        $userId = $request->session()->get('user_id');
+        if (!$userId) return response()->json(['success' => false, 'message' => 'Not logged in'], 401);
+        $settings = \App\Models\GameSetting::where('user_id', $userId)->get()->pluck('value', 'key')->toArray();
+        return response()->json(['success' => true, 'settings' => $settings]);
+    }
+
+    // Set a per-user game setting
+    public function setGameSetting(Request $request)
+    {
+        $userId = $request->session()->get('user_id');
+        if (!$userId) return response()->json(['success' => false, 'message' => 'Not logged in'], 401);
+
+        $validated = $request->validate([
+            'key' => 'required|string',
+            'value' => 'nullable|string'
+        ]);
+
+        // If the key is production_length_hours, validate numeric range
+        if ($validated['key'] === 'production_length_hours') {
+            $v = intval($validated['value']);
+            if ($v < 1 || $v > 24) {
+                return response()->json(['success' => false, 'message' => 'Invalid production_length_hours'], 422);
+            }
+            $validated['value'] = (string)$v;
+        }
+
+        $s = \App\Models\GameSetting::updateOrCreate([
+            'user_id' => $userId,
+            'key' => $validated['key']
+        ], ['value' => $validated['value'] ?? null]);
+
+        return response()->json(['success' => true, 'setting' => ['key' => $s->key, 'value' => $s->value]]);
+    }
 }

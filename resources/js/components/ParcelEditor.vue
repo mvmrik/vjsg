@@ -276,11 +276,17 @@ export default {
       const newTimes = {};
       availableObjects.value.forEach(o => {
         const base = o.build_time_minutes || 1;
+  // Apply same formula as backend (use NEXT level = current + 1):
+  // 1) increase base by next level
+  // 2) reductionMinutes = (worker_level * count) - 1 (min 0)
+  const objectLevel = (o.level || 0) + 1;
         if (lvl > 0 && cnt > 0) {
-          const reduction = lvl * cnt;
-          newTimes[o.type] = Math.max(1, base - reduction);
+          const levelAdjusted = base * Math.max(1, objectLevel);
+          let reductionMinutes = (lvl * cnt) - 1;
+          if (reductionMinutes < 0) reductionMinutes = 0;
+          newTimes[o.type] = Math.max(1, levelAdjusted - reductionMinutes);
         } else {
-          newTimes[o.type] = base;
+          newTimes[o.type] = base * Math.max(1, (o.level || 0) + 1);
         }
       });
       displayedTimes.value = newTimes;
@@ -291,11 +297,14 @@ export default {
         const base = objType.build_time_minutes || 1;
         const lvl = selectedWorkerLevel.value ? parseInt(selectedWorkerLevel.value) : 0;
         const cnt = selectedWorkerCount.value ? parseInt(selectedWorkerCount.value) : 0;
+  const objectLevel = (objType.level || 0) + 1;
         if (lvl > 0 && cnt > 0) {
-          const reduction = lvl * cnt;
-          return Math.max(1, base - reduction);
+          const levelAdjusted = base * Math.max(1, objectLevel);
+          let reductionMinutes = (lvl * cnt) - 1;
+          if (reductionMinutes < 0) reductionMinutes = 0;
+          return Math.max(1, levelAdjusted - reductionMinutes);
         }
-        return base;
+        return base * Math.max(1, objectLevel);
       };
     });
 

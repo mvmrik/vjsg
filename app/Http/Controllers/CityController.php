@@ -179,6 +179,9 @@ class CityController extends Controller
 
                 // Check for workers info sent in properties (level & count)
                 $workers = ($objData['properties'] ?? [])['workers'] ?? null;
+                // Determine current object level (if provided in payload for upgrades), default to 0
+                // We calculate time for the NEXT level (current + 1) inside the helper
+                $objectLevel = intval($objData['level'] ?? 0);
                 
                 // VALIDATION: Verify user actually has the claimed workers
                 if ($workers && isset($workers['level']) && isset($workers['count'])) {
@@ -197,10 +200,10 @@ class CityController extends Controller
                         ], 400);
                     }
                     
-                    $reductionSeconds = $level * $count * 60;
-                    $buildSeconds = max(60, $baseSeconds - $reductionSeconds);
+                    // Use centralized helper that applies the 'next level' logic
+                    $buildSeconds = \App\Models\CityObject::calculateBuildSeconds($baseSeconds, $objectLevel, $level, $count);
                 } else {
-                    $buildSeconds = $baseSeconds;
+                    $buildSeconds = \App\Models\CityObject::calculateBuildSeconds($baseSeconds, $objectLevel, 0, 0);
                 }
 
                 $readyAt = time() + $buildSeconds; // UNIX timestamp
@@ -209,7 +212,7 @@ class CityController extends Controller
                     'user_id' => $userId,
                     'parcel_id' => $objData['parcel_id'],
                     'object_type' => $objData['object_type'],
-                    'level' => 1,
+                    'level' => $objectLevel,
                     'x' => $objData['x'],
                     'y' => $objData['y'],
                     'ready_at' => $readyAt,
@@ -332,17 +335,16 @@ class CityController extends Controller
             }
         }
 
-        // Calculate upgrade time (same as build time of the object type)
-        $objectType = ObjectType::where('type', $object->object_type)->first();
-        $baseMinutes = $objectType ? $objectType->build_time_minutes : 10;
-        $baseSeconds = $baseMinutes * 60;
-        $reduction = intval($workerLevel) * intval($workerCount);
-        $finalMinutes = max(1, $baseMinutes - $reduction);
-        $finalSeconds = max(60, $baseSeconds - ($reduction * 60));
+    // Calculate upgrade time using centralized helper (next level logic)
+    $objectType = ObjectType::where('type', $object->object_type)->first();
+    $baseMinutes = $objectType ? $objectType->build_time_minutes : 10;
+    $baseSeconds = $baseMinutes * 60;
+    $finalSeconds = \App\Models\CityObject::calculateBuildSeconds($baseSeconds, $object->level ?? 0, intval($workerLevel), intval($workerCount));
+    $finalMinutes = intval(ceil($finalSeconds / 60));
 
         // Update object to increase level and set build time
-        $readyAt = time() + $finalSeconds; // UNIX timestamp
-        $object->level = ($object->level ?? 1) + 1;
+    $readyAt = time() + $finalSeconds; // UNIX timestamp
+    $object->level = ($object->level ?? 0) + 1;
         $object->build_seconds = $finalSeconds;
         $object->ready_at = $readyAt;
         $object->save();
@@ -426,13 +428,27 @@ class CityController extends Controller
             return response()->json(['success' => false, 'message' => 'No materials/tools attached to this object for production'], 400);
         }
 
-        // Production duration fixed to 24 hours (per requirements)
-        $durationSeconds = 24 * 3600;
+    // Production duration: if request provides duration_hours use it; otherwise try user's game_settings; fallback to 12
+    $requested = $request->input('duration_hours', null);
+    if ($requested !== null) {
+        $durationHours = max(1, intval($requested));
+    } else {
+        $durationHours = 12; // default
+        $userId = $request->session()->get('user_id');
+        if ($userId) {
+            $setting = \App\Models\GameSetting::where('user_id', $userId)->where('key', 'production_length_hours')->first();
+            if ($setting && intval($setting->value) > 0) {
+                $durationHours = intval($setting->value);
+            }
+        }
+    }
+    if ($durationHours > 24) $durationHours = 24; // cap at 24
+    $durationSeconds = $durationHours * 3600;
 
         // Compute production per tool field
         // Formula: perHourPerField = worker_level * worker_count
         // totalPerField = perHourPerField * 24 (hours)
-        $perHourMultiplier = intval($workerLevel) * intval($workerCount);
+    $perHourMultiplier = intval($workerLevel) * intval($workerCount);
         if ($perHourMultiplier <= 0) $perHourMultiplier = 1; // baseline
 
         // Prepare inventory updates (temp_count)
@@ -462,7 +478,7 @@ class CityController extends Controller
 
             // Per hour production = fieldsCount * basePerHour * workerLevel * workerCount
             $perHour = $fieldsCount * $basePerHour * $lvl * $cnt;
-            $totalProduced = $perHour * 24; // for 24 hours
+            $totalProduced = $perHour * $durationHours; // for selected hours
 
             // Atomically insert or increment temp_count to avoid races and ensure accumulation
             // Use INSERT ... ON DUPLICATE KEY UPDATE (works on MySQL). The unique index on (user_id, tool_type_id)
@@ -504,7 +520,7 @@ class CityController extends Controller
                 'parcel_id' => $object->parcel_id,
                 'user_id' => $object->user_id
             ],
-            'production_length_hours' => 24
+            'production_length_hours' => $durationHours
         ]);
     }
 }

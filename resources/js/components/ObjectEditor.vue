@@ -259,6 +259,14 @@
             </div>
           </div>
 
+          <div class="mb-3">
+            <label class="form-label small mb-1">{{ $t('city.production_length_hours') || 'Production length (hours)' }}</label>
+            <div class="d-flex align-items-center gap-3">
+              <input type="range" min="1" max="24" v-model.number="produceDurationHours" @input="calculateProductionPreview" class="form-range" />
+              <div class="fw-bold">{{ produceDurationHours }}h</div>
+            </div>
+          </div>
+
           <div v-if="productionPreview.length === 0" class="text-center">
             {{ $t('city.no_production_materials') }}
           </div>
@@ -268,9 +276,9 @@
                 <strong>{{ item.tool_type_name }}</strong>
                 <div class="small text-muted">{{ item.fieldsCount }} {{ $t('city.fields') }}</div>
               </div>
-              <div class="text-end">
+                <div class="text-end">
                 <div>{{ item.perHour }} / {{ $t('city.hour') }}</div>
-                <div><strong>{{ item.totalProduced }}</strong> / 24 {{ $t('city.hours') }}</div>
+                <div><strong>{{ item.totalProduced }}</strong> / {{ produceDurationHours }} {{ $t('city.hours') }}</div>
               </div>
             </div>
           </div>
@@ -340,6 +348,7 @@ export default {
   const produceWorkerLevel = ref(null);
   const produceWorkerCount = ref(0);
   const productionPreview = ref([]); // [{tool_type_name, fieldsCount, perHour, totalProduced, produces_tool_type_id}]
+  const produceDurationHours = ref(12);
     const upgradeWorkerLevel = ref(null);
     const upgradeWorkerCount = ref(0);
     const people = ref({ total: 0, by_level: {}, groups: [] });
@@ -480,11 +489,16 @@ export default {
       const baseTime = objectType ? objectType.build_time_minutes : 10;
       const lvl = upgradeWorkerLevel.value ? parseInt(upgradeWorkerLevel.value) : 0;
       const cnt = upgradeWorkerCount.value ? parseInt(upgradeWorkerCount.value) : 0;
+      // Use NEXT level = current + 1 for upgrade calculation
+      const currentLevel = object.value?.level || 0;
+      const nextLevel = (currentLevel || 0) + 1;
       if (lvl > 0 && cnt > 0) {
-        const reduction = lvl * cnt;
-        return Math.max(1, baseTime - reduction);
+        const levelAdjusted = baseTime * Math.max(1, nextLevel);
+        let reductionMinutes = (lvl * cnt) - 1;
+        if (reductionMinutes < 0) reductionMinutes = 0;
+        return Math.max(1, levelAdjusted - reductionMinutes);
       }
-      return baseTime;
+      return baseTime * Math.max(1, nextLevel);
     });
 
     const startUpgrade = async () => {
@@ -532,6 +546,17 @@ export default {
       // Prepare preview based on current workers selection (default to first level if available)
       produceWorkerLevel.value = Object.keys(people.value.by_level || {})[0] || null;
       produceWorkerCount.value = 1;
+      // Try to load user's saved production length from game settings
+      try {
+        const res = await axios.get('/api/game-settings');
+        if (res.data.success && res.data.settings && res.data.settings.production_length_hours) {
+          produceDurationHours.value = parseInt(res.data.settings.production_length_hours);
+        } else {
+          produceDurationHours.value = 12;
+        }
+      } catch (e) {
+        produceDurationHours.value = 12;
+      }
       await calculateProductionPreview();
       showProduceModal.value = true;
     };
@@ -550,13 +575,14 @@ export default {
 
       const lvl = produceWorkerLevel.value ? parseInt(produceWorkerLevel.value) : 1;
       const cnt = produceWorkerCount.value ? parseInt(produceWorkerCount.value) : 1;
+      const duration = produceDurationHours.value ? parseInt(produceDurationHours.value) : 24;
 
       for (const key in byToolType) {
         const entry = byToolType[key];
         const fieldsCount = entry.count;
   const basePerHour = entry.tool.units_per_hour ? parseInt(entry.tool.units_per_hour) : 0; // units/hour/field from DB
         const perHour = fieldsCount * basePerHour * Math.max(1, lvl) * Math.max(1, cnt);
-        const total = perHour * 24;
+        const total = perHour * duration;
         productionPreview.value.push({
           tool_type_id: entry.tool.tool_type_id,
           tool_type_name: entry.tool.tool_type_name,
@@ -574,6 +600,7 @@ export default {
           object_id: objectId.value,
           worker_level: produceWorkerLevel.value,
           worker_count: produceWorkerCount.value,
+          duration_hours: produceDurationHours.value
         });
 
         if (res.data.success) {
@@ -814,6 +841,7 @@ export default {
   produceWorkerLevel,
   produceWorkerCount,
   productionPreview,
+  produceDurationHours,
   objectHasProduction,
   openProduceModal,
   calculateProductionPreview,
