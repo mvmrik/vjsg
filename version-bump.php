@@ -1,5 +1,6 @@
 <?php
 
+// Simple semantic version bump script that updates APP_VERSION in .env
 if ($argc < 4) {
     echo 'Usage: php version-bump.php <major_inc> <minor_inc> <patch_inc>' . PHP_EOL;
     exit(1);
@@ -11,59 +12,78 @@ $patchInc = (int)$argv[3];
 
 echo "Args: major=$majorInc, minor=$minorInc, patch=$patchInc\n";
 
-$file = 'resources/js/components/GameApp.vue';
-if (!file_exists($file)) {
-    echo "File not found: $file\n";
+$envFile = __DIR__ . '/.env';
+if (!file_exists($envFile)) {
+    echo "Env file not found: $envFile\n";
     exit(1);
 }
 
-$content = file_get_contents($file);
-if ($content === false) {
-    echo "Failed to read file: $file\n";
+$envContent = file_get_contents($envFile);
+if ($envContent === false) {
+    echo "Failed to read env file: $envFile\n";
     exit(1);
 }
 
-// Match patterns like: const appVersion = '0.1.2' ; or const appVersion = "0.1.2";
-// Be tolerant to spaces and optional semicolon. Capture the quote char to reuse in replacement.
-if (!preg_match('/(const\s+appVersion\s*=\s*)([\"\'])([^\"\']+)(\2)\s*;?/u', $content, $matches)) {
-    echo 'Version not found in GameApp.vue.' . PHP_EOL;
-    exit(1);
+// Read current version from .env if present
+if (preg_match('/^APP_VERSION=(.*)$/m', $envContent, $m)) {
+    $currentVersion = trim($m[1]);
+    $currentVersion = trim($currentVersion, "\"' \t");
+} else {
+    // Fallback to reading GameApp.vue for older projects
+    $vueFile = __DIR__ . '/resources/js/components/GameApp.vue';
+    $currentVersion = '0.0.0';
+    if (file_exists($vueFile) && ($v = file_get_contents($vueFile)) !== false) {
+        if (preg_match('/const\s+appVersion\s*=\s*(["\'])([^"\']+)\1/u', $v, $vm)) {
+            $currentVersion = trim($vm[2]);
+        }
+    }
 }
 
-$currentVersion = $matches[3];
 echo "Current version: $currentVersion\n";
 
-list($major, $minor, $patch) = explode('.', $currentVersion);
+// Parse semantic version into parts
+$parts = preg_split('/\./', $currentVersion);
+for ($i = 0; $i < 3; $i++) {
+    if (!isset($parts[$i]) || $parts[$i] === '') {
+        $parts[$i] = '0';
+    }
+}
+
+$major = (int)$parts[0];
+$minor = (int)$parts[1];
+$patch = (int)$parts[2];
 
 echo "Parsed: major=$major, minor=$minor, patch=$patch\n";
 
-$major += $majorInc;
-$minor += $minorInc;
-$patch += $patchInc;
-
-echo "After adding: major=$major, minor=$minor, patch=$patch\n";
-
+// Apply increments according to typical semver bump rules
 if ($majorInc > 0) {
+    $major += $majorInc;
     $minor = 0;
     $patch = 0;
     echo "Major bump - resetting minor and patch\n";
 } elseif ($minorInc > 0) {
+    $minor += $minorInc;
     $patch = 0;
     echo "Minor bump - resetting patch\n";
+} else {
+    $patch += $patchInc;
 }
 
 $newVersion = $major . '.' . $minor . '.' . $patch;
+
 echo "New version: $newVersion\n";
 
-$quote = $matches[2];
-$prefix = $matches[1];
+// Update or add APP_VERSION in .env
+$newLine = 'APP_VERSION=' . $newVersion;
+if (preg_match('/^APP_VERSION=.*$/m', $envContent)) {
+    $envContent = preg_replace('/^APP_VERSION=.*$/m', $newLine, $envContent);
+} else {
+    if (substr($envContent, -1) !== "\n") {
+        $envContent .= "\n";
+    }
+    $envContent .= $newLine . "\n";
+}
 
-// Build replacement keeping original quote char
-$replacement = $prefix . $quote . $newVersion . $quote;
-
-// Replace the first occurrence only
-$content = preg_replace('/(const\s+appVersion\s*=\s*)([\"\\\'])([^\"\'\n\r]*)(\2)\s*;?/u', $replacement, $content, 1);
-
-file_put_contents($file, $content);
+file_put_contents($envFile, $envContent);
 
 echo 'Version bumped from ' . $currentVersion . ' to ' . $newVersion . PHP_EOL;

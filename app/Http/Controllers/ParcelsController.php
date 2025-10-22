@@ -19,7 +19,7 @@ class ParcelsController extends Controller
     public function claim(Request $request)
     {
         try {
-            $userId = $request->session()->get('user_id');
+            $userId = $request->session()->get('user_id') ?: \Illuminate\Support\Facades\Auth::id();
             if (!$userId) {
                 return response()->json(['success' => false, 'message' => 'Not authenticated'], 401);
             }

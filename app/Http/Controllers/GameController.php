@@ -12,8 +12,10 @@ class GameController extends Controller
 
     public function getUserData(Request $request)
     {
-        $userId = $request->session()->get('user_id');
-        
+    // Prefer the resolved attribute set by ResolveGameUser middleware.
+    // Fallback to session or Auth::id() for safety.
+    $userId = $request->attributes->get('game_user_id') ?: $request->session()->get('user_id') ?: \Illuminate\Support\Facades\Auth::id();
+
         if (!$userId) {
             return response()->json(['success' => false, 'message' => 'Not logged in'], 401);
         }
@@ -30,7 +32,8 @@ class GameController extends Controller
                 'id' => $user->id,
                 'username' => $user->username,
                 'public_key' => $user->public_key,
-                'private_key' => $user->private_key,
+                // Do not expose private_key in API responses
+                //'private_key' => $user->private_key,
                 'locale' => $user->locale,
                 'balance' => $user->balance
             ]

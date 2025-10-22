@@ -134,6 +134,12 @@
               </c-col>
             </c-row>
 
+            <!-- Delete account button moved below remembered devices to avoid accidental clicks -->
+
+            <!-- Remembered devices -->
+            <profile-devices />
+
+            <!-- Delete account (moved below devices list) -->
             <div class="mt-3 d-flex justify-content-center">
               <c-button color="danger" variant="outline" @click="showDeleteConfirm">
                 <c-icon name="cilTrash" class="me-2" />
@@ -298,9 +304,13 @@
 import { ref, computed, onMounted, watch, inject } from 'vue';
 import { useRouter } from 'vue-router';
 import { useGameStore } from '../stores/gameStore';
+import ProfileDevices from './ProfileDevices.vue';
 
 export default {
   name: 'ProfilePage',
+  components: {
+    ProfileDevices
+  },
   setup() {
     const router = useRouter();
     const gameStore = useGameStore();

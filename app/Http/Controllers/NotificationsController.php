@@ -10,7 +10,7 @@ class NotificationsController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $userId = $request->session()->get('user_id');
+        $userId = $request->session()->get('user_id') ?: \Illuminate\Support\Facades\Auth::id();
         
         if (!$userId) {
             return response()->json(['success' => false, 'message' => 'Not authenticated'], 401);

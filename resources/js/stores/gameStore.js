@@ -5,6 +5,7 @@ export const useGameStore = defineStore('auth', {
   state: () => ({
     user: null,
     parcels: [],
+      postRegistration: null,
     isAuthenticated: false,
     loading: false,
     error: null,
@@ -26,6 +27,10 @@ export const useGameStore = defineStore('auth', {
         const response = await axios.post('/register', { username });
         
         if (response.data.success) {
+          // Save the raw user keys returned once by the backend so the UI can show them
+          if (response.data.user) {
+            this.postRegistration = response.data.user;
+          }
           // Auto-login after registration
           this.isAuthenticated = true;
           localStorage.setItem('game_logged_in', 'true');
@@ -42,6 +47,10 @@ export const useGameStore = defineStore('auth', {
       }
     },
 
+    clearPostRegistration() {
+      this.postRegistration = null;
+    },
+
     async login(privateKey, rememberMe = false) {
       this.loading = true;
       this.error = null;
@@ -54,16 +63,14 @@ export const useGameStore = defineStore('auth', {
         
         if (response.data.success) {
           this.isAuthenticated = true;
-          
-          // Use cookies for remember me, localStorage for session
-          if (rememberMe) {
-            // Set cookie that expires in 30 days
-            document.cookie = 'game_logged_in=true; path=/; max-age=' + (30 * 24 * 60 * 60);
-            document.cookie = 'game_private_key=' + encodeURIComponent(privateKey) + '; path=/; max-age=' + (30 * 24 * 60 * 60);
-          } else {
-            localStorage.setItem('game_logged_in', 'true');
-          }
-          
+
+          // Always set local flag so UI is immediately interactive. The server will be
+          // the source of truth on following requests; fetchUserData will clear the flag
+          // if the server rejects the session.
+          localStorage.setItem('game_logged_in', 'true');
+
+          // For remember/me the server will set the httpOnly cookie; keep localStorage
+          // as a UI-friendly fallback so menus don't stay disabled.
           await this.fetchUserData();
           // Start polling for notifications
           this.startPolling();
@@ -79,14 +86,18 @@ export const useGameStore = defineStore('auth', {
       }
     },
 
-    async logout() {
+    async logout(skipServer = false) {
       // Stop polling
       this.stopPolling();
       
-      try {
-        await axios.post('/logout');
-      } catch (error) {
-        console.error('Logout error:', error);
+      if (!skipServer) {
+        try {
+          await axios.post('/logout');
+        } catch (error) {
+          // Log error but continue clearing client state. Server may have already
+          // invalidated the session which can cause a 419 CSRF error.
+          console.error('Logout error:', error);
+        }
       }
       
       this.user = null;
@@ -114,6 +125,12 @@ export const useGameStore = defineStore('auth', {
         }
       } catch (error) {
         console.error('Failed to fetch user data:', error);
+        // If server reports unauthenticated, clear local auth flags
+        if (error.response && error.response.status === 401) {
+          this.user = null;
+          this.isAuthenticated = false;
+          localStorage.removeItem('game_logged_in');
+        }
       }
     },
 
@@ -176,34 +193,29 @@ export const useGameStore = defineStore('auth', {
 
 
     async checkAuthStatus() {
-      // Check cookies first (remember me)
-      const cookies = document.cookie.split(';').reduce((acc, cookie) => {
-        const [key, value] = cookie.trim().split('=');
-        acc[key] = decodeURIComponent(value || '');
-        return acc;
-      }, {});
-      
-      if (cookies.game_logged_in === 'true' && cookies.game_private_key) {
-        // Auto-login with remembered private key
+        // Try to fetch user data — if server session or remember cookie is valid,
+        // the API will return user data. This avoids storing raw private keys on client.
         try {
-          await this.login(cookies.game_private_key, true);
-        } catch (error) {
-          console.error('Auto-login failed:', error);
-          // Clear invalid cookies
-          document.cookie = 'game_logged_in=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-          document.cookie = 'game_private_key=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+          const res = await axios.get('/api/user-data');
+          if (res.data && res.data.success) {
+            this.user = res.data.user;
+            this.isAuthenticated = true;
+            await this.fetchUnreadNotificationsCount();
+            this.startPolling();
+            return;
+          }
+        } catch (e) {
+          // Ignore - user not authenticated server-side
         }
-        return;
-      }
-      
-      // Fallback to localStorage (session-based)
-      const isLoggedIn = localStorage.getItem('game_logged_in') === 'true';
-      if (isLoggedIn) {
-        this.isAuthenticated = true;
-        await this.fetchUserData();
-        // Start polling for notifications
-        this.startPolling();
-      }
+
+        // Fallback to localStorage (session-based)
+        const isLoggedIn = localStorage.getItem('game_logged_in') === 'true';
+        if (isLoggedIn) {
+          this.isAuthenticated = true;
+          await this.fetchUserData();
+          // Start polling for notifications
+          this.startPolling();
+        }
     },
 
     async fetchUnreadNotificationsCount() {
@@ -252,6 +264,8 @@ export const useGameStore = defineStore('auth', {
       // Start polling every 30 seconds
       this.pollingInterval = setInterval(async () => {
         if (this.isAuthenticated) {
+          // Check for server-side revocation and update notifications
+          await this.checkAuthStatus();
           await this.fetchUnreadNotificationsCount();
         }
       }, 30000); // 30 seconds

@@ -25,6 +25,60 @@
 
       <!-- Map for authenticated users -->
       <div v-if="gameStore.isAuthenticated">
+
+  <!-- Post-registration card (appears only immediately after successful registration) -->
+  <c-card v-if="gameStore.postRegistration" class="mb-4 border-warning">
+          <c-card-header class="bg-warning text-dark">
+            <strong>{{ $t('home.save_your_keys_title') }}</strong>
+          </c-card-header>
+          <c-card-body>
+            <p class="mb-3">
+              {{ $t('home.save_your_keys_explain') }}
+            </p>
+
+            <c-row class="mb-3">
+              <c-col md="12">
+                <c-form-label>{{ $t('home.public_key_label') }}</c-form-label>
+                <c-input-group>
+                  <c-form-input :value="gameStore.postRegistration.public_key" readonly class="font-monospace" />
+                  <c-button type="button" color="secondary" @click="copyToClipboard(gameStore.postRegistration.public_key)">
+                    {{ $t('global.copy') }}
+                  </c-button>
+                </c-input-group>
+              </c-col>
+            </c-row>
+
+            <c-row class="mb-3">
+              <c-col md="12">
+                <c-form-label>{{ $t('home.private_key_label') }}</c-form-label>
+                <c-input-group>
+                  <c-form-input :value="gameStore.postRegistration.private_key" readonly class="font-monospace" />
+                  <c-button type="button" color="danger" @click="copyToClipboard(gameStore.postRegistration.private_key)">
+                    {{ $t('global.copy') }}
+                  </c-button>
+                </c-input-group>
+                <c-form-text class="text-danger mt-2">
+                  <strong>{{ $t('home.private_key_warning_title') }}</strong>
+                  <br />
+                  {{ $t('home.private_key_warning') }}
+                </c-form-text>
+              </c-col>
+            </c-row>
+
+            <div class="d-flex align-items-center">
+              <div class="form-check me-3">
+                <input class="form-check-input" type="checkbox" id="confirmSaved" v-model="savedConfirmed">
+                <label class="form-check-label" for="confirmSaved">
+                  {{ $t('home.confirm_saved') }}
+                </label>
+              </div>
+              <c-button :disabled="!savedConfirmed" color="primary" @click="() => { gameStore.clearPostRegistration(); savedConfirmed = false; }">
+                {{ $t('home.continue') }}
+              </c-button>
+            </div>
+          </c-card-body>
+        </c-card>
+
         <c-card class="mb-4">
           <c-card-header class="d-flex justify-content-between align-items-center">
             <strong>
@@ -192,7 +246,9 @@
                     <c-form-input
                       v-model="loginForm.privateKey"
                       :placeholder="$t('home.private_key_placeholder')"
-                      type="text"
+                      type="password"
+                      name="private_key"
+                      autocomplete="current-password"
                       maxlength="64"
                       required
                     />
@@ -331,6 +387,19 @@ export default {
       }));
     };
 
+    // Post-registration state: contains { public_key, private_key } when user just registered
+    const postRegistration = ref(null);
+    const savedConfirmed = ref(false);
+
+    const copyToClipboard = (text) => {
+      navigator.clipboard.writeText(text).then(() => {
+        showMessage('Успешно копирано в клипборда.', 'success');
+      }).catch(err => {
+        console.error('Copy failed:', err);
+        showMessage('Неуспешно копиране в клипборда.', 'error');
+      });
+    };
+
     const collectResources = () => {
       showMessage('Ресурсите бяха събрани успешно!', 'success');
       gameStats.value.resources += 25;
@@ -355,8 +424,13 @@ export default {
       loading.value = true;
 
       try {
-        await gameStore.register(registerForm.value.username);
-        // Registration successful, redirect handled by gameStore
+        const result = await gameStore.register(registerForm.value.username);
+        // gameStore.register sets gameStore.postRegistration when backend returns keys
+        if (!(result && result.user && result.user.private_key)) {
+          // Fallback: redirect to root
+          await router.push('/');
+        }
+
         registerForm.value.username = '';
       } catch (error) {
         showMessage(gameStore.error || 'Грешка при регистрация', 'error');
@@ -653,6 +727,8 @@ export default {
       refreshMap,
       currentLocale,
       showMessage,
+      copyToClipboard,
+      savedConfirmed,
       collectResources,
       handleLogin,
       handleRegister,

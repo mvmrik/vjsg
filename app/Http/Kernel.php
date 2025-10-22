@@ -36,6 +36,10 @@ class Kernel extends HttpKernel
             \Illuminate\View\Middleware\ShareErrorsFromSession::class,
             \App\Http\Middleware\VerifyCsrfToken::class,
             \App\Http\Middleware\SetLocale::class,
+            // Check remember-device cookie to auto-login if needed
+            \App\Http\Middleware\AuthenticateRememberDevice::class,
+            // Resolve game user (session or Auth) for all web requests
+            \App\Http\Middleware\ResolveGameUser::class,
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
         ],
 
@@ -45,6 +49,10 @@ class Kernel extends HttpKernel
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
             \App\Http\Middleware\EncryptCookies::class,
             \Illuminate\Session\Middleware\StartSession::class,
+            // Check remember-device cookie for API requests
+            \App\Http\Middleware\AuthenticateRememberDevice::class,
+            // Resolve game user for API requests protected by session/remember
+            \App\Http\Middleware\ResolveGameUser::class,
         ],
     ];
 
@@ -68,5 +76,6 @@ class Kernel extends HttpKernel
         'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
         'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
         'game.auth' => \App\Http\Middleware\CheckGameAuth::class,
+    'resolve.game.user' => \App\Http\Middleware\ResolveGameUser::class,
     ];
 }

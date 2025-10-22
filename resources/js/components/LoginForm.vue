@@ -34,7 +34,9 @@
           <c-form-input
             v-model="loginForm.privateKey"
             placeholder="Частен ключ (64 символа)"
-            type="text"
+            type="password"
+            name="private_key"
+            autocomplete="current-password"
             maxlength="64"
             required
           />
@@ -173,18 +175,13 @@ export default {
 
       try {
         const result = await gameStore.register(registerForm.value.username);
-        message.value = `✅ ${result.message}<br><br>
-          <strong>📱 Вашите ключове:</strong><br>
-          <strong>Публичен:</strong> ${result.user.public_key}<br>
-          <strong>Частен:</strong> ${result.user.private_key}<br><br>
-          ⚠️ <strong>ВАЖНО:</strong> Запазете частния ключ сигурно - нужен е за влизане!`;
+        message.value = `✅ ${result.message}`;
         messageType.value = 'success';
         registerForm.value.username = '';
-        
-        // Auto switch to login tab after successful registration
+        // Redirect to map so the post-registration card (in HomePage) will be visible
         setTimeout(() => {
-          activeTab.value = 'login';
-        }, 3000);
+          window.location.href = '/';
+        }, 300);
       } catch (err) {
         message.value = err.message || gameStore.error || 'Грешка при регистрация';
         messageType.value = 'error';

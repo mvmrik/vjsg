@@ -61,6 +61,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Application Version
+    |--------------------------------------------------------------------------
+    |
+    | This value holds the current application version. It's read from the
+    | APP_VERSION environment variable and exposed to the frontend. Use the
+    | provided version-bump script to update .env instead of editing JS files.
+    |
+    */
+    'version' => env('APP_VERSION', '0.0.0'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |

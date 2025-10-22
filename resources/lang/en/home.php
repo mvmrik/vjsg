@@ -25,4 +25,13 @@ return [
     'settings' => 'Settings',
     'login' => 'Login',
     'register' => 'Register',
+    // Post-registration key display
+    'save_your_keys_title' => 'Save your keys — important!',
+    'save_your_keys_explain' => 'After registration we generated a pair of keys for your account. The private key will only be shown once. Copy and store it in a safe place. Without it you cannot access this account again.',
+    'public_key_label' => 'Public key',
+    'private_key_label' => 'Private key (copy and save)',
+    'private_key_warning_title' => 'Warning — private key is unrecoverable',
+    'private_key_warning' => 'This private key will never be shown again. If you lose it you will permanently lose access to your account and everything in it. Create a new account if you lose access.',
+    'confirm_saved' => 'I have securely copied and saved my private key',
+    'continue' => 'Continue',
 ];

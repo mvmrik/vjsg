@@ -189,10 +189,11 @@ export default {
     const sidebarMinimize = ref(false);
   const showLoginModal = ref(false);
   const dropdownVisible = ref(false);
-  const appVersion = "0.10.0"
+  // Read app version from server-injected global to avoid editing JS files during version bumps
+  const appVersion = (typeof window !== 'undefined' && window.APP_VERSION) ? window.APP_VERSION : '0.0.0';
   const unreadNotifications = computed(() => gameStore.unreadNotificationsCount);
   const toasts = ref([]);
-    const showConfirmModal = ref(false);
+  const showConfirmModal = ref(false);
     const confirmMessage = ref("");
     const confirmCallbacks = ref({ onConfirm: null, onCancel: null });
 

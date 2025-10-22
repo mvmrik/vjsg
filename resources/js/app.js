@@ -51,8 +51,23 @@ const router = createRouter({
 
 // Router guard for authentication
 router.beforeEach((to, from, next) => {
-  const isLoggedIn = localStorage.getItem('game_logged_in') === 'true';
-  
+  // Consider both session (localStorage) and remember-me cookies when
+  // determining if the user is logged in. This prevents the router from
+  // redirecting protected routes to '/' before the store has a chance to
+  // perform auto-login using the remembered credentials.
+  const isLoggedInLocal = localStorage.getItem('game_logged_in') === 'true';
+
+  // Simple cookie parser to check remember-me cookies set by the client
+  const cookies = document.cookie.split(';').reduce((acc, cookie) => {
+    const [k, v] = cookie.trim().split('=');
+    acc[k] = decodeURIComponent(v || '');
+    return acc;
+  }, {});
+
+  const isLoggedInCookie = cookies.game_logged_in === 'true' && !!cookies.game_private_key;
+
+  const isLoggedIn = isLoggedInLocal || isLoggedInCookie;
+
   if (to.meta.requiresAuth && !isLoggedIn) {
     next('/');
   } else {

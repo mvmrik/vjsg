@@ -44,4 +44,14 @@ return [
     'settings_saved' => 'Настройките бяха запазени успешно!',
     'error_deleting_account' => 'Грешка при изтриване на акаунта',
     'error_logging_out' => 'Грешка при изход',
+    // Remembered devices UI
+    'remembered_devices' => 'Запомнени устройства',
+    'remembered_devices_explain' => 'Устройства, на които сте избрали "Запомни ме". Можете да отмените достъпа от отделни устройства тук.',
+    'device' => 'Устройство',
+    'last_used' => 'Последна употреба',
+    'ip' => 'IP',
+    'revoke' => 'Отмени',
+    'revoke_all' => 'Отмени всички',
+    'no_devices' => 'Няма запомнени устройства',
+    'loading' => 'Зареждане',
 ];

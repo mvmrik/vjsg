@@ -44,4 +44,14 @@ return [
     'settings_saved' => 'Settings saved successfully!',
     'error_deleting_account' => 'Error deleting account',
     'error_logging_out' => 'Error logging out',
+    // Remembered devices UI
+    'remembered_devices' => 'Remembered devices',
+    'remembered_devices_explain' => 'Devices where you chose "Remember me". You can revoke access from individual devices here.',
+    'device' => 'Device',
+    'last_used' => 'Last used',
+    'ip' => 'IP',
+    'revoke' => 'Revoke',
+    'revoke_all' => 'Revoke all',
+    'no_devices' => 'No remembered devices',
+    'loading' => 'Loading',
 ];

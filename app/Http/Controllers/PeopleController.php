@@ -11,7 +11,7 @@ class PeopleController extends Controller
 {
     public function index(Request $request)
     {
-        $userId = Session::get('user_id');
+        $userId = Session::get('user_id') ?: \Illuminate\Support\Facades\Auth::id();
         if (!$userId) {
             return response()->json(['success' => false, 'message' => 'Not authenticated'], 401);
         }

@@ -11,6 +11,7 @@
     <div id="app"></div>
     <script>
         window.locale = '{{ app()->getLocale() }}';
+        window.APP_VERSION = '{{ config("app.version") }}';
         window.translations = {
             global: @json(__('global')),
             settings: @json(__('settings')),

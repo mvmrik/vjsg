@@ -57,6 +57,10 @@ Route::middleware(['game.auth'])->group(function () {
     Route::post('/game-settings', [GameController::class, 'setGameSetting'])->name('api.game-settings.set');
     Route::get('/game-settings', [GameController::class, 'getGameSettings'])->name('api.game-settings.get');
     Route::post('/game-settings', [GameController::class, 'setGameSetting'])->name('api.game-settings.set');
+    // Remember tokens management
+    Route::get('/remember-tokens', [\App\Http\Controllers\RememberTokenController::class, 'index']);
+    Route::delete('/remember-tokens/{id}', [\App\Http\Controllers\RememberTokenController::class, 'destroy']);
+    Route::delete('/remember-tokens', [\App\Http\Controllers\RememberTokenController::class, 'destroyAll']);
 });
 
 use App\Http\Controllers\ParcelsController;

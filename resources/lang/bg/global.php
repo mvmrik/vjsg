@@ -10,4 +10,5 @@ return [
     'english' => 'Английски',
     'bulgarian' => 'Български',
     'notification' => 'Известие',
+    'copy' => 'Копирай',
 ];
