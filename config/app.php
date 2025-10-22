@@ -69,7 +69,10 @@ return [
     | provided version-bump script to update .env instead of editing JS files.
     |
     */
-    'version' => env('APP_VERSION', '0.0.0'),
+    // Tracked application version. Keep this in source so deployments get the
+    // correct version when you push to the repository. The version-bump script
+    // updates this file directly.
+    'version' => '0.11.1',
 
     /*
     |--------------------------------------------------------------------------

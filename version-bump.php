@@ -73,17 +73,47 @@ $newVersion = $major . '.' . $minor . '.' . $patch;
 
 echo "New version: $newVersion\n";
 
-// Update or add APP_VERSION in .env
-$newLine = 'APP_VERSION=' . $newVersion;
-if (preg_match('/^APP_VERSION=.*$/m', $envContent)) {
-    $envContent = preg_replace('/^APP_VERSION=.*$/m', $newLine, $envContent);
-} else {
-    if (substr($envContent, -1) !== "\n") {
-        $envContent .= "\n";
-    }
-    $envContent .= $newLine . "\n";
+// Update tracked config file `config/app.php` so version is present in repo
+$configFile = __DIR__ . '/config/app.php';
+if (!file_exists($configFile)) {
+    echo "Config file not found: $configFile\n";
+    exit(1);
 }
 
-file_put_contents($envFile, $envContent);
+$configContent = file_get_contents($configFile);
+if ($configContent === false) {
+    echo "Failed to read config file: $configFile\n";
+    exit(1);
+}
 
-echo 'Version bumped from ' . $currentVersion . ' to ' . $newVersion . PHP_EOL;
+// Replace the 'version' => 'x.y.z' line (supports single or double quotes)
+$updated = preg_replace(
+    '/(\'version\'\s*=>\s*)([\'\"])([0-9]+\.[0-9]+\.[0-9]+)([\'\"])(\s*,)/',
+    "\\1\\2" . $newVersion . "\\4\\5",
+    $configContent,
+    1
+);
+
+if ($updated === null) {
+    echo "Failed to update config content (regex error).\n";
+    exit(1);
+}
+
+// If regex didn't match (older format), try a more lenient replacement
+if ($updated === $configContent) {
+    $updated = preg_replace(
+        '/(\'version\'\s*=>\s*)([\'\"][^\'\"]*[\'\"])(\s*,)/',
+        "\\1'" . $newVersion . "'\\3",
+        $configContent,
+        1
+    );
+}
+
+if ($updated === $configContent) {
+    echo "Could not find a 'version' entry to replace in config/app.php.\n";
+    exit(1);
+}
+
+file_put_contents($configFile, $updated);
+
+echo 'Version bumped from ' . $currentVersion . ' to ' . $newVersion . ' (updated config/app.php)' . PHP_EOL;
