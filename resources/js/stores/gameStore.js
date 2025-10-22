@@ -113,7 +113,13 @@ export const useGameStore = defineStore('auth', {
       try {
         const response = await axios.get('/api/user-data');
         if (response.data.success) {
-          this.user = response.data.user;
+          // Normalize numeric id fields to numbers to avoid type mismatch
+          const u = response.data.user || null;
+          if (u) {
+            // If id looks numeric, convert to Number, otherwise keep as-is (e.g., UUID)
+            if (/^\d+$/.test(String(u.id))) u.id = Number(u.id);
+          }
+          this.user = u;
           // Emit event to set user language
           if (this.user.locale) {
             window.dispatchEvent(new CustomEvent('set-user-language', { 
@@ -139,7 +145,16 @@ export const useGameStore = defineStore('auth', {
       try {
         const res = await axios.get('/api/parcels');
         if (res.data.success) {
-          this.parcels = res.data.parcels;
+          // Normalize parcels: convert numeric-looking ids to Number and lat/lng to Number
+          const normalized = (res.data.parcels || []).map(p => {
+            const copy = Object.assign({}, p);
+            if (copy.id && /^\d+$/.test(String(copy.id))) copy.id = Number(copy.id);
+            if (copy.user_id && /^\d+$/.test(String(copy.user_id))) copy.user_id = Number(copy.user_id);
+            if (copy.lat != null) copy.lat = Number(copy.lat);
+            if (copy.lng != null) copy.lng = Number(copy.lng);
+            return copy;
+          });
+          this.parcels = normalized;
           return res.data.parcels;
         }
       } catch (e) {
