@@ -8,5 +8,6 @@ return [
     'inventory' => 'Инвентар',
     'notifications' => 'Известия',
     'settings' => 'Настройки',
+    'help' => 'Помощ',
     'user' => 'Потребител',
 ];

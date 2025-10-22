@@ -70,6 +70,17 @@
                 <c-icon name="cilSettings" size="xl" class="mb-1" />
                 <small>{{ $t("menu.settings") }}</small>
               </a>
+              <a
+                @click="$router.push('/help')"
+                :class="[
+                  'text-decoration-none d-flex flex-column align-items-center p-2 rounded',
+                  currentRoute === '/help' ? 'bg-light text-dark' : 'text-white',
+                ]"
+                style="cursor: pointer"
+              >
+                <c-icon name="cilBook" size="xl" class="mb-1" />
+                <small>{{ $t("menu.help") }}</small>
+              </a>
             </nav>
           </div>
         </div>
@@ -178,7 +189,7 @@ export default {
     const sidebarMinimize = ref(false);
   const showLoginModal = ref(false);
   const dropdownVisible = ref(false);
-  const appVersion = "0.9.0";
+  const appVersion = "0.10.0"
   const unreadNotifications = computed(() => gameStore.unreadNotificationsCount);
   const toasts = ref([]);
     const showConfirmModal = ref(false);

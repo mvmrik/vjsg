@@ -176,6 +176,12 @@
                 </c-nav-item>
               </c-nav>
 
+              <div class="text-center mb-3">
+                <c-button color="link" @click="$router.push('/help')">
+                  {{ $t('help.title') }}
+                </c-button>
+              </div>
+
               <!-- Login Tab -->
               <div v-show="activeAuthTab === 'login'" class="text-start">
                 <c-form @submit.prevent="handleLogin">

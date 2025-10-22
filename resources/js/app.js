@@ -23,6 +23,7 @@ import CityPage from './components/CityPage.vue';
 import ParcelEditor from './components/ParcelEditor.vue';
 import ObjectEditor from './components/ObjectEditor.vue';
 import NotificationsPage from './components/NotificationsPage.vue';
+import HelpPage from './components/HelpPage.vue';
 
 // Setup axios defaults
 axios.defaults.baseURL = window.location.origin;
@@ -39,6 +40,7 @@ const routes = [
   { path: '/notifications', name: 'notifications', component: NotificationsPage, meta: { requiresAuth: true } },
   { path: '/settings', name: 'settings', component: ProfilePage, meta: { requiresAuth: true } },
   { path: '/inventory', name: 'inventory', component: InventoryPage, meta: { requiresAuth: true } }
+  ,{ path: '/help', name: 'help', component: HelpPage }
 ];
 
 // Create router

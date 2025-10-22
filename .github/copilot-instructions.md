@@ -87,3 +87,7 @@ These instructions are for GitHub Copilot to understand and follow specific rule
 ## How to Use These Instructions
 
 When working with this project, always consult these instructions. If you have doubts about any rule, ask the user for clarification. These instructions can be updated over time according to project needs.
+
+### Documentation guideline
+- **Mandatory:** Whenever you change gameplay logic (construction, workers, resources, object types, build times, etc.), update the help page and translations under `resources/lang/*/help.php` to reflect the change.
+- **How-to:** Add or update examples in both English and Bulgarian, and ensure `resources/views/game.blade.php` exposes the new keys (add `help` to `window.translations` if missing). Commit changes with a message referencing the gameplay change and the help update.
