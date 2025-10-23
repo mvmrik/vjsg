@@ -748,7 +748,13 @@ export default {
       selectedPosition.value = { x, y };
       try {
         const res = await axios.get(`/api/objects/${objectId.value}/available-tools`);
-        availableTools.value = res.data;
+        // Normalize available tools (ids/numeric fields) to avoid type mismatch
+        availableTools.value = (res.data || []).map(t => {
+          const copy = Object.assign({}, t);
+          if (copy.id && /^\d+$/.test(String(copy.id))) copy.id = Number(copy.id);
+          if (copy.tool_type_id && /^\d+$/.test(String(copy.tool_type_id))) copy.tool_type_id = Number(copy.tool_type_id);
+          return copy;
+        });
         showToolModal.value = true;
       } catch (e) {
         console.error("Failed to fetch available tools", e);
@@ -791,7 +797,15 @@ export default {
     const loadTools = async () => {
       try {
         const res = await axios.get(`/api/objects/${objectId.value}/tools`);
-        tools.value = res.data;
+        // Normalize tool fields so position_x/position_y and ids are Numbers
+        tools.value = (res.data || []).map(tt => {
+          const copy = Object.assign({}, tt);
+          if (copy.id && /^\d+$/.test(String(copy.id))) copy.id = Number(copy.id);
+          if (copy.position_x != null && /^\d+$/.test(String(copy.position_x))) copy.position_x = Number(copy.position_x);
+          if (copy.position_y != null && /^\d+$/.test(String(copy.position_y))) copy.position_y = Number(copy.position_y);
+          if (copy.tool_type_id && /^\d+$/.test(String(copy.tool_type_id))) copy.tool_type_id = Number(copy.tool_type_id);
+          return copy;
+        });
       } catch (e) {
         console.error("Failed to load tools", e);
       }
