@@ -452,7 +452,17 @@ export default {
         const res = await axios.get('/api/city-objects');
         if (res.data.success) {
           // Backend already handles clearing expired ready_at
-          cityObjects.value = res.data.objects;
+          // Normalize numeric fields to avoid strict type mismatches
+          cityObjects.value = (res.data.objects || []).map(o => {
+            const copy = Object.assign({}, o);
+            if (copy.id && /^\d+$/.test(String(copy.id))) copy.id = Number(copy.id);
+            if (copy.parcel_id && /^\d+$/.test(String(copy.parcel_id))) copy.parcel_id = Number(copy.parcel_id);
+            if (copy.user_id && /^\d+$/.test(String(copy.user_id))) copy.user_id = Number(copy.user_id);
+            if (copy.x != null && /^\d+$/.test(String(copy.x))) copy.x = Number(copy.x);
+            if (copy.y != null && /^\d+$/.test(String(copy.y))) copy.y = Number(copy.y);
+            if (copy.ready_at != null && /^\d+$/.test(String(copy.ready_at))) copy.ready_at = Number(copy.ready_at);
+            return copy;
+          });
         }
       } catch (e) {
         console.error('Failed to fetch city objects', e);
