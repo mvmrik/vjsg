@@ -45,17 +45,38 @@ class ToolController extends Controller
 
     public function getTools($objectId)
     {
-        $tools = Tool::join('tool_types', 'tools.tool_type_id', '=', 'tool_types.id')
-            ->where('tools.object_id', $objectId)
-            ->select(
-                'tools.*',
-                'tool_types.name as tool_type_name',
-                'tool_types.icon as tool_type_icon',
-                'tool_types.units_per_hour',
-                'tool_types.produces_tool_type_id'
-            )
-            ->get();
-        return response()->json($tools);
+        // INVERTED MODEL: placed tool is product, find raw via produces_tool_type_id
+        $toolRows = Tool::where('object_id', $objectId)->get();
+        $result = [];
+
+        foreach ($toolRows as $tool) {
+            $productType = ToolType::find($tool->tool_type_id);
+            if (!$productType) continue;
+
+            // Find raw: product.produces_tool_type_id = raw.id (inverted: product points to raw)
+            $rawType = $productType->produces_tool_type_id 
+                ? ToolType::find($productType->produces_tool_type_id) 
+                : null;
+
+            $result[] = (object)[
+                'id' => $tool->id,
+                'object_id' => $tool->object_id,
+                'tool_type_id' => $tool->tool_type_id,
+                'position_x' => $tool->position_x,
+                'position_y' => $tool->position_y,
+                'tool_type_name' => $productType->name,
+                'tool_type_icon' => $productType->icon,
+                'units_per_hour' => $productType->units_per_hour, // product units_per_hour
+                'produces_tool_type_id' => $productType->produces_tool_type_id,
+                'produces_tool_type_name' => $productType->name,
+                // INVERTED fields
+                'raw_tool_type_id' => $rawType ? $rawType->id : null,
+                'raw_name' => $rawType ? $rawType->name : null,
+                'product_units_per_hour' => $productType->units_per_hour, // USE THIS for production calculation
+            ];
+        }
+
+        return response()->json($result);
     }
 
     public function updateToolPosition(Request $request)

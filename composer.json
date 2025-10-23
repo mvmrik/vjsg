@@ -45,8 +45,7 @@
         ],
         "post-create-project-cmd": [
             "@php artisan key:generate --ansi"
-        ],
-        "version": "php version-bump.php"
+        ]
     },
     "extra": {
         "laravel": {

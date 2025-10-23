@@ -58,6 +58,7 @@ return [
         'pending' => 'Pending',
         'expected' => 'Expected'
     ],
+        'need' => 'Need',
     'menu' => [
         'inventory' => 'Inventory'
     ],

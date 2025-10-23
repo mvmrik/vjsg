@@ -58,7 +58,8 @@ return [
         'pending' => 'В производство',
         'expected' => 'Очаквани'
     ],
-    'menu' => [
+        'need' => 'Нужно',
+        'menu' => [
         'inventory' => 'Инвентар'
     ],
 ];

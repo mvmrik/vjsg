@@ -245,8 +245,8 @@
             <div>
               <label class="form-label small mb-1">{{ $t('city.worker_level') }}</label>
               <select class="form-select" v-model="produceWorkerLevel" @change="calculateProductionPreview">
-                <option v-for="(count, lvl) in people.by_level" :key="lvl" :value="lvl">
-                  LV {{ lvl }} ({{ count }})
+                <option v-for="item in availableWorkerLevels" :key="item.level" :value="item.level">
+                  LV {{ item.level }} ({{ item.count }})
                 </option>
               </select>
             </div>
@@ -273,8 +273,20 @@
           <div v-else class="list-group">
             <div v-for="item in productionPreview" :key="item.tool_type_id" class="list-group-item d-flex justify-content-between align-items-center">
               <div>
-                <strong>{{ item.tool_type_name }}</strong>
-                <div class="small text-muted">{{ item.fieldsCount }} {{ $t('city.fields') }}</div>
+                <strong>
+                  {{ getTranslatedName(item.tool_type_name) }}
+                  <template v-if="item.produces_tool_type_name">
+                    <span class="text-muted"> → </span>
+                    <em>{{ getTranslatedName(item.produces_tool_type_name) }}</em>
+                  </template>
+                </strong>
+                <div class="small text-muted">
+                  {{ item.fieldsCount }} {{ $t('city.fields') }}
+                  <template v-if="item.needRaw > 0">
+                    <span class="text-muted"> - </span>
+                    <small>{{ $t('city.need') || 'Need' }}: <strong>{{ item.needRaw }}</strong></small>
+                  </template>
+                </div>
               </div>
                 <div class="text-end">
                 <div>{{ item.perHour }} / {{ $t('city.hour') }}</div>
@@ -285,7 +297,7 @@
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" @click="showProduceModal = false">{{ $t('city.cancel') }}</button>
-          <button type="button" class="btn btn-success" :disabled="produceWorkerCount <= 0" @click="startProduction">{{ $t('city.start_production') }}</button>
+          <button type="button" class="btn btn-success" :disabled="!produceWorkerLevel || produceWorkerCount <= 0 || !produceStartAllowed" @click="startProduction">{{ $t('city.start_production') }}</button>
         </div>
       </div>
     </div>
@@ -315,7 +327,7 @@
                     style="width: 40px; height: 40px"
                     class="mb-2"
                   />
-                  <h6 class="card-title">{{ tool.name }}</h6>
+                  <h6 class="card-title">{{ getTranslatedName(tool.name) }}</h6>
                   <p class="card-text small">{{ tool.description }}</p>
                 </div>
               </div>
@@ -341,6 +353,25 @@ export default {
     const gameStore = useGameStore();
     const $t = inject("$t");
 
+      const getTranslatedName = (name) => {
+        if (!name) return '';
+        const key = `tools.types.${name}`;
+        try {
+          const translated = $t(key);
+          // if translation missing, some i18n implementations return the key unchanged
+          if (!translated || translated === key) {
+            // fallback: prettify the DB name (replace underscores, title-case)
+            return name
+              .replace(/_/g, ' ')
+              .split(' ')
+              .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+              .join(' ');
+          }
+          return translated;
+        } catch (e) {
+          return name.replace(/_/g, ' ').split(' ').map((w)=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ');
+        }
+      };
     const loading = ref(true);
     const cityObjects = ref([]);
     const showUpgradeModal = ref(false);
@@ -349,6 +380,8 @@ export default {
   const produceWorkerCount = ref(0);
   const productionPreview = ref([]); // [{tool_type_name, fieldsCount, perHour, totalProduced, produces_tool_type_id}]
   const produceDurationHours = ref(12);
+  const inventories = ref({});
+  const produceStartAllowed = ref(true);
     const upgradeWorkerLevel = ref(null);
     const upgradeWorkerCount = ref(0);
     const people = ref({ total: 0, by_level: {}, groups: [] });
@@ -399,8 +432,8 @@ export default {
 
     const objectHasProduction = () => {
       if (!object.value) return false;
-      // check tools for this object to see if any have units_per_hour set (units/hour) and produce an output
-      return tools.value.some((t) => (t.units_per_hour || t.units_per_hour === 0) && t.produces_tool_type_id);
+      // INVERTED: show production if ANY tool is placed (products)
+      return tools.value.length > 0;
     };
 
     const getReadyTimestamp = (obj) => {
@@ -481,6 +514,16 @@ export default {
       return arr;
     };
 
+    const availableWorkerLevels = computed(() => {
+      const levels = [];
+      for (const [lvl, count] of Object.entries(people.value.by_level || {})) {
+        if (count > 0) {
+          levels.push({ level: lvl, count: count });
+        }
+      }
+      return levels;
+    });
+
     const upgradeTimeMinutes = computed(() => {
       // Base time is the same as build time of the object type (same as building)
       const objectType = availableObjects.value.find(
@@ -498,9 +541,8 @@ export default {
         if (reductionMinutes < 0) reductionMinutes = 0;
         return Math.max(1, levelAdjusted - reductionMinutes);
       }
-      return baseTime * Math.max(1, nextLevel);
+    return baseTime * Math.max(1, nextLevel);
     });
-
     const startUpgrade = async () => {
       try {
         const res = await axios.post("/api/city-objects/upgrade", {
@@ -543,9 +585,10 @@ export default {
     };
 
     const openProduceModal = async () => {
-      // Prepare preview based on current workers selection (default to first level if available)
-      produceWorkerLevel.value = Object.keys(people.value.by_level || {})[0] || null;
-      produceWorkerCount.value = 1;
+      // Select first available level with workers > 0
+      const availableLevels = Object.entries(people.value.by_level || {}).filter(([lvl, count]) => count > 0);
+      produceWorkerLevel.value = availableLevels.length > 0 ? availableLevels[0][0] : null;
+      produceWorkerCount.value = produceWorkerLevel.value ? 1 : 0;
       // Try to load user's saved production length from game settings
       try {
         const res = await axios.get('/api/game-settings');
@@ -557,6 +600,16 @@ export default {
       } catch (e) {
         produceDurationHours.value = 12;
       }
+      // Load inventories BEFORE calculating preview
+      try {
+        const inv = await axios.get('/api/inventories');
+        inventories.value = (inv.data.items || []).reduce((acc, it) => {
+          acc[it.tool_type_id] = it;
+          return acc;
+        }, {});
+      } catch (e) {
+        inventories.value = {};
+      }
       await calculateProductionPreview();
       showProduceModal.value = true;
     };
@@ -565,33 +618,54 @@ export default {
       productionPreview.value = [];
       if (!object.value) return;
 
-      const byToolType = {};
+      // INVERTED: group by product (tool_type_id)
+      const byProduct = {};
       tools.value.forEach((t) => {
-        if (!t.units_per_hour || !t.produces_tool_type_id) return;
         const key = t.tool_type_id;
-        byToolType[key] = byToolType[key] || { tool: t, count: 0 };
-        byToolType[key].count++;
+        if (!byProduct[key]) {
+          byProduct[key] = { tool: t, count: 0 };
+        }
+        byProduct[key].count++;
       });
 
       const lvl = produceWorkerLevel.value ? parseInt(produceWorkerLevel.value) : 1;
       const cnt = produceWorkerCount.value ? parseInt(produceWorkerCount.value) : 1;
-      const duration = produceDurationHours.value ? parseInt(produceDurationHours.value) : 24;
+      const duration = produceDurationHours.value ? parseInt(produceDurationHours.value) : 1;
 
-      for (const key in byToolType) {
-        const entry = byToolType[key];
+      for (const key in byProduct) {
+        const entry = byProduct[key];
         const fieldsCount = entry.count;
-  const basePerHour = entry.tool.units_per_hour ? parseInt(entry.tool.units_per_hour) : 0; // units/hour/field from DB
+        const tool = entry.tool;
+
+        // Use PRODUCT units_per_hour for production calculation
+        const basePerHour = tool.product_units_per_hour 
+          ? parseInt(tool.product_units_per_hour) 
+          : (tool.units_per_hour ? parseInt(tool.units_per_hour) : 0);
         const perHour = fieldsCount * basePerHour * Math.max(1, lvl) * Math.max(1, cnt);
         const total = perHour * duration;
+
+        // Need raw: 1 per field per hour (if raw exists)
+        const rawId = tool.raw_tool_type_id;
+        const needRaw = rawId ? (fieldsCount * duration) : 0;
+        const availableRaw = rawId && inventories.value[rawId]
+          ? parseInt(inventories.value[rawId].count || 0)
+          : 0;
+
         productionPreview.value.push({
-          tool_type_id: entry.tool.tool_type_id,
-          tool_type_name: entry.tool.tool_type_name,
+          tool_type_id: tool.tool_type_id,
+          tool_type_name: tool.raw_name || tool.tool_type_name, // left: raw name (or product if harvest)
+          produces_tool_type_name: tool.raw_name ? tool.tool_type_name : null, // right: product name (null if harvest)
+          needRaw,
+          availableRaw,
           fieldsCount,
           perHour,
           totalProduced: total,
-          produces_tool_type_id: entry.tool.produces_tool_type_id,
+          produces_tool_type_id: tool.tool_type_id,
         });
       }
+
+      // Enable start only if user has enough raw materials
+      produceStartAllowed.value = productionPreview.value.every(p => (p.availableRaw || 0) >= (p.needRaw || 0));
     };
 
     const startProduction = async () => {
@@ -623,16 +697,14 @@ export default {
 
     // Tool methods
     const openToolModal = async (x, y) => {
-      console.log("openToolModal called", x, y, objectId.value);
       selectedPosition.value = { x, y };
       try {
         const res = await axios.get(`/api/objects/${objectId.value}/available-tools`);
-        console.log("available tools", res.data);
         availableTools.value = res.data;
         showToolModal.value = true;
       } catch (e) {
         console.error("Failed to fetch available tools", e);
-        alert("Failed to load available tools. Check console.");
+        alert("Failed to load available tools.");
       }
     };
 
@@ -671,7 +743,6 @@ export default {
     const loadTools = async () => {
       try {
         const res = await axios.get(`/api/objects/${objectId.value}/tools`);
-        console.log("loaded tools", res.data);
         tools.value = res.data;
       } catch (e) {
         console.error("Failed to load tools", e);
@@ -679,11 +750,7 @@ export default {
     };
 
     const getToolAt = (x, y) => {
-      const tool = tools.value.find((t) => t.position_x === x && t.position_y === y);
-      if (tool) {
-        console.log("tool at", x, y, tool, tool.tool_type_icon);
-      }
-      return tool;
+      return tools.value.find((t) => t.position_x === x && t.position_y === y);
     };
 
     // Long press for move mode
@@ -732,7 +799,7 @@ export default {
 
     const showToolInfo = (tool) => {
       alert(
-        `Tool: ${tool.name}\nType: ${tool.tool_type_name}\nLevel: ${
+        `Tool: ${getTranslatedName(tool.name)}\nType: ${getTranslatedName(tool.tool_type_name)}\nLevel: ${
           tool.level || 1
         }\nPosition: (${tool.position_x}, ${tool.position_y})`
       );
@@ -811,6 +878,7 @@ export default {
       buildingWorkers,
       goBackToParcel,
       getObjectTypeName,
+      getTranslatedName,
       isBuilding,
       remainingTimeText,
       availableCountsForLevel,
@@ -842,6 +910,8 @@ export default {
   produceWorkerCount,
   productionPreview,
   produceDurationHours,
+  produceStartAllowed,
+  availableWorkerLevels,
   objectHasProduction,
   openProduceModal,
   calculateProductionPreview,

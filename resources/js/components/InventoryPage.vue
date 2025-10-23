@@ -65,7 +65,7 @@
                   <div class="d-flex align-items-center gap-2">
                     <img v-if="resource.icon" :src="`/images/tools/${resource.icon}`" alt="icon" style="width:36px;height:36px;object-fit:contain" />
                     <c-icon v-else name="cilStorage" />
-                    <div>{{ resource.name }}</div>
+                    <div>{{ resource.display_name || resource.name }}</div>
                   </div>
                 </td>
                 <td class="text-end"><strong>{{ resource.quantity }}</strong></td>
@@ -95,14 +95,14 @@
 
   <!-- Resource Details Modal -->
   <c-modal v-model="showResourceModal" size="lg">
-    <c-modal-header>
-      <c-modal-title>{{ selectedResource?.name }}</c-modal-title>
+          <c-modal-header>
+      <c-modal-title>{{ selectedResource?.display_name || selectedResource?.name }}</c-modal-title>
     </c-modal-header>
     <c-modal-body v-if="selectedResource">
       <c-row>
         <c-col md="4" class="text-center">
           <c-icon :name="selectedResource.icon" size="4xl" :class="selectedResource.iconColor" />
-          <h5 class="mt-2">{{ selectedResource.name }}</h5>
+          <h5 class="mt-2">{{ selectedResource.display_name || selectedResource.name }}</h5>
           <c-badge :color="getQuantityBadgeColor(selectedResource.quantity)" size="lg">
             Количество: {{ selectedResource.quantity }}
           </c-badge>
@@ -184,6 +184,18 @@ export default {
       }
     };
 
+    const getTranslatedName = (name) => {
+      if (!name) return '';
+      const key = `tools.types.${name}`;
+      try {
+        const translated = $t(key);
+        if (!translated || translated === key) return name;
+        return translated;
+      } catch (e) {
+        return name;
+      }
+    };
+
     const fetchInventories = async () => {
       loading.value = true;
       try {
@@ -195,6 +207,7 @@ export default {
             id: it.id,
             tool_type_id: it.tool_type_id,
             name: it.tool_name || 'Unknown',
+            display_name: getTranslatedName(it.tool_name) || (it.tool_name || 'Unknown'),
             quantity: parseInt(it.count) || 0,
             temp_quantity: parseInt(it.temp_count) || 0,
             description: it.tool_description || '',
@@ -237,19 +250,19 @@ export default {
         case 'consume':
           if (resource.quantity > 0) {
             resource.quantity--;
-            message.value = `Използвахте ${resource.name}`;
+            message.value = `Използвахте ${resource.display_name || resource.name}`;
             messageType.value = 'success';
           }
           break;
         case 'sell':
           if (resource.quantity > 0) {
             resource.quantity--;
-            message.value = `Продадохте ${resource.name} за ${resource.value} монети`;
+            message.value = `Продадохте ${resource.display_name || resource.name} за ${resource.value} монети`;
             messageType.value = 'success';
           }
           break;
         case 'equip':
-          message.value = `Екипирахте ${resource.name}`;
+          message.value = `Екипирахте ${resource.display_name || resource.name}`;
           messageType.value = 'success';
           break;
         default:

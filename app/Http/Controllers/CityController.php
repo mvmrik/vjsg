@@ -418,14 +418,51 @@ class CityController extends Controller
             }
         }
 
-        // Find tools attached to this object that have production_seconds set
-        $tools = \App\Models\Tool::where('object_id', $object->id)
-            ->join('tool_types', 'tools.tool_type_id', '=', 'tool_types.id')
-            ->select('tools.*', 'tool_types.units_per_hour', 'tool_types.produces_tool_type_id', 'tool_types.name as tool_type_name')
-            ->get();
+        // INVERTED: placed tools are products, find their raw
+        $toolRows = \App\Models\Tool::where('object_id', $object->id)->get();
+        if ($toolRows->isEmpty()) {
+            return response()->json(['success' => false, 'message' => 'No tools attached'], 400);
+        }
 
-        if ($tools->isEmpty()) {
-            return response()->json(['success' => false, 'message' => 'No materials/tools attached to this object for production'], 400);
+        // Check if harvest/mine type (no raw materials needed)
+        $objectType = \App\Models\ObjectType::where('type', $object->object_type)->first();
+        $isHarvest = $objectType && in_array($objectType->type, ['harvest', 'mine']);
+
+        $tools = [];
+        foreach ($toolRows as $tr) {
+            $productType = \App\Models\ToolType::find($tr->tool_type_id);
+            if (!$productType) continue;
+
+            if ($isHarvest) {
+                // Harvest: no raw needed
+                $tools[] = (object)[
+                    'tool_id' => $tr->id,
+                    'product_id' => $productType->id,
+                    'raw_id' => null,
+                    'product_units_per_hour' => $productType->units_per_hour,
+                    'product_name' => $productType->name,
+                    'raw_name' => null,
+                ];
+            } else {
+                // Factory: need raw
+                $rawType = $productType->produces_tool_type_id 
+                    ? \App\Models\ToolType::find($productType->produces_tool_type_id)
+                    : null;
+                if (!$rawType) continue;
+
+                $tools[] = (object)[
+                    'tool_id' => $tr->id,
+                    'product_id' => $productType->id,
+                    'raw_id' => $rawType->id,
+                    'product_units_per_hour' => $productType->units_per_hour,
+                    'product_name' => $productType->name,
+                    'raw_name' => $rawType->name,
+                ];
+            }
+        }
+
+        if (empty($tools)) {
+            return response()->json(['success' => false, 'message' => 'No raw materials found'], 400);
         }
 
     // Production duration: if request provides duration_hours use it; otherwise try user's game_settings; fallback to 12
@@ -451,76 +488,106 @@ class CityController extends Controller
     $perHourMultiplier = intval($workerLevel) * intval($workerCount);
         if ($perHourMultiplier <= 0) $perHourMultiplier = 1; // baseline
 
-        // Prepare inventory updates (temp_count)
-        // Group tools by tool_type_id to avoid double-counting
+        // Group by product
         $groups = [];
-        foreach ($tools as $tool) {
-            if (!$tool->units_per_hour || !$tool->produces_tool_type_id) continue;
-            $tid = $tool->tool_type_id;
-            if (!isset($groups[$tid])) {
-                $groups[$tid] = [
-                    'tool_type_id' => $tid,
+        foreach ($tools as $t) {
+            $pid = $t->product_id;
+            if (!isset($groups[$pid])) {
+                $groups[$pid] = [
+                    'product_id' => $pid,
+                    'raw_id' => $t->raw_id,
                     'fieldsCount' => 0,
-                    'units_per_hour' => intval($tool->units_per_hour),
-                    'produces_tool_type_id' => $tool->produces_tool_type_id,
-                    'tool_type_name' => $tool->tool_type_name ?? null,
+                    'product_units_per_hour' => intval($t->product_units_per_hour),
+                    'product_name' => $t->product_name,
+                    'raw_name' => $t->raw_name,
                 ];
             }
-            $groups[$tid]['fieldsCount'] += 1;
+            $groups[$pid]['fieldsCount'] += 1;
         }
 
         $lvl = max(1, intval($workerLevel));
         $cnt = max(1, intval($workerCount));
 
-        foreach ($groups as $g) {
-            $fieldsCount = $g['fieldsCount'];
-            $basePerHour = max(0, intval($g['units_per_hour'])); // units per hour per field from DB
+        // Before writing temp_count, ensure user has enough raw inputs in their inventory.
+        // For each produced tool type we will need 1 unit of the raw input PER unit of produced product (baseline).
+        // We must check availability in inventories (count) for the raw tool_type_id (which is tool_type_id in groups).
+        $db = \Illuminate\Support\Facades\DB::connection();
+        $db->beginTransaction();
+        try {
+            foreach ($groups as $g) {
+                $fieldsCount = $g['fieldsCount'];
+                $basePerHour = max(0, intval($g['product_units_per_hour']));
+                $perHour = $fieldsCount * $basePerHour * $lvl * $cnt;
+                $totalProduced = $perHour * $durationHours;
 
-            // Per hour production = fieldsCount * basePerHour * workerLevel * workerCount
-            $perHour = $fieldsCount * $basePerHour * $lvl * $cnt;
-            $totalProduced = $perHour * $durationHours; // for selected hours
+                // Consume raw: 1 per field per hour (SKIP for harvest/mine)
+                $rawId = $g['raw_id'];
+                if ($rawId) {
+                    // Factory: check and consume raw
+                    $rawNeeded = intval($fieldsCount) * intval($durationHours);
 
-            // Atomically insert or increment temp_count to avoid races and ensure accumulation
-            // Use INSERT ... ON DUPLICATE KEY UPDATE (works on MySQL). The unique index on (user_id, tool_type_id)
-            // guarantees correct behavior.
-            $now = date('Y-m-d H:i:s');
-            $userIdEsc = intval($userId);
-            $toolTypeIdEsc = intval($g['produces_tool_type_id']);
-            $toAdd = intval($totalProduced);
+                    $inventoryRow = \App\Models\Inventory::where('user_id', $userId)
+                        ->where('tool_type_id', intval($rawId))
+                        ->lockForUpdate()
+                        ->first();
 
-            \Illuminate\Support\Facades\DB::statement(
-                'INSERT INTO inventories (user_id, tool_type_id, count, temp_count, created_at, updated_at) VALUES (?, ?, 0, ?, ?, ?) '
-                . 'ON DUPLICATE KEY UPDATE temp_count = temp_count + ?, updated_at = ?;',
-                [$userIdEsc, $toolTypeIdEsc, $toAdd, $now, $now, $toAdd, $now]
-            );
+                    $availableRaw = $inventoryRow ? intval($inventoryRow->count) : 0;
+                    if ($availableRaw < $rawNeeded) {
+                        $db->rollBack();
+                        return response()->json(['success' => false, 'message' => 'Insufficient ' . $g['raw_name'] . ': need ' . $rawNeeded], 400);
+                    }
+
+                    // Deduct raw
+                    $inventoryRow->count = $inventoryRow->count - $rawNeeded;
+                    $inventoryRow->save();
+                }
+                // If harvest ($rawId is null), skip raw consumption
+
+                // Add product to temp_count
+                $now = date('Y-m-d H:i:s');
+                $productId = intval($g['product_id']);
+                $toAdd = intval($totalProduced);
+
+                \Illuminate\Support\Facades\DB::statement(
+                    'INSERT INTO inventories (user_id, tool_type_id, count, temp_count, created_at, updated_at) VALUES (?, ?, 0, ?, ?, ?) '
+                    . 'ON DUPLICATE KEY UPDATE temp_count = temp_count + ?, updated_at = ?;',
+                    [intval($userId), $productId, $toAdd, $now, $now, $toAdd, $now]
+                );
+            }
+
+            // Set object ready_at and create occupied_workers record
+            $readyAt = time() + $durationSeconds;
+            $object->ready_at = $readyAt;
+            $object->save();
+
+            OccupiedWorker::create([
+                'user_id' => $userId,
+                'level' => intval($workerLevel),
+                'count' => intval($workerCount),
+                'occupied_until' => $readyAt,
+                'city_object_id' => $object->id
+            ]);
+
+            $db->commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Production started successfully',
+                'object' => [
+                    'id' => $object->id,
+                    'ready_at' => $object->ready_at * 1000,
+                    'object_type' => $object->object_type,
+                    'x' => $object->x,
+                    'y' => $object->y,
+                    'parcel_id' => $object->parcel_id,
+                    'user_id' => $object->user_id
+                ],
+                'production_length_hours' => $durationHours
+            ]);
+        } catch (\Exception $e) {
+            $db->rollBack();
+            return response()->json(['success' => false, 'message' => 'Failed to start production: ' . $e->getMessage()], 500);
         }
-
-        // Set object ready_at and create occupied_workers record
-        $readyAt = time() + $durationSeconds;
-        $object->ready_at = $readyAt;
-        $object->save();
-
-        OccupiedWorker::create([
-            'user_id' => $userId,
-            'level' => intval($workerLevel),
-            'count' => intval($workerCount),
-            'occupied_until' => $readyAt,
-            'city_object_id' => $object->id
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Production started successfully',
-            'object' => [
-                'id' => $object->id,
-                'ready_at' => $object->ready_at * 1000,
-                'object_type' => $object->object_type,
-                'x' => $object->x,
-                'y' => $object->y,
-                'parcel_id' => $object->parcel_id,
-                'user_id' => $object->user_id
-            ],
-            'production_length_hours' => $durationHours
-        ]);
+        // end transaction handling
     }
 }

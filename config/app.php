@@ -70,9 +70,10 @@ return [
     |
     */
     // Tracked application version. Keep this in source so deployments get the
-    // correct version when you push to the repository. The version-bump script
-    // updates this file directly.
-    'version' => '0.11.1',
+    // correct version when you push to the repository. We read APP_VERSION from
+    // the environment and fall back to a safe default to avoid runtime errors.
+    // Tracked version - update this manually when releasing (visible in footer)
+    'version' => '0.12.0',
 
     /*
     |--------------------------------------------------------------------------
