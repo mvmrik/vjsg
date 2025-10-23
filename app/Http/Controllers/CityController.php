@@ -19,25 +19,25 @@ class CityController extends Controller
             return response()->json(['success' => false, 'message' => 'Not authenticated'], 401);
         }
 
-        // Clear ready_at for any objects whose ready_at is in the past (they are completed)
-        $cleaned = CityObject::where('user_id', $userId)
-            ->whereNotNull('ready_at')
-            ->where('ready_at', '<=', time())
-            ->update(['ready_at' => null]);
-
-        // FREE OCCUPIED WORKERS: Delete occupied_worker records for completed buildings
-        OccupiedWorker::whereHas('cityObject', function ($query) use ($userId) {
-            $query->where('user_id', $userId)->whereNull('ready_at');
-        })->delete();
+        // NOTE: finishing (transfer temp->count and freeing workers) is handled by the scheduled
+        // command `check:completed-builds`. We no longer clear ready_at or free workers on page
+        // load to avoid race conditions and to centralize finalization logic in the cron job.
+        $cleaned = 0;
 
         $objects = CityObject::where('user_id', $userId)->get();
 
         // Annotate build_seconds for frontend convenience
         $types = ObjectType::all()->keyBy('type');
         
-        // Get occupied workers for objects that are building
+        // Get occupied workers for objects that are building (active) and all occupied records
         $occupiedWorkers = OccupiedWorker::where('user_id', $userId)
             ->where('occupied_until', '>', time())
+            ->get()
+            ->keyBy('city_object_id');
+
+        // Also fetch any occupied_worker records for this user (regardless of occupied_until)
+        // so we can detect expired-but-not-yet-cleaned entries and avoid showing action buttons
+        $allOccupied = OccupiedWorker::where('user_id', $userId)
             ->get()
             ->keyBy('city_object_id');
         
@@ -60,7 +60,7 @@ class CityController extends Controller
                 }
             }
             
-            // Add occupied workers info if building
+            // Add occupied workers info if building (active workers)
             if (isset($occupiedWorkers[$o->id])) {
                 $worker = $occupiedWorkers[$o->id];
                 $arr['workers'] = [
@@ -68,7 +68,13 @@ class CityController extends Controller
                     'count' => $worker->count
                 ];
             }
-            
+
+            // finalized: true when object is not building (no ready_at) AND there are no occupied_worker
+            // records at all for this object (this prevents the frontend from showing action buttons
+            // when occupied_worker rows exist but their occupied_until has already passed and cron
+            // hasn't cleaned them yet).
+            $arr['finalized'] = (!$o->ready_at) && !isset($allOccupied[$o->id]);
+
             return $arr;
         });
 
@@ -236,17 +242,9 @@ class CityController extends Controller
             }
         }
 
-        // After creating new objects, clear any expired ready_at values for the user
-        CityObject::where('user_id', $userId)
-            ->whereNotNull('ready_at')
-            ->where('ready_at', '<=', time())
-            ->update(['ready_at' => null]);
-
-        // Return the full, updated list of objects for the user so frontend stays consistent
-        $cleanedAfter = CityObject::where('user_id', $userId)
-            ->whereNotNull('ready_at')
-            ->where('ready_at', '<=', time())
-            ->update(['ready_at' => null]);
+        // We don't clear ready_at here; finalization (including transferring temp_count -> count
+        // and freeing occupied workers) is performed by the scheduled `check:completed-builds`.
+        $cleanedAfter = 0;
 
         $allObjects = CityObject::where('user_id', $userId)->get();
         $types = ObjectType::all()->keyBy('type');
@@ -543,16 +541,34 @@ class CityController extends Controller
                 }
                 // If harvest ($rawId is null), skip raw consumption
 
-                // Add product to temp_count
-                $now = date('Y-m-d H:i:s');
+                // Add product to per-object production_outputs and increment aggregate inventories.temp_count
                 $productId = intval($g['product_id']);
                 $toAdd = intval($totalProduced);
 
-                \Illuminate\Support\Facades\DB::statement(
-                    'INSERT INTO inventories (user_id, tool_type_id, count, temp_count, created_at, updated_at) VALUES (?, ?, 0, ?, ?, ?) '
-                    . 'ON DUPLICATE KEY UPDATE temp_count = temp_count + ?, updated_at = ?;',
-                    [intval($userId), $productId, $toAdd, $now, $now, $toAdd, $now]
-                );
+                // Create per-object production output record
+                \App\Models\ProductionOutput::create([
+                    'user_id' => intval($userId),
+                    'city_object_id' => $object->id,
+                    'tool_type_id' => $productId,
+                    'count' => $toAdd
+                ]);
+
+                // Also increment aggregate temp_count on inventories to preserve current UI behavior
+                $inv = \App\Models\Inventory::where('user_id', $userId)
+                    ->where('tool_type_id', $productId)
+                    ->lockForUpdate()
+                    ->first();
+                if ($inv) {
+                    $inv->temp_count = intval($inv->temp_count) + $toAdd;
+                    $inv->save();
+                } else {
+                    \App\Models\Inventory::create([
+                        'user_id' => intval($userId),
+                        'tool_type_id' => $productId,
+                        'count' => 0,
+                        'temp_count' => $toAdd
+                    ]);
+                }
             }
 
             // Set object ready_at and create occupied_workers record

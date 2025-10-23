@@ -4,10 +4,6 @@ return [
     // City page translations
     'my_city' => 'Моят град',
     'no_parcels' => 'Нямате парцели за показване.',
-    'house' => 'Къща',
-    'tree' => 'Дърво',
-    'well' => 'Кладенец',
-    'barn' => 'Хамбар',
     'build_time' => 'Време за строеж',
     'minutes' => 'минути',
     'seconds' => 'секунди',
@@ -51,6 +47,10 @@ return [
     'production_failed' => 'Производството се провали',
     'production_length_hours' => 'Продължителност на производството (часове)',
     'unknown' => 'Непознат',
+    // Object type names
+    'factory' => 'Фабрика',
+    'harvest' => 'Добив на ресурси',
+    'waiting_release_workers' => 'Работниците ще бъдат освободени след изтичане на времето.',
     // Inventory
     'inventory' => [
         'resource' => 'Ресурс',

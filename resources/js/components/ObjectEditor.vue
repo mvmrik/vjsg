@@ -21,7 +21,7 @@
             <c-card-body>
               <div v-if="loading" class="text-center">
                 <c-spinner />
-                <p>{{ $t("city.loading") }}</p>
+                <p>{{ $t('city.loading') }}</p>
               </div>
 
               <div v-else-if="object" class="object-editor-content">
@@ -34,8 +34,7 @@
                       class="object-grid-cell"
                       :class="{
                         'cell-empty': !getToolAt(Math.floor((i - 1) / 4), (i - 1) % 4),
-                        'move-target':
-                          moveMode && !getToolAt(Math.floor((i - 1) / 4), (i - 1) % 4),
+                        'move-target': moveMode && !getToolAt(Math.floor((i - 1) / 4), (i - 1) % 4),
                       }"
                       @click="handleCellClick(Math.floor((i - 1) / 4), (i - 1) % 4)"
                     >
@@ -44,45 +43,28 @@
                         v-if="getToolAt(Math.floor((i - 1) / 4), (i - 1) % 4)"
                         class="placed-tool"
                         @click="handleToolClick(Math.floor((i - 1) / 4), (i - 1) % 4)"
-                        @touchstart="
-                          handleToolTouch(Math.floor((i - 1) / 4), (i - 1) % 4)
-                        "
+                        @touchstart="handleToolTouch(Math.floor((i - 1) / 4), (i - 1) % 4)"
                       >
                         <img
-                          :src="`/images/tools/${
-                            getToolAt(Math.floor((i - 1) / 4), (i - 1) % 4)
-                              ?.tool_type_icon || 'student_materials.png'
-                          }`"
+                          :src="`/images/tools/${getToolAt(Math.floor((i - 1) / 4), (i - 1) % 4)?.tool_type_icon || 'student_materials.png'}`"
                           alt="Tool"
                           style="width: 100%; height: 100%; object-fit: cover"
                         />
 
                         <!-- Tool actions overlay -->
                         <div
-                          v-if="
-                            hoveredCell &&
-                            hoveredCell.x === Math.floor((i - 1) / 4) &&
-                            hoveredCell.y === (i - 1) % 4
-                          "
+                          v-if="hoveredCell && hoveredCell.x === Math.floor((i - 1) / 4) && hoveredCell.y === (i - 1) % 4"
                           class="tool-actions"
                         >
                           <div
-                            @click.stop="
-                              startMoveMode(
-                                getToolAt(Math.floor((i - 1) / 4), (i - 1) % 4)
-                              )
-                            "
+                            @click.stop="startMoveMode(getToolAt(Math.floor((i - 1) / 4), (i - 1) % 4))"
                             class="action-icon move-icon"
                             title="Премести tool"
                           >
                             <c-icon name="cil-move" size="xl" />
                           </div>
                           <div
-                            @click.stop="
-                              showToolInfo(
-                                getToolAt(Math.floor((i - 1) / 4), (i - 1) % 4)
-                              )
-                            "
+                            @click.stop="showToolInfo(getToolAt(Math.floor((i - 1) / 4), (i - 1) % 4))"
                             class="action-icon info-icon"
                             title="Информация за tool"
                           >
@@ -104,54 +86,54 @@
 
                 <!-- Object info -->
                 <div class="object-info mt-4">
-                  <h6>{{ $t("city.object_info") }}</h6>
+                  <h6>{{ $t('city.object_info') }}</h6>
                   <div class="row">
                     <div class="col-md-6">
                       <p class="mb-1">
-                        <strong>{{ $t("city.type") }}:</strong>
+                        <strong>{{ $t('city.type') }}:</strong>
                         {{ getObjectTypeName(object.object_type) }}
                       </p>
                       <p class="mb-1">
-                        <strong>{{ $t("city.level") }}:</strong> {{ object.level || 1 }}
+                        <strong>{{ $t('city.level') }}:</strong> {{ object.level || 1 }}
                       </p>
                     </div>
                     <div class="col-md-6">
                       <p v-if="!object.ready_at || remainingTimeText === ''" class="mb-1">
-                        <strong>{{ $t("city.status") }}:</strong>
-                        <span class="text-success">{{ $t("city.ready") }}</span>
+                        <strong>{{ $t('city.status') }}:</strong>
+                        <span class="text-success">{{ $t('city.ready') }}</span>
                       </p>
                       <p v-else class="mb-1">
-                        <strong>{{ $t("city.status") }}:</strong>
-                        <span class="text-danger">{{ $t("city.building") }}</span> -
+                        <strong>{{ $t('city.status') }}:</strong>
+                        <span class="text-danger">{{ $t('city.building') }}</span> -
                         {{ remainingTimeText }}
                       </p>
                     </div>
                   </div>
                   <!-- Show workers info if building -->
-                  <div
-                    v-if="isBuilding(object) && buildingWorkers"
-                    class="mt-2 alert alert-info py-2"
-                  >
+                  <div v-if="isBuilding(object) && buildingWorkers" class="mt-2 alert alert-info py-2">
                     <small>
-                      <strong>{{ $t("city.workers") }}:</strong>
-                      {{ buildingWorkers.count }} х {{ $t("city.level") }}
+                      <strong>{{ $t('city.workers') }}:</strong>
+                      {{ buildingWorkers.count }} х {{ $t('city.level') }}
                       {{ buildingWorkers.level }}
                     </small>
                   </div>
-                  <div class="mt-3" v-if="!isBuilding(object)">
-                    <c-button color="primary" @click="showUpgradeModal = true">
-                      <c-icon name="cilArrowTop" class="me-1" />
-                      {{ $t("city.upgrade_level") }}
-                    </c-button>
-                    <c-button
-                      color="success"
-                      class="ms-2"
-                      v-if="objectHasProduction()"
-                      @click="openProduceModal"
-                    >
-                      <c-icon name="cilFactory" class="me-1" />
-                      {{ $t("city.start_production") }}
-                    </c-button>
+                  <div class="mt-3">
+                    <template v-if="object && object.ready_at === null && (!object.workers || !object.workers.count)">
+                      <c-button color="primary" @click="showUpgradeModal = true">
+                        <c-icon name="cilArrowTop" class="me-1" />
+                        {{ $t('city.upgrade_level') }}
+                      </c-button>
+                      <c-button color="success" class="ms-2" v-if="objectHasProduction()" @click="openProduceModal">
+                        <c-icon name="cilFactory" class="me-1" />
+                        {{ $t('city.start_production') }}
+                      </c-button>
+                    </template>
+                    <template v-else-if="object && (object.ready_at !== null || (object.workers && object.workers.count))">
+                      <div class="alert alert-info py-2 mb-0 d-flex align-items-center gap-2">
+                        <c-spinner class="spinner-border-sm" />
+                        <span>{{ $t('city.waiting_release_workers') }}</span>
+                      </div>
+                    </template>
                   </div>
                 </div>
               </div>
@@ -387,6 +369,7 @@ export default {
     const people = ref({ total: 0, by_level: {}, groups: [] });
     const currentTime = ref(Date.now()); // For reactive time updates
     let tickInterval = null;
+  let pollInterval = null;
 
     // Tool-related data
     const tools = ref([]);
@@ -419,9 +402,20 @@ export default {
     const availableObjects = ref([]);
 
     const getObjectTypeName = (type) => {
+      // Prefer language file translation city.{type}, fall back to availableObjects name or prettified type
+      try {
+        const key = 'city.' + type;
+        const translated = $t(key);
+        if (translated && translated !== key) return translated;
+      } catch (e) {
+        // ignore
+      }
       const obj = availableObjects.value.find((o) => o.type === type);
-      return obj ? obj.name : $t("city.unknown");
+      if (obj && obj.name) return obj.name;
+      return type ? String(type).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : $t('city.unknown');
     };
+
+    
 
     const isBuilding = (obj) => {
       if (!obj) return false;
@@ -480,6 +474,50 @@ export default {
         }
       } catch (e) {
         console.error("Failed to fetch city objects", e);
+      }
+    };
+
+    // Fetch a single object from server and update local copy. Used by the poller.
+    const fetchSingleObject = async () => {
+      try {
+        const res = await axios.get('/api/city-objects');
+        if (res.data.success) {
+          const obj = (res.data.objects || []).find(o => o.id === objectId.value);
+          if (obj) {
+            const idx = cityObjects.value.findIndex(o => o.id === objectId.value);
+            if (idx !== -1) {
+              cityObjects.value[idx] = obj;
+              cityObjects.value = [...cityObjects.value];
+            }
+            // stop polling when object is finalized (ready_at null and no workers)
+            if (obj.ready_at === null && (!obj.workers || !obj.workers.count)) {
+              stopObjectPoll();
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Failed to fetch single object', e);
+      }
+    };
+
+    const startObjectPoll = () => {
+      stopObjectPoll();
+      // Poll every 15s while viewing the object and it appears to need finalization
+      pollInterval = setInterval(async () => {
+        const obj = cityObjects.value.find(o => o.id === objectId.value);
+        if (!obj) return;
+        const readyTs = obj.ready_at ? new Date(obj.ready_at).getTime() : null;
+        const needsCheck = (readyTs !== null && readyTs <= Date.now()) || (obj.workers && obj.workers.count);
+        if (needsCheck) {
+          await fetchSingleObject();
+        }
+      }, 15000);
+    };
+
+    const stopObjectPoll = () => {
+      if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
       }
     };
 
@@ -848,21 +886,15 @@ export default {
       // Tick every second to update countdown displays
       tickInterval = setInterval(() => {
         currentTime.value = Date.now();
-
-        // Clear ready_at when time expires
-        cityObjects.value.forEach((obj) => {
-          if (obj.ready_at) {
-            const ready = new Date(obj.ready_at).getTime();
-            if (ready <= Date.now()) {
-              obj.ready_at = null;
-            }
-          }
-        });
       }, 1000);
+
+      // Start object poll (checks every 15s when needed)
+      startObjectPoll();
 
       // Store cleanup function
       onUnmounted(() => {
         if (tickInterval) clearInterval(tickInterval);
+        stopObjectPoll();
       });
     });
 
@@ -880,7 +912,7 @@ export default {
       getObjectTypeName,
       getTranslatedName,
       isBuilding,
-      remainingTimeText,
+  remainingTimeText,
       availableCountsForLevel,
       startUpgrade,
       // Tool-related

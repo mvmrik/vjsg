@@ -4,10 +4,6 @@ return [
     // City page translations
     'my_city' => 'My City',
     'no_parcels' => 'You have no parcels to display.',
-    'house' => 'House',
-    'tree' => 'Tree',
-    'well' => 'Well',
-    'barn' => 'Barn',
     'build_time' => 'Build time',
     'minutes' => 'minutes',
     'seconds' => 'seconds',
@@ -51,6 +47,10 @@ return [
     'production_failed' => 'Production failed',
     'production_length_hours' => 'Production length (hours)',
     'unknown' => 'Unknown',
+    // Object type names
+    'factory' => 'Factory',
+    'harvest' => 'Harvest resources',
+    'waiting_release_workers' => 'Workers will be released after the time elapses.',
     // Inventory
     'inventory' => [
         'resource' => 'Resource',

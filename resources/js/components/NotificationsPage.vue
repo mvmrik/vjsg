@@ -53,7 +53,7 @@
                   />
                 </c-table-data-cell>
                 <c-table-data-cell>
-                  <span v-html="$t(notification.message, notification.data || {})"></span>
+                  <span v-html="renderNotificationMessage(notification)"></span>
                 </c-table-data-cell>
                 <c-table-data-cell>
                   {{ formatDate(notification.created_at) }}
@@ -245,6 +245,33 @@ export default {
       return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     };
 
+    const renderNotificationMessage = (notification) => {
+      try {
+        let data = notification.data || {};
+        if (typeof data === 'string' && data.length > 0) {
+          try { data = JSON.parse(data); } catch (e) { /* keep as-is */ }
+        }
+        // If objectType present, prepare translated objectType for interpolation
+        if (data.objectType) {
+          try { data.objectType = $t('city.' + String(data.objectType)); } catch (e) { /* ignore */ }
+        }
+
+        const msg = notification.message || '';
+        if (typeof msg !== 'string') return '';
+
+        // Only treat the stored message as a translation key when it explicitly starts with 'notifications.'
+        if (msg.startsWith('notifications.')) {
+          return $t(msg, data);
+        }
+
+        // Otherwise assume backend stored full resolved text and return it unchanged
+        return msg;
+      } catch (e) {
+        console.error('Failed to render notification message', e);
+        return notification.message || '';
+      }
+    };
+
     onMounted(() => {
       fetchNotifications();
       fetchUnreadCount();
@@ -261,6 +288,7 @@ export default {
       getTypeColor,
       getTypeLabel,
       formatDate,
+      renderNotificationMessage,
       $t
     };
   }

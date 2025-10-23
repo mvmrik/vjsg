@@ -118,9 +118,9 @@
             style="cursor: pointer;"
             @click="modalSelectedObjectType = objType"
           >
-            <div class="d-flex align-items-center">
+              <div class="d-flex align-items-center">
               <c-icon :name="objType.icon" class="me-2" />
-              <div>{{ objType.name }}</div>
+              <div>{{ translateObjectLabel(objType.type, objType.name) }}</div>
             </div>
             <div class="d-flex align-items-center gap-2">
                 <div class="d-flex flex-column align-items-end">
@@ -174,9 +174,9 @@
             style="cursor: pointer;"
             @click="modalSelectedObjectType = objType"
           >
-            <div class="d-flex align-items-center">
+              <div class="d-flex align-items-center">
               <c-icon :name="objType.icon" class="me-2" />
-              <div>{{ objType.name }}</div>
+              <div>{{ translateObjectLabel(objType.type, objType.name) }}</div>
             </div>
             <div class="d-flex align-items-center gap-2">
                 <div class="d-flex flex-column align-items-end">
@@ -477,6 +477,20 @@ export default {
       }
     };
 
+    const translateObjectLabel = (type, fallback) => {
+      try {
+        const key = 'city.' + type;
+        const translated = $t(key);
+        // If $t returns the key unchanged, fall back to provided name
+        if (!translated || translated === key) {
+          return fallback || key;
+        }
+        return translated;
+      } catch (e) {
+        return fallback || type;
+      }
+    };
+
     const getProgressPercent = (obj) => {
       const totalSeconds = obj.build_seconds || 60;
       if (!totalSeconds || !obj.ready_at) return 100;
@@ -571,7 +585,8 @@ export default {
       availableCountsForLevel,
       getAdjustedTime,
       displayedTimes,
-      $t
+      $t,
+      translateObjectLabel
     };
   }
 }

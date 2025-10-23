@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\CityObject;
 use App\Models\Notification;
 use App\Models\OccupiedWorker;
+use App\Models\ObjectType;
 
 class CheckCompletedBuilds extends Command
 {
@@ -47,13 +48,24 @@ class CheckCompletedBuilds extends Command
             $wasUpgrade = isset($properties['workers']);
 
             // Create notification
+            // Resolve object type label: prefer language key, fallback to ObjectType.name or prettified type
+            $objectLabel = __('city.' . $object->object_type);
+            if ($objectLabel === 'city.' . $object->object_type) {
+                $ot = ObjectType::where('type', $object->object_type)->first();
+                if ($ot && $ot->name) {
+                    $objectLabel = $ot->name;
+                } else {
+                    $objectLabel = ucwords(str_replace('_', ' ', $object->object_type));
+                }
+            }
+
             if ($wasUpgrade) {
-                // Upgrade completed
+                // Upgrade completed - resolve translations now and store full text
                 Notification::create([
                     'user_id' => $object->user_id,
-                    'title' => 'notifications.upgrade_completed_title',
+                    'title' => __('notifications.upgrade_completed_title'),
                     'message' => __('notifications.upgrade_completed_message', [
-                        'objectType' => __('city.' . $object->object_type),
+                        'objectType' => $objectLabel,
                         'level' => $object->level
                     ]),
                     'type' => 'success',
@@ -64,12 +76,12 @@ class CheckCompletedBuilds extends Command
                     ])
                 ]);
             } else {
-                // Build completed
+                // Build completed - resolve translations now and store full text
                 Notification::create([
                     'user_id' => $object->user_id,
-                    'title' => 'notifications.build_completed_title',
+                    'title' => __('notifications.build_completed_title'),
                     'message' => __('notifications.build_completed_message', [
-                        'objectType' => __('city.' . $object->object_type)
+                        'objectType' => $objectLabel
                     ]),
                     'type' => 'success',
                     'is_read' => false,
@@ -79,22 +91,54 @@ class CheckCompletedBuilds extends Command
                 ]);
             }
 
-            // Finalize production: transfer inventories.temp_count -> count for produced tool types attached to this object
-            $tools = \App\Models\Tool::where('object_id', $object->id)
-                ->join('tool_types', 'tools.tool_type_id', '=', 'tool_types.id')
-                ->select('tool_types.units_per_hour', 'tool_types.produces_tool_type_id')
-                ->get();
+            // Finalize production: transfer per-object production_outputs -> inventories.count and decrement inventories.temp_count accordingly
+            $db = \Illuminate\Support\Facades\DB::connection();
+            $db->beginTransaction();
+            try {
+                // Aggregate outputs for this object grouped by tool_type_id
+                $outputs = \App\Models\ProductionOutput::where('city_object_id', $object->id)
+                    ->where('user_id', $object->user_id)
+                    ->select('tool_type_id', \Illuminate\Support\Facades\DB::raw('SUM(count) as total'))
+                    ->groupBy('tool_type_id')
+                    ->get();
 
-            foreach ($tools as $t) {
-                if (!$t->units_per_hour || !$t->produces_tool_type_id) continue;
-                $inventory = \App\Models\Inventory::where('user_id', $object->user_id)
-                    ->where('tool_type_id', $t->produces_tool_type_id)
-                    ->first();
-                if ($inventory && intval($inventory->temp_count) > 0) {
-                    $inventory->count = intval($inventory->count) + intval($inventory->temp_count);
-                    $inventory->temp_count = 0;
-                    $inventory->save();
+                foreach ($outputs as $out) {
+                    $toolTypeId = $out->tool_type_id;
+                    $toTransfer = intval($out->total);
+                    if ($toTransfer <= 0) continue;
+
+                    // Lock inventory row and update
+                    $inventory = \App\Models\Inventory::where('user_id', $object->user_id)
+                        ->where('tool_type_id', $toolTypeId)
+                        ->lockForUpdate()
+                        ->first();
+
+                    if (!$inventory) {
+                        // create inventory if missing
+                        $inventory = \App\Models\Inventory::create([
+                            'user_id' => $object->user_id,
+                            'tool_type_id' => $toolTypeId,
+                            'count' => $toTransfer,
+                            'temp_count' => 0
+                        ]);
+                    } else {
+                        $inventory->count = intval($inventory->count) + $toTransfer;
+                        // decrement temp_count but don't let it go negative
+                        $inventory->temp_count = max(0, intval($inventory->temp_count) - $toTransfer);
+                        $inventory->save();
+                    }
                 }
+
+                // Delete production outputs for this object (we transferred them)
+                \App\Models\ProductionOutput::where('city_object_id', $object->id)
+                    ->where('user_id', $object->user_id)
+                    ->delete();
+
+                $db->commit();
+            } catch (\Exception $e) {
+                $db->rollBack();
+                // log and continue so other objects aren't blocked
+                \Log::error('Failed to finalize production for object ' . $object->id . ': ' . $e->getMessage());
             }
 
             // Clear ready_at
