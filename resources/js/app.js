@@ -100,12 +100,13 @@ const translations = reactive({
 
 // Try to fetch server-side translations for the current locale (ensures sections like 'events' are present)
 (async () => {
-  try {
-    const res = await axios.get(`/api/translations/${currentLocale.value}`);
-    if (res.data) {
-      translations[currentLocale.value] = res.data;
-    }
-  } catch (e) {
+    try {
+      const res = await axios.get(`/api/translations/${currentLocale.value}`);
+      if (res.data) {
+        // merge server-provided translations into existing window-injected translations
+        translations[currentLocale.value] = Object.assign({}, translations[currentLocale.value] || {}, res.data);
+      }
+    } catch (e) {
     // ignore - fallback to server-injected window.translations
     console.warn('Could not fetch translations for', currentLocale.value);
   }
@@ -161,4 +162,13 @@ app.mount('#app');
 window.addEventListener('set-user-language', (event) => {
   const { locale } = event.detail;
   setUserLanguage(locale);
+  // Fetch translations for the newly selected locale so $t() returns proper values
+  (async () => {
+    try {
+      const res = await axios.get(`/api/translations/${locale}`);
+      if (res.data) translations[locale] = res.data;
+    } catch (e) {
+      console.warn('Could not fetch translations for locale', locale);
+    }
+  })();
 });

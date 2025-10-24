@@ -8,6 +8,7 @@ return [
         'getting_started' => 'Getting started',
         'game_basics' => 'Game basics',
         'resources' => 'Resources',
+        'lottery' => 'Lottery',
         'parcels' => 'Parcels',
         'construction' => 'Construction & Objects',
         'economy' => 'Economy & Trading',
@@ -71,6 +72,17 @@ return [
                 . '<li><strong>Example:</strong> Building a Level 1 House with base time 60 minutes. Assigning two workers with total effect 0.5 reduces time: 60 / (1 + 0.5) = 40 minutes. Upgrading to Level 2 may double base time but increases production.</li>'
                 . '<li><strong>Precise example (formula):</strong> The implementation uses a server-side helper: <code>calculateBuildSeconds(baseSeconds, currentLevel, workerLevel, workerCount)</code>. Internally: nextLevel = max(1, currentLevel+1); seconds = max(60, baseSeconds * nextLevel - ((workerLevel * workerCount) - 1)*60).</li>'
                 . '<li><strong>Occupied workers example:</strong> You have 5 level-1 workers. You start construction using 2 level-1 workers: an occupied_workers record is created and those 2 workers are not available until the build is complete. If you start another build with 2 level-1 workers, you will have 1 free level-1 worker left.</li>'
+                . '</ul>'
+        ],
+        'lottery' => [
+            'title' => 'Lottery (Instant communal)',
+            'body' => '<p>The Lottery is played instantly per-player: when you press Play your stake is added to a shared jackpot and a server-side draw is performed immediately for your entry.</p>'
+                . '<ul>'
+                . '<li><strong>Communal jackpot:</strong> All stakes are added to a common jackpot stored on the server. Payouts are deducted from that jackpot immediately.</li>'
+                . '<li><strong>Payouts:</strong> Payouts are calculated as percentages of the current jackpot at the moment you play: 6 matches = 100% (entire jackpot), 5 = 20%, 4 = 4%, 3 = 1% (minimum 1).</li>'
+                . '<li><strong>Atomicity:</strong> Your bet, the draw and any payout are processed inside a database transaction so that two players cannot be paid the same portion of the jackpot.</li>'
+                . '<li><strong>Warning:</strong> If the jackpot decreased since you last viewed it, the client will warn you and block the bet so you can retry with the updated jackpot.</li>'
+                . '<li><strong>Animaton & UX:</strong> The client still plays a short animation for suspense, but the outcome is already recorded server-side when Play is pressed.</li>'
                 . '</ul>'
         ],
     'population' => [

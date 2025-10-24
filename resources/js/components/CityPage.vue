@@ -293,6 +293,8 @@ export default {
       loading,
       message,
       messageType,
+      GRID_SIZE,
+      gridCellCount,
       userParcels,
       getParcelPosition,
       cityMapHeight,

@@ -73,7 +73,7 @@ return [
     // correct version when you push to the repository. We read APP_VERSION from
     // the environment and fall back to a safe default to avoid runtime errors.
     // Tracked version - update this manually when releasing (visible in footer)
-    'version' => '0.13.0',
+    'version' => '0.14.0',
 
     /*
     |--------------------------------------------------------------------------
