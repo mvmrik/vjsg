@@ -3008,7 +3008,7 @@
     "src": "node_modules/leaflet/dist/images/marker-icon.png"
   },
   "resources/css/app.css": {
-    "file": "assets/app-u-bOglT6.css",
+    "file": "assets/app-DGY6NftS.css",
     "src": "resources/css/app.css",
     "isEntry": true,
     "names": [
@@ -3016,12 +3016,12 @@
     ]
   },
   "resources/js/app.js": {
-    "file": "assets/app-xCQXzREV.js",
+    "file": "assets/app-DDn-hHYV.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true,
     "css": [
-      "assets/app-zS6UxTSm.css"
+      "assets/app-Z0Lg-U2l.css"
     ],
     "assets": [
       "assets/xx-zm_JmrXl.svg",
