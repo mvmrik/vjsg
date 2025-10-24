@@ -29,7 +29,7 @@
                 <div class="large-grid-container">
                   <div class="large-grid">
                     <div
-                      v-for="i in 100"
+                      v-for="i in gridCellCount"
                       :key="i"
                       class="large-grid-cell"
                       @click="toggleCellSelection(i)"
@@ -42,10 +42,21 @@
                         :class="['placed-object-large', { 'building-large': isBuilding(obj) }]"
                         @click.stop="selectObject(obj)"
                       >
-                        <c-icon 
-                          :name="getObjectIcon(obj.object_type)" 
-                          :class="{ 'icon-building': isBuilding(obj) }"
-                        />
+                        <!-- Render image when available filename is present; otherwise fallback to CoreUI icon -->
+                        <template v-if="hasImageForType(obj.object_type) && !obj._imgError">
+                          <img
+                            :src="`/images/objects/${encodeURIComponent(getIconForType(obj.object_type))}`"
+                            :alt="obj.object_type"
+                            class="object-image-large"
+                            @error="onObjectImageError(obj)"
+                          />
+                        </template>
+                        <template v-else>
+                          <c-icon 
+                            :name="getObjectIcon(obj.object_type)" 
+                            :class="{ 'icon-building': isBuilding(obj) }"
+                          />
+                        </template>
                         <!-- Show time when building, level when ready (desktop only) -->
                         <div v-if="isBuilding(obj)" class="object-info-badge d-none d-md-flex building-badge">
                           {{ getRemainingTimeText(obj) }}
@@ -128,7 +139,12 @@
             @click="modalSelectedObjectType = objType"
           >
               <div class="d-flex align-items-center">
-              <c-icon :name="objType.icon" class="me-2" />
+              <template v-if="isImageFilename(objType.icon)">
+                <img :src="`/images/objects/${encodeURIComponent(objType.icon)}`" class="me-2 object-palette-image" alt="obj" @error="(e)=>{ e.target.style.display='none' }" />
+              </template>
+              <template v-else>
+                <c-icon :name="objType.icon" class="me-2" />
+              </template>
               <div>{{ translateObjectLabel(objType.type, objType.name) }}</div>
             </div>
             <div class="d-flex align-items-center gap-2">
@@ -193,7 +209,12 @@
             @click="modalSelectedObjectType = objType"
           >
               <div class="d-flex align-items-center">
-              <c-icon :name="objType.icon" class="me-2" />
+              <template v-if="isImageFilename(objType.icon)">
+                <img :src="`/images/objects/${encodeURIComponent(objType.icon)}`" class="me-2 object-palette-image" alt="obj" @error="(e)=>{ e.target.style.display='none' }" />
+              </template>
+              <template v-else>
+                <c-icon :name="objType.icon" class="me-2" />
+              </template>
               <div>{{ translateObjectLabel(objType.type, objType.name) }}</div>
             </div>
             <div class="d-flex align-items-center gap-2">
@@ -250,6 +271,10 @@ export default {
       return gameStore.parcels?.find(p => p.id === parcelId.value && p.user_id === gameStore.user?.id);
     });
     
+    // Grid size for parcel editor
+    const GRID_SIZE = 5;
+    const gridCellCount = GRID_SIZE * GRID_SIZE;
+
     // Watch for route changes to refresh objects when returning to parcel
     watch(() => route.path, async (newPath, oldPath) => {
       if (newPath.includes('/city/') && !newPath.includes('/object/')) {
@@ -266,6 +291,31 @@ export default {
     const getObjectIcon = (type) => {
       const obj = availableObjects.value.find(o => o.type === type);
       return obj ? obj.icon : 'cilQuestion';
+    };
+
+    const getIconForType = (type) => {
+      const obj = availableObjects.value.find(o => o.type === type);
+      return obj ? obj.icon : null;
+    };
+
+    const isImageFilename = (name) => {
+      if (!name || typeof name !== 'string') return false;
+      return /\.(png|jpe?g|svg|webp|gif)$/i.test(name) || name.includes('.');
+    };
+
+    const hasImageForType = (type) => {
+      const icon = getIconForType(type);
+      return isImageFilename(icon);
+    };
+
+    const onObjectImageError = (obj) => {
+      try {
+        // mark to avoid retrying image and fall back to icon
+        obj._imgError = true;
+        console.warn('Failed to load object image for', obj.object_type, 'icon=', getIconForType(obj.object_type));
+      } catch (e) {
+        console.warn('onObjectImageError handler failed', e);
+      }
     };
 
     const fetchPeople = async () => {
@@ -357,8 +407,8 @@ export default {
 
     const toggleCellSelection = async (cellIndex) => {
       // For single-cell buildings: directly open modal for this cell
-      const cellX = (cellIndex - 1) % 10;
-      const cellY = Math.floor((cellIndex - 1) / 10);
+  const cellX = (cellIndex - 1) % GRID_SIZE;
+  const cellY = Math.floor((cellIndex - 1) / GRID_SIZE);
       
       // Check if cell is already occupied
       const existingObject = cityObjects.value.find(obj => 
@@ -453,8 +503,8 @@ export default {
     };
 
     const isCellInObject = (cellIndex, obj) => {
-      const cellX = (cellIndex - 1) % 10;
-      const cellY = Math.floor((cellIndex - 1) / 10);
+      const cellX = (cellIndex - 1) % GRID_SIZE;
+      const cellY = Math.floor((cellIndex - 1) / GRID_SIZE);
 
       return obj.x === cellX && obj.y === cellY;
     };
@@ -622,6 +672,10 @@ export default {
       removeObject,
       goBackToCity,
       getObjectIcon,
+      getIconForType,
+      isImageFilename,
+      hasImageForType,
+      onObjectImageError,
       getProgressPercent,
       getRemainingTimeText,
       isBuilding
@@ -635,6 +689,7 @@ export default {
       getAdjustedTime,
       displayedTimes,
       $t,
+      gridCellCount,
       tr,
       translateObjectLabel
     };
@@ -663,8 +718,8 @@ export default {
 
 .large-grid {
   display: grid;
-  grid-template-columns: repeat(10, 1fr);
-  grid-template-rows: repeat(10, 1fr);
+  grid-template-columns: repeat(5, 1fr);
+  grid-template-rows: repeat(5, 1fr);
   gap: 1px;
   background: #e9ecef;
   padding: 1px;
@@ -704,6 +759,22 @@ export default {
   cursor: pointer;
 }
 
+/* Images inside parcel cells should fit the cell */
+.object-image-large {
+  max-width: 55%;
+  max-height: 55%;
+  object-fit: contain;
+  display: block;
+}
+
+/* Small preview in palette */
+.object-palette-image {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  display: inline-block;
+}
+
 /* Red icon when building */
 .icon-building {
   color: #dc3545 !important;
@@ -712,26 +783,30 @@ export default {
 /* Info badge for level/time */
 .object-info-badge {
   position: absolute;
-  bottom: 2px;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
   font-size: 9px;
   font-weight: 600;
   pointer-events: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  white-space: nowrap;
+  z-index: 5;
+  padding: 3px 6px; /* height just enough for text */
+  /* full-width strip background; default light so it's readable */
+  background: rgba(255,255,255,0.95);
+  color: #222;
 }
 
 .building-badge {
-  color: #dc3545;
-  text-shadow: 0 0 2px rgba(255, 255, 255, 0.8);
+  background: rgba(220,53,69,0.95) !important; /* solid red strip */
+  color: #fff !important;
 }
 
 .level-badge {
-  color: #28a745;
-  text-shadow: 0 0 2px rgba(255, 255, 255, 0.8);
+  background: rgba(40,167,69,0.95) !important; /* solid green strip */
+  color: #fff !important;
 }
 
 .build-overlay-large { position:absolute; inset:0; display:flex; align-items:flex-end; }

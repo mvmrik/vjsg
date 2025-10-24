@@ -25,11 +25,11 @@
                   >
                     <div class="grid-simple">
                       <div
-                        v-for="i in 100"
-                        :key="i"
-                        class="grid-cell-simple parcel-cell"
-                        @click="openParcelEditor(parcel)"
-                      >
+                            v-for="i in gridCellCount"
+                            :key="i"
+                            class="grid-cell-simple parcel-cell"
+                            @click="openParcelEditor(parcel)"
+                          >
                         <!-- Show placed objects -->
                         <div
                           v-for="obj in getObjectsForParcel(parcel.id)"
@@ -92,6 +92,9 @@ export default {
       router.push(`/city/${parcel.id}`);
     };
 
+    const GRID_SIZE = 5;
+    const gridCellCount = GRID_SIZE * GRID_SIZE;
+
     const userParcels = computed(() => {
       const parcels = gameStore.parcels?.filter(p => p.user_id === gameStore.user?.id) || [];
       return parcels;
@@ -102,7 +105,7 @@ export default {
       const y = parcel.city_y;
 
       // Responsive parcel size based on map width
-      const parcelSize = Math.max(60, Math.min(110, cityMapWidth.value / 10));
+  const parcelSize = Math.max(60, Math.min(110, cityMapWidth.value / GRID_SIZE));
       const streetWidth = 10; // Street width between parcels
 
       // Find the minimum and maximum x and y coordinates
@@ -131,9 +134,9 @@ export default {
       const allParcels = userParcels.value;
       if (allParcels.length === 0) return 600;
       
-      const minY = Math.min(...allParcels.map(p => p.city_y));
-      const maxY = Math.max(...allParcels.map(p => p.city_y));
-      const parcelSize = Math.max(60, Math.min(110, cityMapWidth.value / 4));
+  const minY = Math.min(...allParcels.map(p => p.city_y));
+  const maxY = Math.max(...allParcels.map(p => p.city_y));
+  const parcelSize = Math.max(60, Math.min(110, cityMapWidth.value / GRID_SIZE));
       const streetWidth = 10;
       
       return (maxY - minY + 1) * (parcelSize + streetWidth) + 40; // +40 for padding
@@ -239,8 +242,8 @@ export default {
     });
 
     const isCellInObject = (cellIndex, obj) => {
-      const cellX = (cellIndex - 1) % 10;
-      const cellY = Math.floor((cellIndex - 1) / 10);
+      const cellX = (cellIndex - 1) % GRID_SIZE;
+      const cellY = Math.floor((cellIndex - 1) / GRID_SIZE);
       // Check if object occupies this single cell
       return obj.x === cellX && obj.y === cellY;
     };
@@ -347,8 +350,8 @@ export default {
 
 .grid-simple {
   display: grid;
-  grid-template-columns: repeat(10, 1fr);
-  grid-template-rows: repeat(10, 1fr);
+  grid-template-columns: repeat(5, 1fr);
+  grid-template-rows: repeat(5, 1fr);
   gap: 1px;
   background: #e9ecef;
   padding: 1px;
@@ -418,8 +421,8 @@ export default {
 
 .large-grid {
   display: grid;
-  grid-template-columns: repeat(10, 1fr);
-  grid-template-rows: repeat(10, 1fr);
+  grid-template-columns: repeat(5, 1fr);
+  grid-template-rows: repeat(5, 1fr);
   gap: 2px;
   background: #e9ecef;
   padding: 2px;

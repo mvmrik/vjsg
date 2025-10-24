@@ -96,8 +96,8 @@ class CityController extends Controller
             'objects' => 'required|array',
             'objects.*.parcel_id' => 'required|integer',
             'objects.*.object_type' => 'required|string',
-            'objects.*.x' => 'required|integer|min:0|max:9',
-            'objects.*.y' => 'required|integer|min:0|max:9'
+            'objects.*.x' => 'required|integer|min:0|max:4',
+            'objects.*.y' => 'required|integer|min:0|max:4'
         ]);
 
         // Get the parcel_id from the first object (all objects should be for the same parcel)
@@ -164,7 +164,7 @@ class CityController extends Controller
                 // VALIDATION: Ensure cells are within grid bounds and not overlapping with existing objects
                 $x = $objData['x'];
                 $y = $objData['y'];
-                if ($x < 0 || $x > 9 || $y < 0 || $y > 9) {
+                if ($x < 0 || $x > 4 || $y < 0 || $y > 4) {
                     return response()->json([
                         'success' => false, 
                         'message' => 'Invalid cell coordinates: x and y must be between 0-9'

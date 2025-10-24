@@ -83,8 +83,8 @@ class ToolController extends Controller
     {
         $request->validate([
             'tool_id' => 'required|exists:tools,id',
-            'x' => 'required|integer|min:0|max:9',
-            'y' => 'required|integer|min:0|max:9',
+            'x' => 'required|integer|min:0|max:4',
+            'y' => 'required|integer|min:0|max:4',
         ]);
 
         $tool = Tool::findOrFail($request->tool_id);

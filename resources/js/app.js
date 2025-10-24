@@ -24,6 +24,7 @@ import ParcelEditor from './components/ParcelEditor.vue';
 import ObjectEditor from './components/ObjectEditor.vue';
 import NotificationsPage from './components/NotificationsPage.vue';
 import HelpPage from './components/HelpPage.vue';
+import LotteryPage from './components/events/LotteryPage.vue';
 
 // Setup axios defaults
 axios.defaults.baseURL = window.location.origin;
@@ -41,6 +42,7 @@ const routes = [
   { path: '/settings', name: 'settings', component: ProfilePage, meta: { requiresAuth: true } },
   { path: '/inventory', name: 'inventory', component: InventoryPage, meta: { requiresAuth: true } }
   ,{ path: '/help', name: 'help', component: HelpPage }
+  ,{ path: '/event', name: 'event', component: LotteryPage, meta: { requiresAuth: true } }
 ];
 
 // Create router
@@ -95,6 +97,19 @@ const translations = reactive({
   en: window.translations,
   bg: window.translations_bg || {},
 });
+
+// Try to fetch server-side translations for the current locale (ensures sections like 'events' are present)
+(async () => {
+  try {
+    const res = await axios.get(`/api/translations/${currentLocale.value}`);
+    if (res.data) {
+      translations[currentLocale.value] = res.data;
+    }
+  } catch (e) {
+    // ignore - fallback to server-injected window.translations
+    console.warn('Could not fetch translations for', currentLocale.value);
+  }
+})();
 
 const translate = computed(() => (key) => {
   const keys = key.split('.');

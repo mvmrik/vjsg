@@ -170,8 +170,17 @@
             <c-col class="col-sm-6 col-md-3 mb-3">
               <c-card class="text-center">
                 <c-card-body>
+                  <c-icon name="cilMap" size="xl" class="text-info mb-2" />
+                  <h4 class="mb-1">{{ gameStats.parcels }}</h4>
+                  <p class="text-muted mb-0">{{ $t('settings.parcels') }}</p>
+                </c-card-body>
+              </c-card>
+            </c-col>
+            <c-col class="col-sm-6 col-md-3 mb-3">
+              <c-card class="text-center">
+                <c-card-body>
                   <c-icon name="cilBuilding" size="xl" class="text-success mb-2" />
-                  <h4 class="mb-1">{{ gameStats.buildings }}</h4>
+                  <h4 class="mb-1">{{ gameStats.objects }}</h4>
                   <p class="text-muted mb-0">{{ $t('settings.buildings') }}</p>
                 </c-card-body>
               </c-card>
@@ -185,26 +194,18 @@
                 </c-card-body>
               </c-card>
             </c-col>
-            <c-col class="col-sm-6 col-md-3 mb-3">
-              <c-card class="text-center">
-                <c-card-body>
-                  <c-icon name="cilMap" size="xl" class="text-info mb-2" />
-                  <h4 class="mb-1">{{ gameStats.parcels }}</h4>
-                  <p class="text-muted mb-0">{{ $t('settings.parcels') }}</p>
-                </c-card-body>
-              </c-card>
-            </c-col>
           </c-row>
 
           <!-- Progress bars -->
           <div class="mt-4">
-            <h6>{{ $t('settings.progress_to_next_level') }}</h6>
+            <h6>{{ $t('settings.health') }}</h6>
+            <p class="text-muted small">{{ $t('settings.expected_mortality_desc') }}</p>
             <c-progress class="mb-3">
-              <c-progress-bar 
-                :value="levelProgress" 
-                color="success"
+              <c-progress-bar
+                :value="Math.min(Math.max(Math.round(gameStats.expected_mortality), 0), 100)"
+                color="danger"
               >
-                {{ levelProgress }}%
+                {{ Math.min(Math.max(gameStats.expected_mortality.toFixed(2), 0), 100) }}%
               </c-progress-bar>
             </c-progress>
 
@@ -328,12 +329,16 @@ export default {
     });
 
     const gameStats = ref({
-      people: 2,
+      people: 0,
       buildings: 0,
-      resources: 1250,
-      level: 15,
-      experience: 3450,
-      parcels: 3
+      resources: 0,
+      level: 0,
+      experience: 0,
+      parcels: 0,
+      objects: 0,
+      hospital_capacity: 0,
+      population: 0,
+      expected_mortality: 0 // percent
     });
 
     const settings = ref({
@@ -516,6 +521,29 @@ export default {
       if (gameStore.fetchUserData) {
         await gameStore.fetchUserData();
       }
+
+      // Load game statistics (parcels, objects, population, expected mortality)
+      const loadStats = async () => {
+        try {
+          const res = await fetch('/api/stats');
+          if (!res.ok) {
+            console.error('Failed to fetch stats', res.status);
+            return;
+          }
+          const d = await res.json();
+          if (!d.success) return;
+          gameStats.value.parcels = d.parcels ?? 0;
+          gameStats.value.objects = d.objects ?? 0;
+          gameStats.value.people = d.population ?? 0;
+          gameStats.value.population = d.population ?? 0;
+          gameStats.value.hospital_capacity = d.hospital_capacity ?? 0;
+          gameStats.value.expected_mortality = (typeof d.expectedMortality === 'number') ? Number(d.expectedMortality) : 0;
+        } catch (e) {
+          console.error('loadStats error', e);
+        }
+      };
+
+      await loadStats();
 
       // Load user settings and stats (after user is available)
       if (gameStore.user) {

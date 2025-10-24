@@ -40,6 +40,7 @@ Route::get('/translations/{locale}', function ($locale) {
         'global' => __('global', [], $locale),
         'settings' => __('settings', [], $locale),
         'menu' => __('menu', [], $locale),
+        'events' => __('events', [], $locale),
         'city' => __('city', [], $locale),
         'home' => __('home', [], $locale),
         'map' => __('map', [], $locale),
@@ -57,6 +58,12 @@ Route::middleware(['game.auth'])->group(function () {
     Route::post('/game-settings', [GameController::class, 'setGameSetting'])->name('api.game-settings.set');
     Route::get('/game-settings', [GameController::class, 'getGameSettings'])->name('api.game-settings.get');
     Route::post('/game-settings', [GameController::class, 'setGameSetting'])->name('api.game-settings.set');
+    // Stats used by profile/settings page
+    Route::get('/stats', [\App\Http\Controllers\StatsController::class, 'index'])->name('api.stats');
+    // Events - namespaced controllers under Events folder
+    Route::get('/events/current', [\App\Http\Controllers\Events\EventController::class, 'current'])->name('api.events.current');
+    Route::post('/events/lottery/enter', [\App\Http\Controllers\Events\LotteryController::class, 'enter'])->name('api.events.lottery.enter');
+    Route::get('/events/lottery/jackpot', [\App\Http\Controllers\Events\LotteryController::class, 'jackpot'])->name('api.events.lottery.jackpot');
     // Remember tokens management
     Route::get('/remember-tokens', [\App\Http\Controllers\RememberTokenController::class, 'index']);
     Route::delete('/remember-tokens/{id}', [\App\Http\Controllers\RememberTokenController::class, 'destroy']);

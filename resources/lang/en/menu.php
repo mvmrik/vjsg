@@ -10,4 +10,5 @@ return [
     'settings' => 'Settings',
     'help' => 'Help',
     'user' => 'User',
+    'event' => 'Event',
 ];
