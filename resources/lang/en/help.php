@@ -73,6 +73,23 @@ return [
                 . '<li><strong>Occupied workers example:</strong> You have 5 level-1 workers. You start construction using 2 level-1 workers: an occupied_workers record is created and those 2 workers are not available until the build is complete. If you start another build with 2 level-1 workers, you will have 1 free level-1 worker left.</li>'
                 . '</ul>'
         ],
+    'population' => [
+        'title' => 'Population, Hospitals & Productions',
+        'body' => '<p>This section describes population dynamics, hospitals and how the server handles occupied workers and cancelled productions.</p>'
+        . '<ul>'
+        . '<li><strong>Births:</strong> Each day the server runs a population tick. New people are added based on your <em>houses</em> and their attached tools. The formula sums house levels and tool levels and adds that many level-1 people to your population.</li>'
+        . '<li><strong>Hospitals and deaths:</strong> Hospitals (object type \"hospital\") and tools placed in hospitals provide medical capacity. After births, the server checks hospital capacity vs current population. If capacity is lower than population, the server will remove (kill) the excess people. Removal is applied from highest-level people first (older people die first). When a people group reaches zero it is removed from the database.</li>'
+        . '<li><strong>Behavior when no hospitals:</strong> If you have zero hospital capacity, the entire current population is considered unprotected and will be removed (deaths apply).</li>'
+        . '<li><strong>Occupied workers reconciliation:</strong> If the number of occupied workers assigned at a particular level exceeds the available people at that level, all affected occupied records for that level are cancelled. When this happens the server:</li>'
+        . '<ul>'
+        . '<li>Deletes the corresponding <code>occupied_workers</code> records (workers are released).</li>'
+        . '<li>Sets the related object <code>ready_at</code> to <code>null</code> (the build/production is stopped and can be started again later).</li>'
+        . '<li>Deletes per-object <code>production_outputs</code> (the produced output is lost) and adjusts <code>inventory.temp_count</code> to subtract the expected product.</li>'
+        . '<li>Input resources consumed when the production started are <strong>not</strong> refunded (starting a production spends the inputs immediately).</li>'
+        . '</ul>'
+        . '<li><strong>Why this design:</strong> This prevents having active productions that reference non-existing people and keeps the server state consistent. It also encourages players to build hospitals to protect their population and to manage worker assignments carefully.</li>'
+        . '</ul>'
+    ],
         'economy' => [
             'title' => 'Economy & Trading',
             'body' => '<p>The in-game economy is based on generating, spending and (optionally) trading resources.</p>'

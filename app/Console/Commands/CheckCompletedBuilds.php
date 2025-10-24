@@ -141,7 +141,7 @@ class CheckCompletedBuilds extends Command
                 \Log::error('Failed to finalize production for object ' . $object->id . ': ' . $e->getMessage());
             }
 
-            // Clear ready_at
+            // Clear ready_at and persist changes
             $object->ready_at = null;
             $object->save();
 

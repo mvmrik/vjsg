@@ -14,6 +14,8 @@ class Kernel extends ConsoleKernel
     {
         $schedule->command('check:completed-builds')
                  ->everyMinute();
+        // Daily births cron - can be run manually for testing with: php artisan population:births
+        $schedule->command('population:births')->daily();
     }
 
     /**

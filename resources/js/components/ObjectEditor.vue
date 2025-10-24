@@ -119,7 +119,7 @@
                   </div>
                   <div class="mt-3">
                     <template v-if="object && object.ready_at === null && (!object.workers || !object.workers.count)">
-                      <c-button color="primary" @click="showUpgradeModal = true">
+                      <c-button color="primary" @click="openUpgradeModal">
                         <c-icon name="cilArrowTop" class="me-1" />
                         {{ $t('city.upgrade_level') }}
                       </c-button>
@@ -161,27 +161,31 @@
         <div class="modal-body">
           <p class="mb-3">{{ $t("city.select_workers_upgrade") }}</p>
           <div class="d-flex gap-2 mb-3">
-            <div>
+            <div style="flex:1">
               <label class="form-label small mb-1">{{ $t("city.worker_level") }}</label>
-              <select class="form-select" v-model="upgradeWorkerLevel">
+              <select class="form-select" v-model="upgradeWorkerLevel" @change="onUpgradeWorkerLevelChange">
                 <option v-for="(count, lvl) in people.by_level" :key="lvl" :value="lvl">
                   LV {{ lvl }} ({{ count }})
                 </option>
               </select>
             </div>
-            <div>
-              <label class="form-label small mb-1">{{ $t("city.worker_count") }}</label>
-              <select class="form-select" v-model.number="upgradeWorkerCount">
-                <option :value="0">0</option>
-                <option
-                  v-for="n in availableCountsForLevel(upgradeWorkerLevel)"
-                  :key="n"
-                  :value="n"
-                >
-                  {{ n }}
-                </option>
-              </select>
+          </div>
+
+          <!-- Worker count slider for upgrade (full-width) -->
+          <div class="mb-3">
+            <label class="form-label small mb-1">{{ $t("city.worker_count") }}</label>
+            <div class="d-flex align-items-center gap-3">
+              <input
+                type="range"
+                :min="0"
+                :max="availableCountForLevel(upgradeWorkerLevel)"
+                v-model.number="upgradeWorkerCount"
+                @input=""
+                class="form-range"
+              />
+              <div class="fw-bold">{{ upgradeWorkerCount }}</div>
             </div>
+            <div class="small text-muted">{{ tr('city.available','Available') }}: {{ availableCountForLevel(upgradeWorkerLevel) }}</div>
           </div>
           <div v-if="upgradeWorkerLevel && upgradeWorkerCount" class="alert alert-info">
             <strong>{{ $t("city.upgrade_time") }}:</strong> {{ upgradeTimeMinutes }}
@@ -224,21 +228,31 @@
         <div class="modal-body">
           <p class="mb-3">{{ $t('city.select_workers_production') }}</p>
           <div class="d-flex gap-2 mb-3">
-            <div>
+            <div style="flex:1">
               <label class="form-label small mb-1">{{ $t('city.worker_level') }}</label>
-              <select class="form-select" v-model="produceWorkerLevel" @change="calculateProductionPreview">
+              <select class="form-select" v-model="produceWorkerLevel" @change="onProduceWorkerLevelChange">
                 <option v-for="item in availableWorkerLevels" :key="item.level" :value="item.level">
                   LV {{ item.level }} ({{ item.count }})
                 </option>
               </select>
             </div>
-            <div>
-              <label class="form-label small mb-1">{{ $t('city.worker_count') }}</label>
-              <select class="form-select" v-model.number="produceWorkerCount" @change="calculateProductionPreview">
-                <option :value="0">0</option>
-                <option v-for="n in availableCountsForLevel(produceWorkerLevel)" :key="n" :value="n">{{ n }}</option>
-              </select>
+          </div>
+
+          <!-- Worker count slider (full-width, like time) -->
+          <div class="mb-3">
+            <label class="form-label small mb-1">{{ $t('city.worker_count') }}</label>
+            <div class="d-flex align-items-center gap-3">
+              <input
+                type="range"
+                :min="0"
+                :max="availableCountForLevel(produceWorkerLevel)"
+                v-model.number="produceWorkerCount"
+                @input="calculateProductionPreview"
+                class="form-range"
+              />
+              <div class="fw-bold">{{ produceWorkerCount }}</div>
             </div>
+            <div class="small text-muted">{{ tr('city.available', 'Available') }}: {{ availableCountForLevel(produceWorkerLevel) }}</div>
           </div>
 
           <div class="mb-3">
@@ -397,6 +411,16 @@ export default {
     const getObjectIcon = (type) => {
       // This would need to be implemented if we want icons
       return "cilQuestion";
+    };
+
+    const tr = (key, fallback) => {
+      try {
+        const v = $t(key);
+        if (!v || v === key) return fallback || key;
+        return v;
+      } catch (e) {
+        return fallback || key;
+      }
     };
 
     const availableObjects = ref([]);
@@ -632,11 +656,25 @@ export default {
       }
     };
 
+    const openUpgradeModal = async () => {
+      // Select first available level with workers > 0
+      const availableLevels = Object.entries(people.value.by_level || {}).filter(([lvl, count]) => count > 0);
+      upgradeWorkerLevel.value = availableLevels.length > 0 ? availableLevels[0][0] : null;
+      // default slider to 0 — require user to explicitly pick workers
+      upgradeWorkerCount.value = 0;
+      showUpgradeModal.value = true;
+    };
+
+    const onUpgradeWorkerLevelChange = () => {
+      upgradeWorkerCount.value = 0;
+    };
+
     const openProduceModal = async () => {
       // Select first available level with workers > 0
       const availableLevels = Object.entries(people.value.by_level || {}).filter(([lvl, count]) => count > 0);
       produceWorkerLevel.value = availableLevels.length > 0 ? availableLevels[0][0] : null;
-      produceWorkerCount.value = produceWorkerLevel.value ? 1 : 0;
+      // default slider to 0 — require user to explicitly pick workers
+      produceWorkerCount.value = 0;
       // Try to load user's saved production length from game settings
       try {
         const res = await axios.get('/api/game-settings');
@@ -662,6 +700,16 @@ export default {
       showProduceModal.value = true;
     };
 
+    const availableCountForLevel = (level) => {
+      return parseInt(people.value.by_level?.[level] || 0);
+    };
+
+    const onProduceWorkerLevelChange = () => {
+      // reset chosen worker count when level changes — slider should default to 0
+      produceWorkerCount.value = 0;
+      calculateProductionPreview();
+    };
+
     const calculateProductionPreview = async () => {
       productionPreview.value = [];
       if (!object.value) return;
@@ -676,8 +724,8 @@ export default {
         byProduct[key].count++;
       });
 
-      const lvl = produceWorkerLevel.value ? parseInt(produceWorkerLevel.value) : 1;
-      const cnt = produceWorkerCount.value ? parseInt(produceWorkerCount.value) : 1;
+  const lvl = produceWorkerLevel.value ? parseInt(produceWorkerLevel.value) : 0;
+  const cnt = produceWorkerCount.value ? parseInt(produceWorkerCount.value) : 0;
       const duration = produceDurationHours.value ? parseInt(produceDurationHours.value) : 1;
 
       for (const key in byProduct) {
@@ -689,7 +737,7 @@ export default {
         const basePerHour = tool.product_units_per_hour 
           ? parseInt(tool.product_units_per_hour) 
           : (tool.units_per_hour ? parseInt(tool.units_per_hour) : 0);
-        const perHour = fieldsCount * basePerHour * Math.max(1, lvl) * Math.max(1, cnt);
+  const perHour = fieldsCount * basePerHour * Math.max(0, lvl) * Math.max(0, cnt);
         const total = perHour * duration;
 
         // Need raw: 1 per field per hour (if raw exists)
@@ -968,6 +1016,12 @@ export default {
   produceDurationHours,
   produceStartAllowed,
   availableWorkerLevels,
+  availableCountForLevel,
+  onProduceWorkerLevelChange,
+  tr,
+  // Upgrade
+  openUpgradeModal,
+  onUpgradeWorkerLevelChange,
   objectHasProduction,
   openProduceModal,
   calculateProductionPreview,

@@ -93,20 +93,29 @@
       </c-modal-header>
       <c-modal-body>
         <div class="mb-3 d-flex gap-2">
-          <div>
+          <div style="flex:1">
             <label class="form-label small mb-1">{{ $t('city.worker_level') }}</label>
-            <select class="form-select" v-model="selectedWorkerLevel">
+            <select class="form-select" v-model="selectedWorkerLevel" @change="onSelectedWorkerLevelChange">
               <option :value="null">{{ $t('city.no_workers') }}</option>
               <option v-for="(count, lvl) in people.by_level" :key="lvl" :value="lvl">LV {{ lvl }} ({{ count }})</option>
             </select>
           </div>
-          <div>
-            <label class="form-label small mb-1">{{ $t('city.worker_count') }}</label>
-            <select class="form-select" v-model.number="selectedWorkerCount">
-              <option :value="0">0</option>
-              <option v-for="n in availableCountsForLevel(selectedWorkerLevel)" :key="n" :value="n">{{ n }}</option>
-            </select>
+        </div>
+
+        <!-- Worker count slider (full-width) -->
+        <div class="mb-3">
+          <label class="form-label small mb-1">{{ $t('city.worker_count') }}</label>
+          <div class="d-flex align-items-center gap-3">
+            <input
+              type="range"
+              :min="0"
+              :max="availableCountForLevel(selectedWorkerLevel)"
+              v-model.number="selectedWorkerCount"
+              class="form-range"
+            />
+            <div class="fw-bold">{{ selectedWorkerCount }}</div>
           </div>
+          <div class="small text-muted">{{ tr('city.available','Available') }}: {{ availableCountForLevel(selectedWorkerLevel) }}</div>
         </div>
 
         <div class="object-palette d-flex flex-column">
@@ -149,20 +158,29 @@
       <div class="fallback-modal">
         <h5>{{ $t('city.select_object_type') }}</h5>
         <div class="mb-3 d-flex gap-2">
-          <div>
+          <div style="flex:1">
             <label class="form-label small mb-1">{{ $t('city.worker_level') }}</label>
-            <select class="form-select" v-model="selectedWorkerLevel">
+            <select class="form-select" v-model="selectedWorkerLevel" @change="onSelectedWorkerLevelChange">
               <option :value="null">{{ $t('city.no_workers') }}</option>
               <option v-for="(count, lvl) in people.by_level" :key="lvl + '-fb'" :value="lvl">LV {{ lvl }} ({{ count }})</option>
             </select>
           </div>
-          <div>
-            <label class="form-label small mb-1">{{ $t('city.worker_count') }}</label>
-            <select class="form-select" v-model.number="selectedWorkerCount">
-              <option :value="0">0</option>
-              <option v-for="n in availableCountsForLevel(selectedWorkerLevel)" :key="'fb-' + n" :value="n">{{ n }}</option>
-            </select>
+        </div>
+
+        <!-- Fallback: worker count slider -->
+        <div class="mb-3">
+          <label class="form-label small mb-1">{{ $t('city.worker_count') }}</label>
+          <div class="d-flex align-items-center gap-3">
+            <input
+              type="range"
+              :min="0"
+              :max="availableCountForLevel(selectedWorkerLevel)"
+              v-model.number="selectedWorkerCount"
+              class="form-range"
+            />
+            <div class="fw-bold">{{ selectedWorkerCount }}</div>
           </div>
+          <div class="small text-muted">{{ tr('city.available','Available') }}: {{ availableCountForLevel(selectedWorkerLevel) }}</div>
         </div>
 
         <div class="object-palette d-flex flex-column mt-2">
@@ -263,11 +281,25 @@ export default {
       }
     };
 
+    const tr = (key, fallback) => {
+      try {
+        const v = $t(key);
+        if (!v || v === key) return fallback || key;
+        return v;
+      } catch (e) {
+        return fallback || key;
+      }
+    };
+
     const availableCountsForLevel = (level) => {
       const count = people.value.by_level?.[level] || 0;
       const arr = [];
       for (let i = 1; i <= count; i++) arr.push(i);
       return arr;
+    };
+
+    const availableCountForLevel = (level) => {
+      return parseInt(people.value.by_level?.[level] || 0);
     };
 
     const updateDisplayedTimes = () => {
@@ -313,6 +345,11 @@ export default {
       selectedWorkerCount.value = 0;
       updateDisplayedTimes();
     });
+
+    const onSelectedWorkerLevelChange = () => {
+      selectedWorkerCount.value = 0;
+      updateDisplayedTimes();
+    };
 
     watch(selectedWorkerCount, () => {
       updateDisplayedTimes();
@@ -593,9 +630,12 @@ export default {
       selectedWorkerLevel,
       selectedWorkerCount,
       availableCountsForLevel,
+      availableCountForLevel,
+      onSelectedWorkerLevelChange,
       getAdjustedTime,
       displayedTimes,
       $t,
+      tr,
       translateObjectLabel
     };
   }

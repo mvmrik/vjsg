@@ -49,6 +49,8 @@ return [
     'unknown' => 'Непознат',
     // Object type names
     'factory' => 'Фабрика',
+    'house' => 'Къща',
+    'hospital' => 'Болница',
     'harvest' => 'Добив на ресурси',
     'waiting_release_workers' => 'Работниците ще бъдат освободени след изтичане на времето.',
     // Inventory

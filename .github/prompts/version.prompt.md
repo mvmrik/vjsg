@@ -24,6 +24,7 @@ English instructions for the assistant (use when asked to "use this prompt"):
 	- After generating files, create a commit with message: `chore(release): bump version to vX.Y.Z — {short title}`.
 	- Create an annotated tag `vX.Y.Z` with a short message (the tag message may contain a one-line summary).
 	- By default, ask the user for confirmation before running `git push origin main` and `git push origin vX.Y.Z` unless the user explicitly requested automatic push.
+	- After updating files and before pushing, run the frontend build so compiled assets are included on the server after deploy: `npm run build`. If your project requires different build commands (for example `npm ci` then `npm run build`), follow your usual build workflow.
 	- If the user allows pushing to GitHub, after pushing the branch and tag, optionally create a GitHub Release for `vX.Y.Z` and use the generated markdown file as the release body. Prefer using the GitHub CLI (`gh`) if available, otherwise use the GitHub REST API with a provided token.
 	- If `gh` or a GitHub token is not available, inform the user and provide the `git` commands and the release body so they can create the release manually on GitHub.
 
@@ -41,5 +42,11 @@ English instructions for the assistant (use when asked to "use this prompt"):
 	- Commit and tag are ready locally; push is done only after user confirmation (or if automatic push was requested).
 
 ---
+
+8) Help / Documentation check (important)
+	- When preparing the version/release prompt, ALWAYS check whether the change introduces new user-facing gameplay behavior or UI instructions that players need to know.
+	- If user-facing gameplay or UI changes exist, update the help pages under `resources/lang/*/help.php` (both English and Bulgarian) with short, clear guidance about the new behavior. The release notes MUST include a bullet saying whether help was updated; if no help changes are needed, explicitly state "help: no changes needed" in the release notes.
+	- Only update the help for new gameplay behavior or UI changes. Do NOT update help for internal bug fixes or refactors that do not change how the game works from the player's perspective.
+
 
 

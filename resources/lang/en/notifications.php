@@ -28,4 +28,10 @@ return [
     'upgrade_started_message' => 'Upgrade of :objectType started. Will be ready in :time.',
     'upgrade_completed_title' => 'Upgrade Completed',
     'upgrade_completed_message' => ':objectType has been upgraded to level :level.',
+    'population_increase_title' => 'Population Increased',
+    'population_increase_message' => 'Your population increased by :count people.',
+    'population_decrease_title' => 'Population Decrease',
+    'population_decrease_message' => 'Due to insufficient hospital capacity, :count people have died.',
+    'production_cancelled_title' => 'Production Cancelled',
+    'production_cancelled_message' => 'Production cancelled for :count workers at level :level due to insufficient people.',
 ];

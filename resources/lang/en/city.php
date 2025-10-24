@@ -49,6 +49,8 @@ return [
     'unknown' => 'Unknown',
     // Object type names
     'factory' => 'Factory',
+    'house' => 'House',
+    'hospital' => 'Hospital',
     'harvest' => 'Harvest resources',
     'waiting_release_workers' => 'Workers will be released after the time elapses.',
     // Inventory

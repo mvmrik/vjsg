@@ -9,7 +9,11 @@ class Tool extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['object_id', 'tool_type_id', 'position_x', 'position_y'];
+    protected $fillable = ['object_id', 'tool_type_id', 'position_x', 'position_y', 'level'];
+
+    protected $attributes = [
+        'level' => 1,
+    ];
 
     public function object()
     {
