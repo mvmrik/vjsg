@@ -22,8 +22,10 @@ English instructions for the assistant (use when asked to "use this prompt"):
 
 4) Commit, tag and push behaviour
 	- After generating files, create a commit with message: `chore(release): bump version to vX.Y.Z — {short title}`.
-	- Create an annotated tag `vX.Y.Z` with a short message.
+	- Create an annotated tag `vX.Y.Z` with a short message (the tag message may contain a one-line summary).
 	- By default, ask the user for confirmation before running `git push origin main` and `git push origin vX.Y.Z` unless the user explicitly requested automatic push.
+	- If the user allows pushing to GitHub, after pushing the branch and tag, optionally create a GitHub Release for `vX.Y.Z` and use the generated markdown file as the release body. Prefer using the GitHub CLI (`gh`) if available, otherwise use the GitHub REST API with a provided token.
+	- If `gh` or a GitHub token is not available, inform the user and provide the `git` commands and the release body so they can create the release manually on GitHub.
 
 5) Validation and safety
 	- Verify `config/app.php` contained a valid semantic version before the change and that the updated file also contains a valid semantic version.
