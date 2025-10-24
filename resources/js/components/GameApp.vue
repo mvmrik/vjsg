@@ -110,7 +110,9 @@
               <span style="color: #ffd700">💰</span> {{ currentUser.balance }}
             </div>
             <div class="bg-light px-3 py-2 rounded">
-              <span>{{ $t("global.version") }} {{ appVersion }}</span>
+              <a :href="`/releases/${appVersion}`" class="text-decoration-none text-dark">
+                {{ $t("global.version") }} {{ appVersion }}
+              </a>
             </div>
           </div>
         </c-footer>

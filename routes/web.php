@@ -15,11 +15,16 @@ use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\GameController;
+use App\Http\Controllers\ReleaseController;
 
 // Debug route
 Route::get('/debug', function () {
     return view('debug');
 });
+
+// Releases listing and details (keep before the SPA catch-all)
+Route::get('/releases', [ReleaseController::class, 'index'])->name('releases.index');
+Route::get('/releases/{version}', [ReleaseController::class, 'show'])->name('releases.show');
 
 // Main SPA route - catch all routes and let Vue Router handle them
 Route::get('/{any}', function () {
