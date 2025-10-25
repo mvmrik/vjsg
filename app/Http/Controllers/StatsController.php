@@ -48,7 +48,9 @@ class StatsController extends Controller
 
             $deficit = max(0, $population - $hospitalCapacity);
 
+            // Expected immediate mortality percentage (cap at 80% so it never shows 100%)
             $expectedMortality = ($population > 0) ? ($deficit / max(1, $population)) * 100 : 0;
+            $expectedMortality = min(80, $expectedMortality);
 
             return response()->json([
                 'success' => true,

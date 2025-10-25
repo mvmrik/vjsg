@@ -69,51 +69,62 @@ class PopulationBirths extends Command
                     if ($hospitalCapacity < $totalPop) {
                         $deficit = $totalPop - $hospitalCapacity;
 
-                        // Remove deficit people from highest levels first (descending level)
-                        DB::beginTransaction();
-                        try {
-                            $levels = Person::where('user_id', $userId)
-                                ->where('count', '>', 0)
-                                ->orderBy('level', 'desc')
-                                ->get();
+                        // Cap mortality so it can never reach 100% of the population.
+                        // Maximum removable people is 80% of the total population.
+                        $maxRemovable = intval(floor($totalPop * 0.8));
+                        // Determine how many to remove (can't exceed deficit nor maxRemovable)
+                        $toRemoveTotal = min($deficit, $maxRemovable);
 
-                            $toRemove = $deficit;
-                            foreach ($levels as $lvlRow) {
-                                if ($toRemove <= 0) break;
-                                $available = intval($lvlRow->count);
-                                if ($available <= 0) continue;
-                                $take = min($available, $toRemove);
-                                // decrement count; if becomes zero, delete the row to avoid empty-level rows
-                                $newCount = $available - $take;
-                                if ($newCount <= 0) {
-                                    $lvlRow->delete();
-                                } else {
-                                    $lvlRow->count = $newCount;
-                                    $lvlRow->save();
+                        // If capped removal is zero, skip deletion (we don't remove everybody)
+                        if ($toRemoveTotal > 0) {
+                            // Remove people from highest levels first (descending level)
+                            DB::beginTransaction();
+                            try {
+                                $levels = Person::where('user_id', $userId)
+                                    ->where('count', '>', 0)
+                                    ->orderBy('level', 'desc')
+                                    ->get();
+
+                                $remaining = $toRemoveTotal;
+                                foreach ($levels as $lvlRow) {
+                                    if ($remaining <= 0) break;
+                                    $available = intval($lvlRow->count);
+                                    if ($available <= 0) continue;
+                                    $take = min($available, $remaining);
+                                    // decrement count; if becomes zero, delete the row to avoid empty-level rows
+                                    $newCount = $available - $take;
+                                    if ($newCount <= 0) {
+                                        $lvlRow->delete();
+                                    } else {
+                                        $lvlRow->count = $newCount;
+                                        $lvlRow->save();
+                                    }
+                                    $remaining -= $take;
                                 }
-                                $toRemove -= $take;
+
+                                DB::commit();
+
+                                // Create notification about deaths
+                                $title = __('notifications.population_decrease_title');
+                                $message = __('notifications.population_decrease_message', ['count' => $toRemoveTotal]);
+                                Notification::create([
+                                    'user_id' => $userId,
+                                    'title' => $title,
+                                    'message' => $message,
+                                    'type' => 'danger',
+                                    'is_read' => false,
+                                    'data' => json_encode([
+                                        'removed' => $toRemoveTotal,
+                                        'hospital_capacity' => $hospitalCapacity,
+                                        'total_before' => $totalPop,
+                                        'deficit' => $deficit,
+                                        'max_removable' => $maxRemovable
+                                    ])
+                                ]);
+                            } catch (\Exception $e) {
+                                DB::rollBack();
+                                \Log::error('population:births: mortality processing failed for user ' . $userId . ': ' . $e->getMessage());
                             }
-
-                            DB::commit();
-
-                            // Create notification about deaths
-                            $title = __('notifications.population_decrease_title');
-                            $message = __('notifications.population_decrease_message', ['count' => $deficit]);
-                            Notification::create([
-                                'user_id' => $userId,
-                                'title' => $title,
-                                'message' => $message,
-                                'type' => 'danger',
-                                'is_read' => false,
-                                'data' => json_encode([
-                                    'removed' => $deficit,
-                                    'hospital_capacity' => $hospitalCapacity,
-                                    'total_before' => $totalPop
-                                ])
-                            ]);
-                        } catch (\Exception $e) {
-                            DB::rollBack();
-                            \Log::error('population:births: mortality processing failed for user ' . $userId . ': ' . $e->getMessage());
                         }
                     }
                 } catch (\Exception $e) {

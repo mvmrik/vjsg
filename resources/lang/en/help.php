@@ -86,12 +86,12 @@ return [
                 . '</ul>'
         ],
     'population' => [
-        'title' => 'Population, Hospitals & Productions',
-        'body' => '<p>This section describes population dynamics, hospitals and how the server handles occupied workers and cancelled productions.</p>'
-        . '<ul>'
-        . '<li><strong>Births:</strong> Each day the server runs a population tick. New people are added based on your <em>houses</em> and their attached tools. The formula sums house levels and tool levels and adds that many level-1 people to your population.</li>'
-        . '<li><strong>Hospitals and deaths:</strong> Hospitals (object type \"hospital\") and tools placed in hospitals provide medical capacity. After births, the server checks hospital capacity vs current population. If capacity is lower than population, the server will remove (kill) the excess people. Removal is applied from highest-level people first (older people die first). When a people group reaches zero it is removed from the database.</li>'
-        . '<li><strong>Behavior when no hospitals:</strong> If you have zero hospital capacity, the entire current population is considered unprotected and will be removed (deaths apply).</li>'
+    'title' => 'Population, Hospitals & Productions',
+    'body' => '<p>This section describes population dynamics, hospitals and how the server handles occupied workers and cancelled productions.</p>'
+    . '<ul>'
+    . '<li><strong>Births:</strong> Each day the server runs a population tick. New people are added based on your <em>houses</em> and their attached tools. The formula sums house levels and tool levels and adds that many level-1 people to your population.</li>'
+    . '<li><strong>Hospitals and deaths:</strong> Hospitals (object type "hospital") and tools placed in hospitals provide medical capacity. After births, the server checks hospital capacity vs current population. If capacity is lower than population, the server will remove (kill) a portion of the excess people. Removal is applied from highest-level people first (older people die first). When a people group reaches zero it is removed from the database.</li>'
+    . '<li><strong>Behavior when no hospitals:</strong> If you have zero hospital capacity, the server will still remove people due to lack of capacity but will cap immediate mortality so it never removes more than 80% of your total population in a single tick — you will not lose your entire population at once.</li>'
         . '<li><strong>Occupied workers reconciliation:</strong> If the number of occupied workers assigned at a particular level exceeds the available people at that level, all affected occupied records for that level are cancelled. When this happens the server:</li>'
         . '<ul>'
         . '<li>Deletes the corresponding <code>occupied_workers</code> records (workers are released).</li>'

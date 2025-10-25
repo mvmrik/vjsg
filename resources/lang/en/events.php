@@ -12,6 +12,8 @@ return [
     ,'your_balance' => 'Balance'
     ,'matched' => 'You matched :count of 6 — payout :payout'
     ,'no_match' => 'You matched :count of 6 — no payout'
+    ,'expected_payouts' => 'Estimated payouts'
+    ,'match_suffix' => 'matched'
     ,'new_game' => 'New game'
     ,'jackpot_decreased' => 'Warning: jackpot decreased from :old to :new before your play'
 ];

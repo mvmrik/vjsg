@@ -39,7 +39,7 @@
                 style="cursor: pointer"
               >
                 <c-icon name="cilStorage" size="xl" class="mb-1" />
-                <small>{{ $t('menu.inventory') }}</small>
+                <small>{{ $t("menu.inventory") }}</small>
               </a>
               <a
                 v-if="isLoggedIn"
@@ -51,7 +51,7 @@
                 style="cursor: pointer"
               >
                 <c-icon name="cilStar" size="xl" class="mb-1" />
-                <small>{{ $t('menu.event') }}</small>
+                <small>{{ $t("menu.event") }}</small>
               </a>
               <a
                 @click="$router.push('/notifications')"
@@ -109,20 +109,21 @@
         <!-- CoreUI Footer -->
         <c-footer class="fixed-bottom">
           <div class="d-flex justify-content-between w-100 align-items-center">
-            <div class="bg-light px-3 py-2 rounded">
-              <span
-                >&copy; {{ new Date().getFullYear() }} Resource Legends. Всички права
-                запазени.</span
-              >
-            </div>
+            <!-- removed long copyright text for compact mobile footer -->
             <div
               v-if="isLoggedIn && currentUser"
-              class="bg-warning text-dark px-3 py-2 rounded fw-bold"
+              class="bg-warning text-dark px-2 py-1 rounded fw-bold small-balance"
             >
-              <span style="color: #ffd700">💰</span> {{ currentUser.balance }}
+              <span style="color: #ffd700">💰</span>
+              <span class="ms-1">{{ currentUser.balance }}</span>
             </div>
-            <div class="bg-light px-3 py-2 rounded">
-              <a :href="`/releases/${appVersion}`" target="_blank" rel="noopener noreferrer" class="text-decoration-none text-dark">
+            <div class="ms-auto bg-light px-2 py-1 rounded small-version">
+              <a
+                :href="`/releases/${appVersion}`"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-decoration-none text-dark small"
+              >
                 {{ $t("global.version") }} {{ appVersion }}
               </a>
             </div>
@@ -201,13 +202,14 @@ export default {
     const $t = inject("$t");
     const sidebarShow = ref(true);
     const sidebarMinimize = ref(false);
-  const showLoginModal = ref(false);
-  const dropdownVisible = ref(false);
-  // Read app version from server-injected global to avoid editing JS files during version bumps
-  const appVersion = (typeof window !== 'undefined' && window.APP_VERSION) ? window.APP_VERSION : '0.0.0';
-  const unreadNotifications = computed(() => gameStore.unreadNotificationsCount);
-  const toasts = ref([]);
-  const showConfirmModal = ref(false);
+    const showLoginModal = ref(false);
+    const dropdownVisible = ref(false);
+    // Read app version from server-injected global to avoid editing JS files during version bumps
+    const appVersion =
+      typeof window !== "undefined" && window.APP_VERSION ? window.APP_VERSION : "0.0.0";
+    const unreadNotifications = computed(() => gameStore.unreadNotificationsCount);
+    const toasts = ref([]);
+    const showConfirmModal = ref(false);
     const confirmMessage = ref("");
     const confirmCallbacks = ref({ onConfirm: null, onCancel: null });
 
@@ -365,7 +367,7 @@ export default {
         const { message, type } = event.detail;
         const color =
           type === "error" ? "danger" : type === "success" ? "success" : "info";
-        addToast($t('global.notification'), message, color);
+        addToast($t("global.notification"), message, color);
       });
     });
 
@@ -405,5 +407,60 @@ export default {
 body {
   margin: 0;
   font-family: Inter, ui-sans-serif, system-ui;
+}
+
+/* Ensure the app uses full viewport width on small screens and prevent horizontal scroll */
+html,
+body,
+#app,
+.c-app,
+.c-wrapper,
+.c-body,
+.c-main {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+/* Hide accidental horizontal overflow (helps on mobile when some element exceeds viewport) */
+html,
+body {
+  overflow-x: hidden;
+}
+
+/* Make the top nav horizontally scrollable on small screens without visible scrollbar */
+header .container-fluid .d-flex > nav {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch; /* smooth scrolling on iOS */
+  white-space: nowrap;
+  padding-bottom: 6px; /* small padding so touch target is easier */
+  touch-action: pan-x; /* allow horizontal panning */
+}
+
+/* Ensure nav items don't wrap and remain reachable by horizontal scroll */
+header .container-fluid .d-flex > nav a {
+  flex: 0 0 auto; /* don't shrink, keep intrinsic width */
+}
+
+/* Hide scrollbars while keeping scrolling functional */
+header .container-fluid .d-flex > nav::-webkit-scrollbar {
+  height: 0;
+  display: none;
+}
+header .container-fluid .d-flex > nav {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+
+/* Make footer more compact on small screens */
+.c-footer.fixed-bottom {
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+}
+.c-footer.fixed-bottom .small-balance,
+.c-footer.fixed-bottom .small-version {
+  padding: 0.25rem 0.5rem;
+}
+.c-footer.fixed-bottom .small-version a {
+  font-size: 0.85rem;
 }
 </style>
