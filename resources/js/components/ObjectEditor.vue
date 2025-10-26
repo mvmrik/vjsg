@@ -46,10 +46,15 @@
                         @touchstart="handleToolTouch(Math.floor((i - 1) / 4), (i - 1) % 4)"
                       >
                         <img
+                          class="tool-image"
                           :src="`/images/tools/${getToolAt(Math.floor((i - 1) / 4), (i - 1) % 4)?.tool_type_icon || 'student_materials.png'}`"
                           alt="Tool"
-                          style="width: 100%; height: 100%; object-fit: cover"
                         />
+
+                        <!-- Show tool level badge (desktop only) -->
+                        <div class="object-info-badge d-none d-md-flex level-badge">
+                          {{ $t('city.level') }} {{ getToolAt(Math.floor((i - 1) / 4), (i - 1) % 4)?.level || 1 }}
+                        </div>
 
                         <!-- Tool actions overlay -->
                         <div
@@ -1092,9 +1097,26 @@ export default {
 }
 
 .placed-tool {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center; /* center vertically within the area above the badge */
+  justify-content: center;
+  /* reserve space at bottom for the level badge so image centers above it */
+  padding-bottom: 18px;
   color: black;
   font-size: 1.2rem;
-  position: relative;
+}
+
+/* tool image sizing - mimic parcel object sizing but slightly smaller and positioned higher */
+.tool-image {
+  max-width: 70%;
+  max-height: 70%;
+  object-fit: contain;
+  display: block;
 }
 
 .tool-actions {
@@ -1157,6 +1179,34 @@ export default {
 .object-info {
   width: 100%;
   max-width: 500px;
+}
+
+/* Info badge for level/time (copied from ParcelEditor for consistency) */
+.object-info-badge {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  pointer-events: none;
+  z-index: 5;
+  padding: 3px 6px;
+  background: rgba(255,255,255,0.95);
+  color: #222;
+}
+
+.building-badge {
+  background: rgba(220,53,69,0.95) !important;
+  color: #fff !important;
+}
+
+.level-badge {
+  background: rgba(40,167,69,0.95) !important;
+  color: #fff !important;
 }
 
 /* Mobile responsive */

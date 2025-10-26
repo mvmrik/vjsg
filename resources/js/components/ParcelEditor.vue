@@ -776,6 +776,11 @@ export default {
   cursor: pointer;
 }
 
+/* Reserve space above the badge so the image is visually centered relative to the level strip */
+.placed-object-large {
+  padding-bottom: 18px;
+}
+
 /* Images inside parcel cells should fit the cell */
 .object-image-large {
   max-width: 55%;
@@ -806,7 +811,7 @@ export default {
   display: flex;
   justify-content: center;
   align-items: center;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 600;
   pointer-events: none;
   z-index: 5;
