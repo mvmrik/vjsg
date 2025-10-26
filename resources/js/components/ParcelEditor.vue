@@ -488,8 +488,25 @@ export default {
           objects: objectsForThisParcel
         });
         if (res.data.success) {
-          // Backend already handles clearing expired ready_at
-          cityObjects.value = res.data.objects;
+          // Backend returns the authoritative list of objects; merge them with local list
+          // so transient client-side objects (e.g., pending new ones) are replaced with
+          // server versions that include ids and timestamps, but we avoid briefly
+          // emptying the array which caused the UI to flicker.
+          const serverObjs = (res.data.objects || []).map(o => {
+            const copy = Object.assign({}, o);
+            if (copy.id && /^\d+$/.test(String(copy.id))) copy.id = Number(copy.id);
+            if (copy.parcel_id && /^\d+$/.test(String(copy.parcel_id))) copy.parcel_id = Number(copy.parcel_id);
+            if (copy.user_id && /^\d+$/.test(String(copy.user_id))) copy.user_id = Number(copy.user_id);
+            if (copy.x != null && /^\d+$/.test(String(copy.x))) copy.x = Number(copy.x);
+            if (copy.y != null && /^\d+$/.test(String(copy.y))) copy.y = Number(copy.y);
+            if (copy.ready_at != null && /^\d+$/.test(String(copy.ready_at))) copy.ready_at = Number(copy.ready_at);
+            if (copy.level == null) copy.level = 1; // ensure level exists
+            return copy;
+          });
+
+          // Replace only objects for this parcel to avoid touching other parcels in memory
+          cityObjects.value = cityObjects.value.filter(o => o.parcel_id !== parcel.value.id).concat(serverObjs);
+
           message.value = $t('city.changes_saved');
           messageType.value = 'success';
         }

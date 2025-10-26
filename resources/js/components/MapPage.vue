@@ -148,11 +148,8 @@ export default {
     const messageType = ref('');
     const gameStore = useGameStore();
     
-    // Local translate function
-    const $t = (key) => {
-      const [section, actualKey] = key.split('.');
-      return window.translations[section]?.[actualKey] || key;
-    };
+    // Use injected reactive $t so translations are consistent with app state
+    const $t = inject('$t');
 
     const userParcels = computed(() => 
       parcels.value.filter(p => p.user_id === gameStore.user?.id)

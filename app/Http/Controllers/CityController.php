@@ -125,12 +125,16 @@ class CityController extends Controller
             }
         }
 
-        // Delete existing objects for this parcel that are not present in incoming payload
-        $toDeleteQuery = CityObject::where('user_id', $userId)->where('parcel_id', $parcelId);
+        // Delete existing objects for this parcel that are not present in incoming payload.
+        // Safety: if the client did not include any existing IDs in the payload (incomingIds empty)
+        // we assume the client did not intend to remove existing objects and skip deletion to
+        // avoid accidental data loss.
         if (!empty($incomingIds)) {
-            $toDeleteQuery = $toDeleteQuery->whereNotIn('id', $incomingIds);
+            $toDeleteQuery = CityObject::where('user_id', $userId)
+                ->where('parcel_id', $parcelId)
+                ->whereNotIn('id', $incomingIds);
+            $toDeleteQuery->delete();
         }
-        $toDeleteQuery->delete();
 
         // Process incoming objects: update existing ones, create new ones
         foreach ($request->objects as $objData) {
@@ -214,16 +218,26 @@ class CityController extends Controller
 
                 $readyAt = time() + $buildSeconds; // UNIX timestamp
 
-                $created = CityObject::create([
+                // Prepare creation payload. Only set 'level' when it was provided by client
+                // so the database default (if any) can apply when client doesn't send level.
+                $createData = [
                     'user_id' => $userId,
                     'parcel_id' => $objData['parcel_id'],
                     'object_type' => $objData['object_type'],
-                    'level' => $objectLevel,
                     'x' => $objData['x'],
                     'y' => $objData['y'],
                     'ready_at' => $readyAt,
                     'build_seconds' => $buildSeconds
-                ]);
+                ];
+                if (array_key_exists('level', $objData)) {
+                    $createData['level'] = $objectLevel;
+                } else {
+                    // Defensive: explicitly set to 1 if client didn't provide level so hosts
+                    // with different DB defaults behave consistently with local dev.
+                    $createData['level'] = 1;
+                }
+
+                $created = CityObject::create($createData);
                 $arr = $created->toArray();
                 $arr['ready_at'] = $readyAt * 1000; // Convert to milliseconds for frontend
                 $arr['build_seconds'] = $buildSeconds;

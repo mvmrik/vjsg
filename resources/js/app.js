@@ -148,10 +148,11 @@ const setUserLanguage = (userLocale) => {
   }
 };
 
-app.config.globalProperties.$t = translate.value;
 app.config.globalProperties.$changeLanguage = changeLanguage;
 app.config.globalProperties.$setUserLanguage = setUserLanguage;
-app.provide('$t', translate.value);
+// Provide a reactive $t wrapper so consumers always call the latest translate function.
+app.config.globalProperties.$t = (key) => translate.value(key);
+app.provide('$t', (key) => translate.value(key));
 app.provide('$changeLanguage', changeLanguage);
 app.provide('$setUserLanguage', setUserLanguage);
 app.provide('currentLocale', currentLocale);
@@ -166,7 +167,10 @@ window.addEventListener('set-user-language', (event) => {
   (async () => {
     try {
       const res = await axios.get(`/api/translations/${locale}`);
-      if (res.data) translations[locale] = res.data;
+      if (res.data) {
+        // Merge to avoid overwriting other sections and keep reactivity
+        translations[locale] = Object.assign({}, translations[locale] || {}, res.data);
+      }
     } catch (e) {
       console.warn('Could not fetch translations for locale', locale);
     }

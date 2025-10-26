@@ -107,6 +107,7 @@
 <script setup>
 import { ref, onMounted, computed, inject, watch } from 'vue';
 import axios from 'axios';
+import { getJackpot, clearJackpotCache } from '../../utils/jackpotCache';
 import { useGameStore } from '../../stores/gameStore';
 
 const $t = inject('$t');
@@ -162,18 +163,18 @@ const fetchCurrent = async () => {
 
 const fetchJackpot = async () => {
   try {
-    const res = await axios.get('/api/events/lottery/jackpot');
-    if (res.data.success) jackpot.value = res.data.jackpot;
+    const res = await getJackpot();
+    if (res && res.success) jackpot.value = res.jackpot;
   } catch (e) {}
 };
 
 // fetch and update observedJackpot used for display and comparison
 const fetchJackpotObserved = async () => {
   try {
-    const res = await axios.get('/api/events/lottery/jackpot');
-    if (res.data.success) {
-      jackpot.value = res.data.jackpot;
-      observedJackpot.value = res.data.jackpot;
+    const res = await getJackpot();
+    if (res && res.success) {
+      jackpot.value = res.jackpot;
+      observedJackpot.value = res.jackpot;
     }
   } catch (e) {}
 };
@@ -219,10 +220,11 @@ const submitEntry = async () => {
   if (!canSubmit.value) return;
   try {
     // Refresh jackpot before submitting to detect quick changes by others
-    try {
-      const latest = await axios.get('/api/events/lottery/jackpot');
-      if (latest.data && latest.data.success) {
-        const latestVal = latest.data.jackpot ?? 0;
+      try {
+      // Force fetch latest jackpot (bypass short cache) to detect rapid decreases
+      const latestRes = await getJackpot(true).catch(() => null);
+      if (latestRes && latestRes.success) {
+        const latestVal = latestRes.jackpot ?? 0;
         // if jackpot decreased since user saw it, block the bet and notify
         if (latestVal < observedJackpot.value) {
           const warnMsg = translateWithParams('events.jackpot_decreased', { old: observedJackpot.value, new: latestVal });
@@ -262,7 +264,9 @@ const submitEntry = async () => {
         }
 
         // refresh jackpot and user balance
-        await fetchJackpot();
+      // clear cache after submit so subsequent viewers get updated value from server
+      clearJackpotCache();
+      await fetchJackpot();
         await gameStore.fetchUserData();
         // refresh history
         await fetchHistory();
