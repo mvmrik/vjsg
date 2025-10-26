@@ -3016,12 +3016,15 @@
     ]
   },
   "resources/js/app.js": {
-    "file": "assets/app-DOKku7eU.js",
+    "file": "assets/app-BKgIXTzf.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true,
+    "dynamicImports": [
+      "resources/js/components/events/LotteryPage.vue"
+    ],
     "css": [
-      "assets/app-AoI0lvm2.css"
+      "assets/app-B48Nwwil.css"
     ],
     "assets": [
       "assets/xx-zm_JmrXl.svg",
@@ -3775,6 +3778,18 @@
       "assets/layers-BWBAp2CZ.png",
       "assets/layers-2x-Bpkbi35X.png",
       "assets/marker-icon-hN30_KVU.png"
+    ]
+  },
+  "resources/js/components/events/LotteryPage.vue": {
+    "file": "assets/LotteryPage-Ds21zpp-.js",
+    "name": "LotteryPage",
+    "src": "resources/js/components/events/LotteryPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "resources/js/app.js"
+    ],
+    "css": [
+      "assets/LotteryPage-D5-_zH5D.css"
     ]
   }
 }

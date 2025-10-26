@@ -65,7 +65,6 @@ Route::middleware(['game.auth'])->group(function () {
     Route::get('/events/current', [\App\Http\Controllers\Events\EventController::class, 'current'])->name('api.events.current');
     Route::post('/events/lottery/enter', [\App\Http\Controllers\Events\LotteryController::class, 'enter'])->name('api.events.lottery.enter');
     Route::get('/events/lottery/jackpot', [\App\Http\Controllers\Events\LotteryController::class, 'jackpot'])->name('api.events.lottery.jackpot');
-    Route::post('/events/lottery/draw', [\App\Http\Controllers\Events\LotteryController::class, 'draw'])->name('api.events.lottery.draw');
     Route::get('/events/lottery/history', [\App\Http\Controllers\Events\LotteryController::class, 'history'])->name('api.events.lottery.history');
     // Remember tokens management
     Route::get('/remember-tokens', [\App\Http\Controllers\RememberTokenController::class, 'index']);

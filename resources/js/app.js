@@ -24,7 +24,6 @@ import ParcelEditor from './components/ParcelEditor.vue';
 import ObjectEditor from './components/ObjectEditor.vue';
 import NotificationsPage from './components/NotificationsPage.vue';
 import HelpPage from './components/HelpPage.vue';
-import LotteryPage from './components/events/LotteryPage.vue';
 
 // Setup axios defaults
 axios.defaults.baseURL = window.location.origin;
@@ -42,7 +41,7 @@ const routes = [
   { path: '/settings', name: 'settings', component: ProfilePage, meta: { requiresAuth: true } },
   { path: '/inventory', name: 'inventory', component: InventoryPage, meta: { requiresAuth: true } }
   ,{ path: '/help', name: 'help', component: HelpPage }
-  ,{ path: '/event', name: 'event', component: LotteryPage, meta: { requiresAuth: true } }
+  ,{ path: '/event', name: 'event', component: () => import(/* webpackChunkName: "lottery-page" */ './components/events/LotteryPage.vue'), meta: { requiresAuth: true } }
 ];
 
 // Create router
