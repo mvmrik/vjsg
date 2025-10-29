@@ -193,8 +193,7 @@
             <div class="small text-muted">{{ tr('city.available','Available') }}: {{ availableCountForLevel(upgradeWorkerLevel) }}</div>
           </div>
           <div v-if="upgradeWorkerLevel && upgradeWorkerCount" class="alert alert-info">
-            <strong>{{ $t("city.upgrade_time") }}:</strong> {{ upgradeTimeMinutes }}
-            {{ $t("city.minutes") }}
+            <strong>{{ $t("city.upgrade_time") }}:</strong> {{ formatBuildTime(upgradeTimeMinutes) }}
           </div>
         </div>
         <div class="modal-footer">
@@ -620,6 +619,27 @@ export default {
       }
     return baseTime * Math.max(1, nextLevel);
     });
+
+    // Format minutes to human-friendly string: minutes, hours or days+hours
+    const formatBuildTime = (minutes) => {
+      minutes = parseInt(minutes) || 0;
+      if (minutes <= 0) return '0m';
+      const minsInDay = 1440; // 60*24
+      if (minutes >= minsInDay) {
+        const days = Math.floor(minutes / minsInDay);
+        const rem = minutes % minsInDay;
+        const hours = Math.floor(rem / 60);
+        if (hours > 0) return `${days}d ${hours}h`;
+        return `${days}d`;
+      }
+      if (minutes >= 60) {
+        const hrs = Math.floor(minutes / 60);
+        const rem = minutes % 60;
+        if (rem > 0) return `${hrs}h ${rem}m`;
+        return `${hrs}h`;
+      }
+      return `${minutes}m`;
+    };
     const startUpgrade = async () => {
       try {
         const res = await axios.post("/api/city-objects/upgrade", {
@@ -984,6 +1004,7 @@ export default {
       upgradeWorkerCount,
       people,
       upgradeTimeMinutes,
+  formatBuildTime,
       buildingWorkers,
       goBackToParcel,
       getObjectTypeName,

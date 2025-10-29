@@ -57,11 +57,11 @@
                             :class="{ 'icon-building': isBuilding(obj) }"
                           />
                         </template>
-                        <!-- Show time when building, level when ready (desktop only) -->
-                        <div v-if="isBuilding(obj)" class="object-info-badge d-none d-md-flex building-badge">
+                        <!-- Show time when building, level when ready (visible on all screen sizes) -->
+                        <div v-if="isBuilding(obj)" class="object-info-badge building-badge">
                           {{ getRemainingTimeText(obj) }}
                         </div>
-                        <div v-else class="object-info-badge d-none d-md-flex level-badge">
+                        <div v-else class="object-info-badge level-badge">
                           {{ $t('city.level') }} {{ obj.level || 1 }}
                         </div>
                       </div>
@@ -149,8 +149,8 @@
             </div>
             <div class="d-flex align-items-center gap-2">
                 <div class="d-flex flex-column align-items-end">
-                <div class="text-muted small">{{ objType.build_time_minutes }}m</div>
-                <div class="text-success small fw-bold">{{ displayedTimes[objType.type] || objType.build_time_minutes }}m</div>
+                <div class="text-muted small">{{ formatBuildTime(objType.build_time_minutes) }}</div>
+                <div class="text-success small fw-bold">{{ formatBuildTime(displayedTimes[objType.type] || objType.build_time_minutes) }}</div>
               </div>
               <c-icon v-if="modalSelectedObjectType?.type === objType.type" name="cilCheck" class="text-primary" />
             </div>
@@ -219,8 +219,8 @@
             </div>
             <div class="d-flex align-items-center gap-2">
                 <div class="d-flex flex-column align-items-end">
-                <div class="text-muted small">{{ objType.build_time_minutes }}m</div>
-                <div class="text-success small fw-bold">{{ displayedTimes[objType.type] || objType.build_time_minutes }}m</div>
+                <div class="text-muted small">{{ formatBuildTime(objType.build_time_minutes) }}</div>
+                <div class="text-success small fw-bold">{{ formatBuildTime(displayedTimes[objType.type] || objType.build_time_minutes) }}</div>
               </div>
               <c-icon v-if="modalSelectedObjectType?.type === objType.type" name="cilCheck" class="text-primary" />
             </div>
@@ -389,6 +389,27 @@ export default {
         return base * Math.max(1, objectLevel);
       };
     });
+
+    // Format minutes to human-friendly string: minutes, hours or days+hours
+    const formatBuildTime = (minutes) => {
+      minutes = parseInt(minutes) || 0;
+      if (minutes <= 0) return '0m';
+      const minsInDay = 1440; // 60*24
+      if (minutes >= minsInDay) {
+        const days = Math.floor(minutes / minsInDay);
+        const rem = minutes % minsInDay;
+        const hours = Math.floor(rem / 60);
+        if (hours > 0) return `${days}d ${hours}h`;
+        return `${days}d`;
+      }
+      if (minutes >= 60) {
+        const hrs = Math.floor(minutes / 60);
+        const rem = minutes % 60;
+        if (rem > 0) return `${hrs}h ${rem}m`;
+        return `${hrs}h`;
+      }
+      return `${minutes}m`;
+    };
 
     // when level changes, reset selected count (avoid stale selection)
     watch(selectedWorkerLevel, (newVal, oldVal) => {
@@ -705,6 +726,7 @@ export default {
       onSelectedWorkerLevelChange,
       getAdjustedTime,
       displayedTimes,
+  formatBuildTime,
       $t,
       gridCellCount,
       tr,

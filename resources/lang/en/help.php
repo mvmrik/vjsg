@@ -71,6 +71,7 @@ return [
                 . '<li><strong>Resource costs:</strong> At the moment constructions and upgrades do not consume resource currencies in the current implementation — they rely on assigning workers and elapsed build time. If resource costs are added later, this section will be updated.</li>'
                 . '<li><strong>Example:</strong> Building a Level 1 House with base time 60 minutes. Assigning two workers with total effect 0.5 reduces time: 60 / (1 + 0.5) = 40 minutes. Upgrading to Level 2 may double base time but increases production.</li>'
                 . '<li><strong>Precise example (formula):</strong> The implementation uses a server-side helper: <code>calculateBuildSeconds(baseSeconds, currentLevel, workerLevel, workerCount)</code>. Internally: nextLevel = max(1, currentLevel+1); seconds = max(60, baseSeconds * nextLevel - ((workerLevel * workerCount) - 1)*60).</li>'
+                . '<li><strong>Build time display:</strong> Build and upgrade times are now shown in human-friendly units (minutes, hours or days) across the parcel editor and upgrade dialogs for easier reading.</li>'
                 . '<li><strong>Occupied workers example:</strong> You have 5 level-1 workers. You start construction using 2 level-1 workers: an occupied_workers record is created and those 2 workers are not available until the build is complete. If you start another build with 2 level-1 workers, you will have 1 free level-1 worker left.</li>'
                 . '</ul>'
         ],

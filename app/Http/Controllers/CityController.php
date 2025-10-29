@@ -43,6 +43,13 @@ class CityController extends Controller
         
         $objsArr = $objects->map(function ($o) use ($types, $occupiedWorkers) {
             $arr = $o->toArray();
+
+            // Ensure level is always present and numeric for frontend convenience
+            if (!array_key_exists('level', $arr) || $arr['level'] === null) {
+                $arr['level'] = 1;
+            } else {
+                $arr['level'] = intval($arr['level']);
+            }
             
             // ready_at is already an integer timestamp, no conversion needed
             // Frontend expects milliseconds, so multiply by 1000
@@ -264,6 +271,13 @@ class CityController extends Controller
         $types = ObjectType::all()->keyBy('type');
         $allArr = $allObjects->map(function ($o) use ($types) {
             $arr = $o->toArray();
+
+            // Ensure level is present and numeric when returning after save
+            if (!array_key_exists('level', $arr) || $arr['level'] === null) {
+                $arr['level'] = 1;
+            } else {
+                $arr['level'] = intval($arr['level']);
+            }
             
             // Convert ready_at timestamp to milliseconds for frontend
             if ($o->ready_at) {

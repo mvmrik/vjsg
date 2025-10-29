@@ -101,7 +101,7 @@
       <!-- Page Content -->
       <div class="c-body">
         <div class="c-main">
-          <c-container breakpoint="lg" class="h-auto p-3">
+          <c-container breakpoint="lg" class="h-auto p-3 pb-5">
             <router-view />
           </c-container>
         </div>
