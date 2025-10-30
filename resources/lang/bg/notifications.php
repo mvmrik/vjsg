@@ -34,4 +34,6 @@ return [
     'population_decrease_message' => 'Поради недостатъчна болнична капацитет, :count човека са починали.',
     'production_cancelled_title' => 'Производството спряно',
     'production_cancelled_message' => 'Производството бе спряно за :count работници на ниво :level поради недостатъчен брой хора.',
+    'production_overassigned_title' => 'Производството има повече назначени работници',
+    'production_overassigned_message' => 'Имате :assigned назначени работници, но само :available налични на ниво :level.',
 ];

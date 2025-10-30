@@ -221,39 +221,11 @@ class PopulationBirths extends Command
             $available = intval($peopleByLevel[$level] ?? 0);
             if ($assigned <= $available) continue;
 
-            // Too many assigned at this level -> cancel all occupied records at this level
-            DB::beginTransaction();
+            // Too many assigned at this level -> DO NOT cancel productions or clear ready_at.
+            // Instead, notify the user and log the condition. Occupied workers remain as-is.
             try {
-                $rows = OccupiedWorker::where('user_id', $userId)->where('level', $level)->get();
-                $released = 0;
-                foreach ($rows as $r) {
-                    $released += intval($r->count);
-                    $cityObjectId = $r->city_object_id;
-
-                    // Delete occupied record
-                    $r->delete();
-
-                    // Clear ready_at for the object (stop build/production)
-                    DB::table('city_objects')->where('id', $cityObjectId)->update(['ready_at' => null]);
-
-                    // Remove production outputs for this object and adjust inventory.temp_count
-                    $outputs = ProductionOutput::where('user_id', $userId)->where('city_object_id', $cityObjectId)->get();
-                    foreach ($outputs as $out) {
-                        $inv = Inventory::where('user_id', $userId)->where('tool_type_id', $out->tool_type_id)->lockForUpdate()->first();
-                        if ($inv) {
-                            $inv->temp_count = max(0, intval($inv->temp_count) - intval($out->count));
-                            $inv->save();
-                        }
-                    }
-
-                    ProductionOutput::where('user_id', $userId)->where('city_object_id', $cityObjectId)->delete();
-                }
-
-                DB::commit();
-
-                // Notify user about cancelled productions and released workers
-                $title = __('notifications.production_cancelled_title');
-                $message = __('notifications.production_cancelled_message', ['count' => $released, 'level' => $level]);
+                $title = __('notifications.production_overassigned_title');
+                $message = __('notifications.production_overassigned_message', ['assigned' => $assigned, 'available' => $available, 'level' => $level]);
                 Notification::create([
                     'user_id' => $userId,
                     'title' => $title,
@@ -261,13 +233,15 @@ class PopulationBirths extends Command
                     'type' => 'warning',
                     'is_read' => false,
                     'data' => json_encode([
-                        'released' => $released,
+                        'assigned' => $assigned,
+                        'available' => $available,
                         'level' => $level
                     ])
                 ]);
+
+                \Log::warning('population:births: reconcileOccupiedWorkers over-assigned for user ' . $userId . ', level ' . $level . ': assigned=' . $assigned . ' available=' . $available);
             } catch (\Exception $e) {
-                DB::rollBack();
-                \Log::error('population:births: reconcileOccupiedWorkers transaction failed for user ' . $userId . ', level ' . $level . ': ' . $e->getMessage());
+                \Log::error('population:births: reconcileOccupiedWorkers notify failed for user ' . $userId . ', level ' . $level . ': ' . $e->getMessage());
             }
         }
     }

@@ -216,6 +216,19 @@ class CityController extends Controller
                             'message' => 'Invalid workers: You do not have ' . $count . ' workers at level ' . $level
                         ], 400);
                     }
+
+                    // Enforce per-level free worker check: do not allow assigning more than free (total - already occupied at this level)
+                    $occupiedAtLevel = DB::table('occupied_workers')
+                        ->where('user_id', $userId)
+                        ->where('level', $level)
+                        ->sum('count');
+                    $freeAtLevel = intval($personGroup->count) - intval($occupiedAtLevel);
+                    if ($freeAtLevel < $count) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Insufficient free workers at level ' . $level
+                        ], 400);
+                    }
                     
                     // Use centralized helper that applies the 'next level' logic
                     $buildSeconds = \App\Models\CityObject::calculateBuildSeconds($baseSeconds, $objectLevel, $level, $count);
@@ -359,6 +372,19 @@ class CityController extends Controller
                     'message' => 'Invalid workers: You do not have ' . $workerCount . ' workers at level ' . $workerLevel
                 ], 400);
             }
+
+            // Enforce per-level free worker check
+            $occupiedAtLevel = DB::table('occupied_workers')
+                ->where('user_id', $userId)
+                ->where('level', intval($workerLevel))
+                ->sum('count');
+            $freeAtLevel = intval($personGroup->count) - intval($occupiedAtLevel);
+            if ($freeAtLevel < intval($workerCount)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Insufficient free workers at level ' . $workerLevel
+                ], 400);
+            }
         }
 
     // Calculate upgrade time using centralized helper (next level logic)
@@ -440,6 +466,19 @@ class CityController extends Controller
                 return response()->json([
                     'success' => false,
                     'message' => 'Invalid workers: You do not have ' . $workerCount . ' workers at level ' . $workerLevel
+                ], 400);
+            }
+
+            // Enforce per-level free worker check
+            $occupiedAtLevel = DB::table('occupied_workers')
+                ->where('user_id', $userId)
+                ->where('level', intval($workerLevel))
+                ->sum('count');
+            $freeAtLevel = intval($personGroup->count) - intval($occupiedAtLevel);
+            if ($freeAtLevel < intval($workerCount)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Insufficient free workers at level ' . $workerLevel
                 ], 400);
             }
         }

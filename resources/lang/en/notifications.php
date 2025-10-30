@@ -34,4 +34,6 @@ return [
     'population_decrease_message' => 'Due to insufficient hospital capacity, :count people have died.',
     'production_cancelled_title' => 'Production Cancelled',
     'production_cancelled_message' => 'Production cancelled for :count workers at level :level due to insufficient people.',
+    'production_overassigned_title' => 'Production Over-assigned',
+    'production_overassigned_message' => 'There are :assigned workers assigned but only :available available at level :level.',
 ];
