@@ -9,6 +9,7 @@ use App\Models\ObjectType;
 use App\Models\Person;
 use App\Models\OccupiedWorker;
 use App\Models\Parcel;
+use App\Services\MarketService;
 
 class CityController extends Controller
 {
@@ -263,6 +264,15 @@ class CityController extends Controller
                 $arr['build_seconds'] = $buildSeconds;
                 $objects[] = (object)$arr;
 
+                // If this is a bank, recompute user's market fee
+                if (($createData['object_type'] ?? null) === 'bank') {
+                    try {
+                        MarketService::recomputeUserFee($userId);
+                    } catch (\Exception $e) {
+                        \Log::error('MarketService::recomputeUserFee failed for user ' . $userId . ': ' . $e->getMessage());
+                    }
+                }
+
                 // OCCUPY WORKERS: Create occupied_worker record if workers were used
                 if ($workers && isset($workers['level']) && isset($workers['count'])) {
                     OccupiedWorker::create([
@@ -396,10 +406,19 @@ class CityController extends Controller
 
         // Update object to increase level and set build time
     $readyAt = time() + $finalSeconds; // UNIX timestamp
-    $object->level = ($object->level ?? 0) + 1;
+        $object->level = ($object->level ?? 0) + 1;
         $object->build_seconds = $finalSeconds;
         $object->ready_at = $readyAt;
         $object->save();
+
+        // If this object is a bank, recompute user's market fee (bank upgrades reduce fee)
+        if ($object->object_type === 'bank') {
+            try {
+                \App\Services\MarketService::recomputeUserFee($userId);
+            } catch (\Exception $e) {
+                \Log::error('MarketService::recomputeUserFee failed for user ' . $userId . ': ' . $e->getMessage());
+            }
+        }
 
         // Create occupied workers record
         OccupiedWorker::create([

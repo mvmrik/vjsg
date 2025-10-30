@@ -2,6 +2,7 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\MarketController;
 
 /*
 |--------------------------------------------------------------------------
@@ -17,6 +18,12 @@ use Illuminate\Support\Facades\Route;
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
 });
+
+// Market endpoints
+Route::post('/market/orders', [MarketController::class, 'order']);
+Route::get('/market/{toolType}/orderbook', [MarketController::class, 'orderbook']);
+Route::get('/market/{toolType}/trades', [MarketController::class, 'trades']);
+Route::get('/market/orders', [MarketController::class, 'userOrders']);
 
 use App\Http\Controllers\GameController;
 
@@ -40,6 +47,7 @@ Route::get('/translations/{locale}', function ($locale) {
         'global' => __('global', [], $locale),
         'settings' => __('settings', [], $locale),
         'menu' => __('menu', [], $locale),
+        'market' => __('market', [], $locale),
         'events' => __('events', [], $locale),
         'city' => __('city', [], $locale),
         'home' => __('home', [], $locale),
@@ -106,6 +114,7 @@ use App\Http\Controllers\ToolController;
 
 Route::middleware(['game.auth'])->group(function () {
     Route::get('/objects/{objectId}/available-tools', [ToolController::class, 'getAvailableTools']);
+    Route::get('/tool-types', [ToolController::class, 'listToolTypes']);
     Route::post('/objects/add-tool', [ToolController::class, 'addTool']);
     Route::get('/objects/{objectId}/tools', [ToolController::class, 'getTools']);
     Route::post('/objects/update-tool-position', [ToolController::class, 'updateToolPosition']);

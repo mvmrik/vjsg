@@ -75,6 +75,24 @@ class PopulationBirths extends Command
                         // Determine how many to remove (can't exceed deficit nor maxRemovable)
                         $toRemoveTotal = min($deficit, $maxRemovable);
 
+                        // Keep original (pre-scale) for bounds
+                        $originalToRemove = $toRemoveTotal;
+
+                        // Scale mortality down so hospitals are more effective: divide removals by 10
+                        // (this implements: 10x fewer deaths; e.g. previous 80 -> now 8)
+                        $toRemoveTotal = intval(floor($toRemoveTotal / 10));
+
+                        // Enforce a minimum mortality floor of 5% of population (rounded up)
+                        // This guarantees some mortality when there is a deficit, but still
+                        // doesn't exceed the original computed removals.
+                        $minPercent = 0.05; // 5%
+                        $minRemovable = intval(ceil($totalPop * $minPercent));
+                        if ($minRemovable < 1) $minRemovable = 1;
+                        if ($originalToRemove > 0 && $toRemoveTotal < $minRemovable) {
+                            // Respect original bound (can't remove more than originalToRemove)
+                            $toRemoveTotal = min($minRemovable, $originalToRemove);
+                        }
+
                         // If capped removal is zero, skip deletion (we don't remove everybody)
                         if ($toRemoveTotal > 0) {
                             // Remove people from highest levels first (descending level)

@@ -48,8 +48,21 @@ class StatsController extends Controller
 
             $deficit = max(0, $population - $hospitalCapacity);
 
-            // Expected immediate mortality percentage (cap at 80% so it never shows 100%)
-            $expectedMortality = ($population > 0) ? ($deficit / max(1, $population)) * 100 : 0;
+            // Compute expected immediate mortality similar to population:births but scaled down
+            $maxRemovable = intval(floor($population * 0.8));
+            $originalToRemove = min($deficit, $maxRemovable);
+            // Scale mortality down by factor 10 to match daily tick logic
+            $toRemove = intval(floor($originalToRemove / 10));
+
+            // Enforce minimum mortality floor of 5% (rounded up), but do not exceed originalToRemove
+            $minPercent = 0.05; // 5%
+            $minRemovable = intval(ceil($population * $minPercent));
+            if ($minRemovable < 1) $minRemovable = 1;
+            if ($originalToRemove > 0 && $toRemove < $minRemovable) {
+                $toRemove = min($minRemovable, $originalToRemove);
+            }
+
+            $expectedMortality = ($population > 0) ? ($toRemove / max(1, $population)) * 100 : 0;
             $expectedMortality = min(80, $expectedMortality);
 
             return response()->json([

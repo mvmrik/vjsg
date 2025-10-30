@@ -22,6 +22,7 @@ import InventoryPage from './components/InventoryPage.vue';
 import CityPage from './components/CityPage.vue';
 import ParcelEditor from './components/ParcelEditor.vue';
 import ObjectEditor from './components/ObjectEditor.vue';
+import MarketPage from './components/MarketPage.vue';
 import NotificationsPage from './components/NotificationsPage.vue';
 import HelpPage from './components/HelpPage.vue';
 
@@ -41,6 +42,7 @@ const routes = [
   { path: '/settings', name: 'settings', component: ProfilePage, meta: { requiresAuth: true } },
   { path: '/inventory', name: 'inventory', component: InventoryPage, meta: { requiresAuth: true } }
   ,{ path: '/help', name: 'help', component: HelpPage }
+  ,{ path: '/market', name: 'market', component: MarketPage, meta: { requiresAuth: true } }
   ,{ path: '/event', name: 'event', component: () => import(/* webpackChunkName: "lottery-page" */ './components/events/LotteryPage.vue'), meta: { requiresAuth: true } }
 ];
 

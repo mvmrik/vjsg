@@ -247,6 +247,12 @@ export default {
         icon: "cilStorage",
       },
       {
+        _name: "CSidebarNavItem",
+        name: "Пазар",
+        to: "/market",
+        icon: "cilChartLine",
+      },
+      {
         _name: "CSidebarNavTitle",
         name: "Потребител",
       },

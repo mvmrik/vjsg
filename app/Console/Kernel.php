@@ -16,6 +16,8 @@ class Kernel extends ConsoleKernel
                  ->everyMinute();
         // Daily births cron - can be run manually for testing with: php artisan population:births
         $schedule->command('population:births')->daily();
+    // Market matcher runs every 10 minutes
+    $schedule->command('market:match')->everyTenMinutes();
     }
 
     /**

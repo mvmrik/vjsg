@@ -110,6 +110,7 @@ return [
                 . '<li><strong>Balance:</strong> Your current balance is shown in the footer. Spend it on building upgrades, objects or other gameplay features.</li>'
                 . '<li><strong>Trading:</strong> If trading features are enabled, use them to exchange resources with other players or marketplaces.</li>'
                 . '<li><strong>Costs and ROI:</strong> Consider the return on investment for buildings (production vs cost and build time).</li>'
+                . '<li><strong>Player Market:</strong> A new Market page lets you place limit buy and sell orders for tools and products. Orders are matched in periodic batches (every 10 minutes) to ensure fair matching and to reduce server load. When you place an order the required funds or items are reserved; that reservation is released if the order is cancelled or consumed when a trade executes. Trades use integer prices and small taker fees — check the Market UI for current fees and your reserved balances.</li>'
                 . '</ul>'
         ],
         'accounts_security' => [

@@ -11,4 +11,5 @@ return [
     'help' => 'Help',
     'user' => 'User',
     'event' => 'Event',
+    'market' => 'Market',
 ];

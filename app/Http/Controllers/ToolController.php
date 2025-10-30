@@ -106,4 +106,11 @@ class ToolController extends Controller
 
         return response()->json(['success' => true]);
     }
+
+    // Return list of all tool types for market product selection
+    public function listToolTypes()
+    {
+        $types = \App\Models\ToolType::orderBy('name')->get();
+        return response()->json(['success' => true, 'tool_types' => $types]);
+    }
 }
