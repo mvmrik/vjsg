@@ -110,7 +110,12 @@ class ToolController extends Controller
     // Return list of all tool types for market product selection
     public function listToolTypes()
     {
-        $types = \App\Models\ToolType::orderBy('name')->get();
+        // Exclude raw building/food materials from market selection — these resources
+        // are free/unlimited and shouldn't appear in the market. Filter by id to
+        // avoid i18n/name issues (IDs 1 and 2 are raw resources).
+        $excludedIds = [1, 2];
+
+        $types = \App\Models\ToolType::whereNotIn('id', $excludedIds)->orderBy('name')->get();
         return response()->json(['success' => true, 'tool_types' => $types]);
     }
 }

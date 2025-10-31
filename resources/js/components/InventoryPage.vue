@@ -55,7 +55,7 @@
               <tr>
                 <th>{{ tr("inventory.resource", "Resource") }}</th>
                 <th class="text-end">{{ tr("inventory.available", "Available") }}</th>
-                <th class="text-end">{{ tr("inventory.pending", "Pending") }}</th>
+                <th class="text-end">{{ tr("inventory.reserved", "Reserved") }}</th>
                 <th class="text-end">{{ tr("inventory.expected", "Expected") }}</th>
               </tr>
             </thead>
@@ -77,11 +77,12 @@
                   <strong>{{ resource.quantity }}</strong>
                 </td>
                 <td class="text-end">
-                  <span class="text-warning">{{ resource.temp_quantity || 0 }}</span>
+                  <strong class="text-warning">{{ resource.reserved_quantity || 0 }}</strong>
                 </td>
                 <td class="text-end">
                   <strong>{{
                     (parseInt(resource.quantity) || 0) +
+                    (parseInt(resource.reserved_quantity) || 0) +
                     (parseInt(resource.temp_quantity) || 0)
                   }}</strong>
                 </td>
@@ -127,8 +128,8 @@
           <h5 class="mt-2">
             {{ selectedResource ? getTranslatedName(selectedResource.name) : "" }}
           </h5>
-          <c-badge :color="getQuantityBadgeColor(selectedResource.quantity)" size="lg">
-            Количество: {{ selectedResource.quantity }}
+          <c-badge :color="getQuantityBadgeColor((selectedResource.quantity || 0) + (selectedResource.reserved_quantity || 0))" size="lg">
+            Количество: {{ (parseInt(selectedResource.quantity) || 0) + (parseInt(selectedResource.reserved_quantity) || 0) }}
           </c-badge>
         </c-col>
         <c-col md="8">
@@ -229,7 +230,11 @@ export default {
             id: it.id,
             tool_type_id: it.tool_type_id,
             name: it.tool_name || "Unknown",
-            quantity: parseInt(it.count) || 0,
+            // available = total count minus reserved_count (reservation happens when placing market sell orders)
+            quantity: Math.max(0, (parseInt(it.count) || 0) - (parseInt(it.reserved_count) || 0)),
+            // reserved items (e.g. reserved for market orders)
+            reserved_quantity: parseInt(it.reserved_count) || 0,
+            // temp_quantity remains (e.g. production in progress / expected)
             temp_quantity: parseInt(it.temp_count) || 0,
             description: it.tool_description || "",
             icon: it.tool_icon || null,

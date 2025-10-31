@@ -21,6 +21,7 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 
 // Market endpoints
 Route::post('/market/orders', [MarketController::class, 'order']);
+Route::post('/market/orders/{id}/cancel', [MarketController::class, 'cancelOrder']);
 Route::get('/market/{toolType}/orderbook', [MarketController::class, 'orderbook']);
 Route::get('/market/{toolType}/trades', [MarketController::class, 'trades']);
 Route::get('/market/orders', [MarketController::class, 'userOrders']);

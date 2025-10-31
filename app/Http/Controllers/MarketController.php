@@ -10,6 +10,14 @@ class MarketController extends Controller
 {
     public function order(Request $request)
     {
+        // Prevent placing orders for free/raw resources that are not tradable
+        // Use IDs to avoid i18n issues: tool type IDs 1 and 2 are raw resources.
+        $excludedIds = [1, 2];
+        $toolTypeIdInput = intval($request->input('tool_type_id'));
+        if (in_array($toolTypeIdInput, $excludedIds)) {
+            return response()->json(['success' => false, 'message' => 'This item cannot be traded on the market'], 400);
+        }
+
         $userId = $request->session()->get('user_id') ?: auth()->id();
         if (!$userId) return response()->json(['success' => false, 'message' => 'Not authenticated'], 401);
 
@@ -68,6 +76,12 @@ class MarketController extends Controller
 
     public function orderbook($toolTypeId)
     {
+        // If the requested tool type is excluded from market, return empty orderbook
+        $excludedIds = [1, 2];
+        if (in_array(intval($toolTypeId), $excludedIds)) {
+            return response()->json(['success' => true, 'bids' => [], 'asks' => []]);
+        }
+
         $bids = MarketOrder::where('tool_type_id', $toolTypeId)->where('side', 'buy')->whereIn('status', ['open','partial'])
             ->select(DB::raw('price, SUM(quantity-filled_quantity) as volume'))
             ->groupBy('price')->orderBy('price','desc')->limit(20)->get();
@@ -81,6 +95,12 @@ class MarketController extends Controller
 
     public function trades($toolTypeId)
     {
+        // If the requested tool type is excluded from market, return empty trades
+        $excludedIds = [1, 2];
+        if (in_array(intval($toolTypeId), $excludedIds)) {
+            return response()->json(['success' => true, 'trades' => []]);
+        }
+
         $trades = DB::table('market_trades')->where('tool_type_id', $toolTypeId)->orderBy('executed_at','desc')->limit(100)->get();
         return response()->json(['success' => true, 'trades' => $trades]);
     }
@@ -115,5 +135,61 @@ class MarketController extends Controller
         $available = $inv ? intval($inv->count) - intval($inv->reserved_count ?? 0) : 0;
         
         return response()->json(['count' => $available]);
+    }
+
+    public function cancelOrder(Request $request, $id)
+    {
+        $userId = $request->session()->get('user_id') ?: auth()->id();
+        if (!$userId) return response()->json(['success' => false, 'message' => 'Not authenticated'], 401);
+
+        $order = DB::table('market_orders')->where('id', $id)->lockForUpdate()->first();
+        if (!$order) return response()->json(['success' => false, 'message' => 'Order not found'], 404);
+        if (intval($order->user_id) !== intval($userId)) return response()->json(['success' => false, 'message' => 'Not authorized'], 403);
+
+        if (in_array($order->status, ['filled','cancelled'])) {
+            return response()->json(['success' => false, 'message' => 'Order cannot be cancelled'], 400);
+        }
+
+        $remaining = intval($order->quantity) - intval($order->filled_quantity);
+        if ($remaining <= 0) {
+            return response()->json(['success' => false, 'message' => 'Nothing to cancel'], 400);
+        }
+
+        DB::beginTransaction();
+        try {
+            if ($order->side === 'buy') {
+                $amount = intval($order->price) * $remaining;
+                // lock user row and decrement reserved_balance safely
+                $user = DB::table('users')->where('id', $userId)->lockForUpdate()->first();
+                if ($user) {
+                    $newReserved = max(0, intval($user->reserved_balance ?? 0) - $amount);
+                    DB::table('users')->where('id', $userId)->update(['reserved_balance' => $newReserved]);
+                }
+            } else {
+                // sell: release reserved_count
+                $inv = DB::table('inventories')
+                    ->where('user_id', $userId)
+                    ->where('tool_type_id', $order->tool_type_id)
+                    ->lockForUpdate()
+                    ->first();
+                if ($inv) {
+                    $newReserved = max(0, intval($inv->reserved_count ?? 0) - $remaining);
+                    DB::table('inventories')
+                        ->where('user_id', $userId)
+                        ->where('tool_type_id', $order->tool_type_id)
+                        ->update(['reserved_count' => $newReserved]);
+                }
+            }
+
+            // mark order as cancelled
+            DB::table('market_orders')->where('id', $id)->update(['status' => 'cancelled', 'updated_at' => now()]);
+
+            DB::commit();
+            return response()->json(['success' => true]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('market order cancel failed: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
     }
 }

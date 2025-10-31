@@ -38,6 +38,20 @@ return [
     '3m' => '3M',
     '1y' => '1Y',
     'all' => 'All',
+    'show_all' => 'All orders',
+    'current_product' => 'Current product',
+    'hide_cancelled' => 'Hide cancelled',
+    'insufficient_funds' => 'Insufficient funds.',
+    'insufficient_items' => 'Insufficient items.',
+    'order_placed' => 'Order placed',
+    'order_failed' => 'Order failed',
+    'confirm_cancel' => 'Are you sure you want to cancel this order?',
+    'order_cancelled' => 'Order cancelled',
+    'cancel_failed' => 'Cancel failed',
+    'selector_help' => 'Select product to view market data. Raw resources may not be tradable.',
     'available' => 'Available',
-    'after_order' => 'After order'
+    'buy_price_exceeds' => 'Buy price cannot exceed best ask price.',
+    'sell_price_below' => 'Sell price cannot be lower than best bid price.',
+    'after_order' => 'After order',
+    'actions' => 'Actions'
 ];

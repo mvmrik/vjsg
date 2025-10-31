@@ -4,6 +4,7 @@
       <select v-model="selectedToolType" @change="loadMarket" class="selector">
         <option v-for="t in toolTypes" :key="t.id" :value="t.id">{{ translateName(t.name) }}</option>
       </select>
+      <span class="selector-help" :title="$t('market.selector_help')">ℹ︎</span>
       <div class="stats" v-if="stats">
         <div class="stat">
           <small>{{ $t('market.last_price') }}</small>
@@ -126,22 +127,38 @@
       </div>
 
       <div class="panel orders-panel">
-        <div class="panel-head">{{ $t('market.my_orders') }}</div>
+        <div class="panel-head">
+          <span>{{ $t('market.my_orders') }}</span>
+          <div style="display:flex;gap:0.5rem;align-items:center;">
+            <button @click="orderFilterMode='all'" :class="{ active: orderFilterMode === 'all' }" class="filter-btn">{{ $t('market.show_all') }}</button>
+            <button @click="orderFilterMode='current'" :class="{ active: orderFilterMode === 'current' }" class="filter-btn">{{ $t('market.current_product') }}</button>
+            <label style="display:flex;align-items:center;gap:0.25rem;margin-left:0.5rem;color:#848e9c;font-size:0.85rem;">
+              <input type="checkbox" v-model="hideCancelled" />
+              <span style="font-size:0.85rem;">{{ $t('market.hide_cancelled') }}</span>
+            </label>
+          </div>
+        </div>
         <div class="orders-grid">
           <span>{{ $t('market.time') }}</span>
           <span>{{ $t('market.side') }}</span>
           <span>{{ $t('market.price') }}</span>
           <span>{{ $t('market.amount') }}</span>
           <span>{{ $t('market.status') }}</span>
+          <span class="text-end">{{ $t('market.actions') }}</span>
         </div>
         <div class="orders-list">
-          <div v-if="!myOrders.length" class="no-data">{{ $t('market.no_orders') }}</div>
-          <div v-for="o in myOrders" :key="o.id" class="row order-row">
+          <div v-if="!displayedOrders.length" class="no-data">{{ $t('market.no_orders') }}</div>
+          <div v-for="o in displayedOrders" :key="o.id" class="row order-row">
             <span>{{ formatTime(o.created_at) }}</span>
             <span :class="o.side === 'buy' ? 'buy-text' : 'sell-text'">{{ $t(`market.${o.side}`) }}</span>
             <span>{{ o.price }}</span>
             <span>{{ o.filled_quantity }} / {{ o.quantity }}</span>
             <span :class="'status-' + o.status">{{ $t(`market.${o.status}`) }}</span>
+            <span class="order-actions">
+              <button v-if="(o.status === 'open' || o.status === 'partial')" @click="cancelOrder(o.id)" class="icon-btn" :title="$t('market.cancel')">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path></svg>
+              </button>
+            </span>
           </div>
         </div>
       </div>
@@ -150,7 +167,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, inject } from 'vue';
+import { ref, computed, onMounted, onUnmounted, inject, watch } from 'vue';
 import axios from 'axios';
 import { Chart, registerables } from 'chart.js';
 Chart.register(...registerables);
@@ -204,6 +221,51 @@ const canAfford = computed(() => {
   } else {
     return userInventory.value >= form.value.quantity;
   }
+});
+
+// Order filters
+const orderFilterMode = ref('all'); // 'all' | 'current'
+// hideCancelled: when true, cancelled orders are hidden. Default: false (do not hide)
+const hideCancelled = ref(false);
+
+// Persist filter prefs
+onMounted(() => {
+  try {
+    const savedMode = localStorage.getItem('market.orderFilterMode');
+    // Support previous key 'market.showCancelled' (legacy) by migrating it to new hideCancelled semantics.
+    const savedHideCancelled = localStorage.getItem('market.hideCancelled');
+    const legacyShowCancelled = localStorage.getItem('market.showCancelled');
+    if (savedMode) orderFilterMode.value = savedMode;
+    if (savedHideCancelled !== null) {
+      hideCancelled.value = savedHideCancelled === 'true';
+    } else if (legacyShowCancelled !== null) {
+      // legacy: showCancelled (true = show cancelled). Convert to hideCancelled = !showCancelled
+      const legacy = legacyShowCancelled === 'true';
+      hideCancelled.value = !legacy;
+      try { localStorage.setItem('market.hideCancelled', String(hideCancelled.value)); } catch (e) {}
+    }
+  } catch (e) { /* ignore localStorage errors */ }
+});
+watch(orderFilterMode, (v) => { try { localStorage.setItem('market.orderFilterMode', v); } catch (e) {} });
+watch(hideCancelled, (v) => { try { localStorage.setItem('market.hideCancelled', String(v)); } catch (e) {} });
+
+// Helpers for global UI events (toaster / confirm)
+function showToast(message, type = 'info') {
+  try { window.dispatchEvent(new CustomEvent('show-toast', { detail: { message, type } })); } catch (e) { console.log('toast', message); }
+}
+function showConfirm(message, onConfirm, onCancel) {
+  try { window.dispatchEvent(new CustomEvent('show-confirm-dialog', { detail: { message, onConfirm, onCancel } })); } catch (e) { if (confirm(message)) onConfirm(); else onCancel && onCancel(); }
+}
+
+const displayedOrders = computed(() => {
+  let list = Array.isArray(myOrders.value) ? myOrders.value.slice() : [];
+  if (orderFilterMode.value === 'current' && selectedToolType.value) {
+    list = list.filter(o => Number(o.tool_type_id) === Number(selectedToolType.value));
+  }
+  if (hideCancelled.value) {
+    list = list.filter(o => o.status !== 'cancelled');
+  }
+  return list;
 });
 
 const spread = computed(() => {
@@ -266,8 +328,10 @@ async function loadMarket() {
       buildChart();
     }
     if (mo.data?.success) {
-      // Filter orders for selected tool type
-      myOrders.value = mo.data.orders.filter(o => o.tool_type_id === selectedToolType.value);
+      // Show all user orders (including cancelled) so users can see history for
+      // products that may be excluded from the market selector. If desired,
+      // frontend can provide filtering by product separately.
+      myOrders.value = mo.data.orders; // keep server-provided order list intact
     }
     if (user.data?.balance !== undefined) {
       userBalance.value = Number(user.data.balance);
@@ -359,20 +423,20 @@ async function submitOrder() {
   // Check if can afford
   if (!canAfford.value) {
     if (form.value.side === 'buy') {
-      alert(`Insufficient funds. You need ${price * quantity}$ but have only ${userBalance.value}$`);
+      showToast(`${$t('market.insufficient_funds') || 'Insufficient funds. You need'} ${price * quantity}$`, 'error');
     } else {
-      alert(`Insufficient items. You need ${quantity} items but have only ${userInventory.value}`);
+      showToast(`${$t('market.insufficient_items') || 'Insufficient items. You need'} ${quantity}`, 'error');
     }
     return;
   }
   
   // Check price limits
   if (form.value.side === 'buy' && bestAsk.value > 0 && price > bestAsk.value) {
-    alert(`Buy price cannot exceed best ask price (${bestAsk.value})`);
+    showToast($t('market.buy_price_exceeds') || `Buy price cannot exceed best ask price (${bestAsk.value})`, 'error');
     return;
   }
   if (form.value.side === 'sell' && bestBid.value > 0 && price < bestBid.value) {
-    alert(`Sell price cannot be lower than best bid price (${bestBid.value})`);
+    showToast($t('market.sell_price_below') || `Sell price cannot be lower than best bid price (${bestBid.value})`, 'error');
     return;
   }
   
@@ -385,16 +449,37 @@ async function submitOrder() {
     };
     const res = await axios.post('/api/market/orders', payload);
     if (res.data?.success) {
-      alert('Order placed successfully!');
+      showToast($t('market.order_placed') || 'Order placed successfully!', 'success');
       loadMarket();
     } else {
-      alert(res.data.message || 'Order failed');
+      showToast(res.data.message || ($t('market.order_failed') || 'Order failed'), 'error');
     }
   } catch (e) {
     console.error(e);
-    const errorMsg = e.response?.data?.message || 'Order failed';
-    alert(errorMsg);
+    const errorMsg = e.response?.data?.message || ($t('market.order_failed') || 'Order failed');
+    showToast(errorMsg, 'error');
   }
+}
+
+async function cancelOrder(orderId) {
+  // Use global confirm dialog (GameApp.vue listens for this)
+  showConfirm($t('market.confirm_cancel') || 'Are you sure you want to cancel this order?', async () => {
+    try {
+      const res = await axios.post(`/api/market/orders/${orderId}/cancel`);
+      if (res.data?.success) {
+        showToast($t('market.order_cancelled') || 'Order cancelled', 'success');
+        loadMarket();
+      } else {
+        showToast(res.data.message || ($t('market.cancel_failed') || 'Cancel failed'), 'error');
+      }
+    } catch (e) {
+      console.error(e);
+      const msg = e.response?.data?.message || ($t('market.cancel_failed') || 'Cancel failed');
+      showToast(msg, 'error');
+    }
+  }, () => {
+    /* cancelled */
+  });
 }
 
 function formatTime(datetime) {
@@ -433,6 +518,15 @@ onUnmounted(() => { if (chartInstance) chartInstance.destroy(); });
 .tf-btn { padding: 0.25rem 0.5rem; background: #0b0e11; border: 1px solid #2b3139; border-radius: 3px; color: #848e9c; font-size: 0.75rem; cursor: pointer; transition: all 0.2s; }
 .tf-btn:hover { background: #1e2329; border-color: #26a69a; }
 .tf-btn.active { background: #26a69a; border-color: #26a69a; color: #fff; }
+/* order filter buttons styling */
+.filter-btn { padding: 0.25rem 0.5rem; background: #0b0e11; border: 1px solid #2b3139; border-radius: 4px; color: #848e9c; font-size: 0.8rem; cursor: pointer; }
+.filter-btn.active { background: #26a69a; border-color: #26a69a; color: #fff; }
+
+/* small icon button for order actions */
+.icon-btn { background: transparent; border: 1px solid transparent; color: #f6465d; padding: 0.25rem; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.icon-btn svg { display: block; }
+.icon-btn:hover { background: rgba(246,70,93,0.08); border-color: rgba(246,70,93,0.15); }
+.order-actions { display: flex; justify-content: flex-end; }
 .chart-panel { grid-column: 1; grid-row: 1; }
 .book-panel { grid-column: 2; grid-row: 1 / 3; }
 .form-panel { grid-column: 1; grid-row: 2; }
@@ -467,9 +561,10 @@ onUnmounted(() => { if (chartInstance) chartInstance.destroy(); });
 .sell-btn { background: #f6465d; color: #fff; }
 .trades-list { max-height: 300px; overflow-y: auto; overflow-x: hidden; }
 .load-btn { width: calc(100% - 2rem); margin: 1rem; padding: 0.75rem; background: #1e2329; border: 1px solid #2b3139; border-radius: 4px; color: #d1d4dc; font-weight: 600; cursor: pointer; }
-.orders-grid { display: grid; grid-template-columns: 1fr 0.7fr 0.8fr 1fr 0.8fr; padding: 0.5rem 1rem; font-size: 0.75rem; color: #848e9c; text-transform: uppercase; border-bottom: 1px solid #2b3139; }
+.orders-grid { display: grid; grid-template-columns: 1fr 0.7fr 0.8fr 1fr 0.8fr 0.6fr; padding: 0.5rem 1rem; font-size: 0.75rem; color: #848e9c; text-transform: uppercase; border-bottom: 1px solid #2b3139; }
 .orders-list { max-height: 300px; overflow-y: auto; overflow-x: hidden; }
-.order-row { grid-template-columns: 1fr 0.7fr 0.8fr 1fr 0.8fr; }
+.order-row { grid-template-columns: 1fr 0.7fr 0.8fr 1fr 0.8fr 0.6fr; }
+.order-actions { display:flex; justify-content:center; }
 .buy-text { color: #0ecb81; font-weight: 600; }
 .sell-text { color: #f6465d; font-weight: 600; }
 .status-open { color: #26a69a; }

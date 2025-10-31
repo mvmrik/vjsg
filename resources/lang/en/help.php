@@ -112,6 +112,8 @@ return [
                 . '<li><strong>Costs and ROI:</strong> Consider the return on investment for buildings (production vs cost and build time).</li>'
                 . '<li><strong>Player Market:</strong> A new Market page lets you place limit buy and sell orders for tools and products. Orders are matched in periodic batches (every 10 minutes) to ensure fair matching and to reduce server load. When you place an order the required funds or items are reserved; that reservation is released if the order is cancelled or consumed when a trade executes. Trades use integer prices and small taker fees — check the Market UI for current fees and your reserved balances.</li>'
                 . '</ul>'
+
+                . '<p><strong>Market UI notes:</strong> The Market orders table includes a dedicated "Actions" column (trash icon) for cancelling orders. Use the small cancel icon to remove open orders. The "Hide cancelled" checkbox on the Market page is persisted in your browser so your preference is preserved between visits.</p>'
         ],
         'accounts_security' => [
             'title' => 'Accounts & Security',

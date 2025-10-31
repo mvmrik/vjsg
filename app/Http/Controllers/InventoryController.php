@@ -23,6 +23,7 @@ class InventoryController extends Controller
                 'inventories.id',
                 'inventories.tool_type_id',
                 'inventories.count',
+                'inventories.reserved_count',
                 'inventories.temp_count',
                 'tool_types.name as tool_name',
                 'tool_types.icon as tool_icon',
