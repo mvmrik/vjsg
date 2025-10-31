@@ -24,6 +24,8 @@ Route::post('/market/orders', [MarketController::class, 'order']);
 Route::get('/market/{toolType}/orderbook', [MarketController::class, 'orderbook']);
 Route::get('/market/{toolType}/trades', [MarketController::class, 'trades']);
 Route::get('/market/orders', [MarketController::class, 'userOrders']);
+Route::get('/user/balance', [MarketController::class, 'getUserBalance']);
+Route::get('/user/inventory/{toolTypeId}', [MarketController::class, 'getUserInventory']);
 
 use App\Http\Controllers\GameController;
 

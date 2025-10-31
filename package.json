@@ -20,6 +20,7 @@
         "@coreui/vue": "^5.7.0",
         "@vitejs/plugin-vue": "^6.0.1",
         "bootstrap": "^5.3.8",
+        "chart.js": "^4.5.1",
         "flag-icons": "^7.5.0",
         "leaflet": "^1.9.4",
         "pinia": "^3.0.3",

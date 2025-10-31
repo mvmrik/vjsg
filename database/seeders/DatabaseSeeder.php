@@ -34,5 +34,17 @@ class DatabaseSeeder extends Seeder
                 ]);
             }
         }
+
+            // Seed tool types and market demo data
+            if (\Schema::hasTable('tool_types')) {
+                $this->call(ToolSeeder::class);
+            }
+            if (\Schema::hasTable('market_orders')) {
+                $this->call(MarketSeeder::class);
+            }
+            if (\Schema::hasTable('market_trades')) {
+                // Add simulated history only when requested (safe default for local/dev)
+                $this->call(MarketHistorySeeder::class);
+            }
     }
 }

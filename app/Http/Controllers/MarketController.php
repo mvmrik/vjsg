@@ -33,7 +33,7 @@ class MarketController extends Controller
                 $available = intval($user->balance) - intval($user->reserved_balance ?? 0);
                 if ($available < $cost) {
                     DB::rollBack();
-                    return response()->json(['success' => false, 'message' => 'Insufficient funds'], 400);
+                    return response()->json(['success' => false, 'message' => "Insufficient funds. Available: $available, need: $cost"], 400);
                 }
                 DB::table('users')->where('id', $userId)->increment('reserved_balance', $cost);
             } else {
@@ -42,7 +42,8 @@ class MarketController extends Controller
                 $have = $inv ? intval($inv->count) - intval($inv->reserved_count) : 0;
                 if ($have < $quantity) {
                     DB::rollBack();
-                    return response()->json(['success' => false, 'message' => 'Insufficient items to sell'], 400);
+                    $toolTypeName = DB::table('tool_types')->where('id', $toolTypeId)->value('name') ?? 'items';
+                    return response()->json(['success' => false, 'message' => "Insufficient $toolTypeName to sell. You have: $have, need: $quantity"], 400);
                 }
                 DB::table('inventories')->where('user_id', $userId)->where('tool_type_id', $toolTypeId)->increment('reserved_count', $quantity);
             }
@@ -91,5 +92,28 @@ class MarketController extends Controller
 
         $orders = MarketOrder::where('user_id', $userId)->orderBy('created_at','desc')->limit(200)->get();
         return response()->json(['success' => true, 'orders' => $orders]);
+    }
+
+    public function getUserBalance(Request $request)
+    {
+        $userId = $request->session()->get('user_id') ?: auth()->id();
+        if (!$userId) return response()->json(['success' => false, 'message' => 'Not authenticated'], 401);
+
+        $user = DB::table('users')->where('id', $userId)->first();
+        if (!$user) return response()->json(['success' => false], 404);
+
+        $available = intval($user->balance) - intval($user->reserved_balance ?? 0);
+        return response()->json(['balance' => $available]);
+    }
+
+    public function getUserInventory(Request $request, $toolTypeId)
+    {
+        $userId = $request->session()->get('user_id') ?: auth()->id();
+        if (!$userId) return response()->json(['success' => false, 'message' => 'Not authenticated'], 401);
+
+        $inv = DB::table('inventories')->where('user_id', $userId)->where('tool_type_id', $toolTypeId)->first();
+        $available = $inv ? intval($inv->count) - intval($inv->reserved_count ?? 0) : 0;
+        
+        return response()->json(['count' => $available]);
     }
 }

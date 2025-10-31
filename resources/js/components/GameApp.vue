@@ -43,6 +43,18 @@
               </a>
               <a
                 v-if="isLoggedIn"
+                @click="$router.push('/market')"
+                :class="[
+                  'text-decoration-none d-flex flex-column align-items-center p-2 rounded',
+                  currentRoute === '/market' ? 'bg-light text-dark' : 'text-white',
+                ]"
+                style="cursor: pointer"
+              >
+                <c-icon name="cilChartLine" size="xl" class="mb-1" />
+                <small>{{ $t("menu.market") }}</small>
+              </a>
+              <a
+                v-if="isLoggedIn"
                 @click="$router.push('/event')"
                 :class="[
                   'text-decoration-none d-flex flex-column align-items-center p-2 rounded',
