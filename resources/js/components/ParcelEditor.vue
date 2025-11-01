@@ -165,10 +165,10 @@
               <div class="small fw-bold mb-1">{{ $t('city.required_materials') }}:</div>
               <div v-for="(qty, tid) in objType.recipe" :key="tid" class="material-item">
                 <span class="material-name">{{ toolTypes[tid] ? translateToolName(toolTypes[tid].name) : ('ID:' + tid) }}</span>
-                <span class="material-count" :class="{ 'text-danger': (inventories[tid]?.count || 0) < qty }">
+                <span class="material-count" :class="{ 'text-danger': ((inventories[tid]?.count || 0) - (inventories[tid]?.reserved_count || 0)) < qty }">
                   <span class="needed">{{ qty }}</span>
                   <span class="separator">/</span>
-                  <span class="available">{{ inventories[tid]?.count || 0 }}</span>
+                  <span class="available">{{ Math.max(0, (inventories[tid]?.count || 0) - (inventories[tid]?.reserved_count || 0)) }}</span>
                 </span>
               </div>
             </div>
@@ -269,8 +269,8 @@
               <div class="fw-bold mb-1">{{ $t('city.required_materials') }}:</div>
               <div v-for="(qty, tid) in objType.recipe" :key="tid" class="d-flex justify-content-between">
                 <span class="text-truncate me-2">{{ toolTypes[tid] ? translateToolName(toolTypes[tid].name) : ('ID:' + tid) }}</span>
-                <span :class="{ 'text-danger fw-bold': (inventories[tid]?.count || 0) < qty, 'text-success': (inventories[tid]?.count || 0) >= qty }">
-                  {{ qty }}/{{ inventories[tid]?.count || 0 }}
+                <span :class="{ 'text-danger fw-bold': ((inventories[tid]?.count || 0) - (inventories[tid]?.reserved_count || 0)) < qty, 'text-success': ((inventories[tid]?.count || 0) - (inventories[tid]?.reserved_count || 0)) >= qty }">
+                  {{ qty }}/{{ Math.max(0, (inventories[tid]?.count || 0) - (inventories[tid]?.reserved_count || 0)) }}
                 </span>
               </div>
             </div>
@@ -751,7 +751,8 @@ export default {
     const canAfford = (objType) => {
       if (!objType || !objType.recipe) return true;
       for (const [toolTypeId, qty] of Object.entries(objType.recipe)) {
-        const available = inventories.value[toolTypeId]?.count || 0;
+        const inv = inventories.value[toolTypeId];
+        const available = inv ? Math.max(0, (parseInt(inv.count) || 0) - (parseInt(inv.reserved_count) || 0)) : 0;
         if (available < qty) return false;
       }
       return true;
