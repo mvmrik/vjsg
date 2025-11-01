@@ -195,6 +195,14 @@
           <div v-if="upgradeWorkerLevel && upgradeWorkerCount" class="alert alert-info">
             <strong>{{ $t("city.upgrade_time") }}:</strong> {{ formatBuildTime(upgradeTimeMinutes) }}
           </div>
+          <div v-if="upgradeRequirements.length > 0" class="mb-3">
+            <label class="form-label small mb-1">{{ tr('city.required_materials','Required materials') }}</label>
+            <ul class="list-unstyled small">
+              <li v-for="r in upgradeRequirements" :key="r.tool_type_id">
+                {{ r.required }} / {{ r.available }} - {{ r.name || ('tool_type:' + r.tool_type_id) }}
+              </li>
+            </ul>
+          </div>
         </div>
         <div class="modal-footer">
           <button
@@ -208,7 +216,7 @@
             type="button"
             class="btn btn-primary"
             :disabled="
-              !upgradeWorkerLevel || !upgradeWorkerCount || upgradeWorkerCount <= 0
+              !upgradeWorkerLevel || !upgradeWorkerCount || upgradeWorkerCount <= 0 || !hasEnoughMaterialsForUpgrade
             "
             @click="startUpgrade"
           >
@@ -687,12 +695,76 @@ export default {
       upgradeWorkerLevel.value = availableLevels.length > 0 ? availableLevels[0][0] : null;
       // default slider to 0 — require user to explicitly pick workers
       upgradeWorkerCount.value = 0;
+      // Load inventories so we can show required vs available materials
+      try {
+        const inv = await axios.get('/api/inventories');
+        inventories.value = (inv.data.items || []).reduce((acc, it) => {
+          acc[it.tool_type_id] = it;
+          return acc;
+        }, {});
+      } catch (e) {
+        inventories.value = {};
+      }
+
+      // Load tool types so we can show translated resource names
+      try {
+        const res = await axios.get('/api/tool-types');
+        if (res.data && res.data.success && Array.isArray(res.data.tool_types)) {
+          // map by id
+          const map = {};
+          res.data.tool_types.forEach((t) => { map[t.id] = t; });
+          toolTypesMap.value = map;
+        } else if (Array.isArray(res.data)) {
+          const map = {};
+          res.data.forEach((t) => { map[t.id] = t; });
+          toolTypesMap.value = map;
+        }
+      } catch (e) {
+        toolTypesMap.value = {};
+      }
+
       showUpgradeModal.value = true;
     };
 
     const onUpgradeWorkerLevelChange = () => {
       upgradeWorkerCount.value = 0;
     };
+
+    const toolTypesMap = ref({});
+
+    const translateToolName = (name) => {
+      try {
+        const translated = $t ? $t(`tools.types.${name}`) : name;
+        if (!translated || translated === `tools.types.${name}`) return name;
+        return translated;
+      } catch (e) {
+        return name;
+      }
+    };
+
+    const upgradeRequirements = computed(() => {
+      try {
+        const ot = availableObjects.value.find((o) => o.type === object.value?.object_type);
+        const recipe = ot?.recipe || null;
+        if (!recipe || typeof recipe !== 'object') return [];
+        const mult = (object.value?.level ? Number(object.value.level) : 0) + 1;
+        return Object.entries(recipe).map(([toolTypeId, qty]) => {
+          const required = Math.max(0, Number(qty) * Number(mult));
+          const available = inventories.value[toolTypeId] ? parseInt(inventories.value[toolTypeId].count || 0) : 0;
+          const tt = toolTypesMap.value && toolTypesMap.value[toolTypeId] ? toolTypesMap.value[toolTypeId] : null;
+          const name = tt ? translateToolName(tt.name) : null;
+          return { tool_type_id: Number(toolTypeId), required, available, name };
+        });
+      } catch (e) {
+        return [];
+      }
+    });
+
+    const hasEnoughMaterialsForUpgrade = computed(() => {
+      const list = upgradeRequirements.value || [];
+      if (!list || list.length === 0) return true;
+      return list.every((r) => (r.available || 0) >= (r.required || 0));
+    });
 
     const openProduceModal = async () => {
       // Select first available level with workers > 0
@@ -1047,7 +1119,9 @@ export default {
   tr,
   // Upgrade
   openUpgradeModal,
-  onUpgradeWorkerLevelChange,
+      onUpgradeWorkerLevelChange,
+      upgradeRequirements,
+      hasEnoughMaterialsForUpgrade,
   objectHasProduction,
   openProduceModal,
   calculateProductionPreview,

@@ -103,56 +103,86 @@
         <c-modal-title>{{ $t('city.select_object_type') }}</c-modal-title>
       </c-modal-header>
       <c-modal-body>
-        <div class="mb-3 d-flex gap-2">
-          <div style="flex:1">
-            <label class="form-label small mb-1">{{ $t('city.worker_level') }}</label>
-            <select class="form-select" v-model="selectedWorkerLevel" @change="onSelectedWorkerLevelChange">
-              <option :value="null">{{ $t('city.no_workers') }}</option>
-              <option v-for="(count, lvl) in people.by_level" :key="lvl" :value="lvl">LV {{ lvl }} ({{ count }})</option>
-            </select>
+        <!-- Workers selection -->
+        <div class="mb-4">
+          <h6 class="mb-3">{{ $t('city.workers') }}</h6>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label small">{{ $t('city.worker_level') }}</label>
+              <select class="form-select" v-model="selectedWorkerLevel" @change="onSelectedWorkerLevelChange">
+                <option :value="null">{{ $t('city.no_workers') }}</option>
+                <option v-for="(count, lvl) in people.by_level" :key="lvl" :value="lvl">LV {{ lvl }} ({{ count }} {{ $t('city.available') }})</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small">{{ $t('city.worker_count') }}</label>
+              <div class="d-flex align-items-center gap-2">
+                <input
+                  type="range"
+                  :min="0"
+                  :max="availableCountForLevel(selectedWorkerLevel)"
+                  v-model.number="selectedWorkerCount"
+                  class="form-range flex-grow-1"
+                />
+                <span class="badge bg-primary">{{ selectedWorkerCount }}</span>
+              </div>
+            </div>
           </div>
         </div>
 
-        <!-- Worker count slider (full-width) -->
-        <div class="mb-3">
-          <label class="form-label small mb-1">{{ $t('city.worker_count') }}</label>
-          <div class="d-flex align-items-center gap-3">
-            <input
-              type="range"
-              :min="0"
-              :max="availableCountForLevel(selectedWorkerLevel)"
-              v-model.number="selectedWorkerCount"
-              class="form-range"
-            />
-            <div class="fw-bold">{{ selectedWorkerCount }}</div>
-          </div>
-          <div class="small text-muted">{{ tr('city.available','Available') }}: {{ availableCountForLevel(selectedWorkerLevel) }}</div>
-        </div>
-
-        <div class="object-palette d-flex flex-column">
+        <!-- Object selection -->
+        <h6 class="mb-3">{{ $t('city.select_object_type') }}</h6>
+        <div class="object-grid-selection">
           <div
             v-for="objType in availableObjects"
-            :key="objType.type + '-' + selectedWorkerLevel + '-' + selectedWorkerCount"
-            class="palette-object p-2 d-flex justify-content-between align-items-center"
-            :class="{ selected: modalSelectedObjectType?.type === objType.type }"
-            style="cursor: pointer;"
+            :key="objType.type"
+            class="object-card"
+            :class="{ 
+              'selected': modalSelectedObjectType?.type === objType.type,
+              'insufficient': !canAfford(objType)
+            }"
             @click="modalSelectedObjectType = objType"
           >
-              <div class="d-flex align-items-center">
-              <template v-if="isImageFilename(objType.icon)">
-                <img :src="`/images/objects/${encodeURIComponent(objType.icon)}`" class="me-2 object-palette-image" alt="obj" @error="(e)=>{ e.target.style.display='none' }" />
-              </template>
-              <template v-else>
-                <c-icon :name="objType.icon" class="me-2" />
-              </template>
-              <div>{{ translateObjectLabel(objType.type, objType.name) }}</div>
-            </div>
-            <div class="d-flex align-items-center gap-2">
-                <div class="d-flex flex-column align-items-end">
-                <div class="text-muted small">{{ formatBuildTime(objType.build_time_minutes) }}</div>
-                <div class="text-success small fw-bold">{{ formatBuildTime(displayedTimes[objType.type] || objType.build_time_minutes) }}</div>
+            <div class="object-card-header">
+              <div class="d-flex align-items-center gap-2">
+                <template v-if="isImageFilename(objType.icon)">
+                  <img :src="`/images/objects/${encodeURIComponent(objType.icon)}`" class="object-icon" alt="obj" @error="(e)=>{ e.target.style.display='none' }" />
+                </template>
+                <template v-else>
+                  <c-icon :name="objType.icon" size="xl" />
+                </template>
+                <div>
+                  <div class="fw-bold">{{ translateObjectLabel(objType.type, objType.name) }}</div>
+                  <div class="text-muted small">
+                    <c-icon name="cilClock" size="sm" /> {{ formatBuildTime(displayedTimes[objType.type] || objType.build_time_minutes) }}
+                  </div>
+                </div>
               </div>
-              <c-icon v-if="modalSelectedObjectType?.type === objType.type" name="cilCheck" class="text-primary" />
+              <c-icon v-if="modalSelectedObjectType?.type === objType.type" name="cilCheckCircle" class="text-success" size="xl" />
+            </div>
+            
+            <div v-if="objType.recipe" class="object-card-materials mt-2">
+              <div class="small fw-bold mb-1">{{ $t('city.required_materials') }}:</div>
+              <div v-for="(qty, tid) in objType.recipe" :key="tid" class="material-item">
+                <span class="material-name">{{ toolTypes[tid] ? translateToolName(toolTypes[tid].name) : ('ID:' + tid) }}</span>
+                <span class="material-count" :class="{ 'text-danger': (inventories[tid]?.count || 0) < qty }">
+                  <span class="needed">{{ qty }}</span>
+                  <span class="separator">/</span>
+                  <span class="available">{{ inventories[tid]?.count || 0 }}</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Selected object summary -->
+        <div v-if="modalSelectedObjectType" class="alert alert-info mt-3">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <strong>{{ translateObjectLabel(modalSelectedObjectType.type, modalSelectedObjectType.name) }}</strong>
+              <span v-if="!canAfford(modalSelectedObjectType)" class="text-danger ms-2">
+                <c-icon name="cilWarning" /> {{ $t('city.insufficient_materials') }}
+              </span>
             </div>
           </div>
         </div>
@@ -161,7 +191,7 @@
         <c-button color="secondary" @click="(modalSelectedObjectType = null, showObjectModal = false)">{{ $t('city.cancel') }}</c-button>
         <c-button 
           color="primary" 
-          :disabled="!modalSelectedObjectType || !selectedWorkerLevel || selectedWorkerCount === 0" 
+          :disabled="!canStartBuild" 
           @click="confirmModalPlacement"
         >
           {{ $t('city.confirm') }}
@@ -172,70 +202,100 @@
     <!-- Fallback modal (simple overlay) -->
     <div v-if="showObjectModal && useFallbackModal" class="fallback-backdrop" @click.self="(modalSelectedObjectType = null, showObjectModal = false)">
       <div class="fallback-modal">
-        <h5>{{ $t('city.select_object_type') }}</h5>
-        <div class="mb-3 d-flex gap-2">
-          <div style="flex:1">
-            <label class="form-label small mb-1">{{ $t('city.worker_level') }}</label>
-            <select class="form-select" v-model="selectedWorkerLevel" @change="onSelectedWorkerLevelChange">
-              <option :value="null">{{ $t('city.no_workers') }}</option>
-              <option v-for="(count, lvl) in people.by_level" :key="lvl + '-fb'" :value="lvl">LV {{ lvl }} ({{ count }})</option>
-            </select>
+        <div class="modal-header-custom mb-3">
+          <h5 class="mb-0">{{ $t('city.select_object_type') }}</h5>
+          <button class="btn-close" @click="(modalSelectedObjectType = null, showObjectModal = false)"></button>
+        </div>
+
+        <!-- Workers selection -->
+        <div class="mb-4">
+          <h6 class="mb-2 small fw-bold text-uppercase">{{ $t('city.workers') }}</h6>
+          <div class="row g-2">
+            <div class="col-6">
+              <label class="form-label small mb-1">{{ $t('city.worker_level') }}</label>
+              <select class="form-select form-select-sm" v-model="selectedWorkerLevel" @change="onSelectedWorkerLevelChange">
+                <option :value="null">{{ $t('city.no_workers') }}</option>
+                <option v-for="(count, lvl) in people.by_level" :key="lvl + '-fb'" :value="lvl">
+                  LV {{ lvl }} ({{ count }} {{ $t('city.available') }})
+                </option>
+              </select>
+            </div>
+            <div class="col-6">
+              <label class="form-label small mb-1">{{ $t('city.worker_count') }}</label>
+              <div class="d-flex align-items-center gap-2">
+                <input
+                  type="range"
+                  :min="0"
+                  :max="availableCountForLevel(selectedWorkerLevel)"
+                  v-model.number="selectedWorkerCount"
+                  class="form-range flex-grow-1"
+                />
+                <span class="badge bg-primary">{{ selectedWorkerCount }}</span>
+              </div>
+            </div>
           </div>
         </div>
 
-        <!-- Fallback: worker count slider -->
-        <div class="mb-3">
-          <label class="form-label small mb-1">{{ $t('city.worker_count') }}</label>
-          <div class="d-flex align-items-center gap-3">
-            <input
-              type="range"
-              :min="0"
-              :max="availableCountForLevel(selectedWorkerLevel)"
-              v-model.number="selectedWorkerCount"
-              class="form-range"
-            />
-            <div class="fw-bold">{{ selectedWorkerCount }}</div>
-          </div>
-          <div class="small text-muted">{{ tr('city.available','Available') }}: {{ availableCountForLevel(selectedWorkerLevel) }}</div>
-        </div>
-
-        <div class="object-palette d-flex flex-column mt-2">
+        <!-- Object selection -->
+        <h6 class="mb-2 small fw-bold text-uppercase">{{ $t('city.select_object_type') }}</h6>
+        <div class="fallback-object-grid">
           <div
             v-for="objType in availableObjects"
-            :key="objType.type + '-fb-' + selectedWorkerLevel + '-' + selectedWorkerCount"
-            class="palette-object p-2 d-flex justify-content-between align-items-center"
-            :class="{ selected: modalSelectedObjectType?.type === objType.type }"
-            style="cursor: pointer;"
+            :key="objType.type + '-fb'"
+            class="fallback-object-card"
+            :class="{ 
+              'selected': modalSelectedObjectType?.type === objType.type,
+              'insufficient': !canAfford(objType)
+            }"
             @click="modalSelectedObjectType = objType"
           >
-              <div class="d-flex align-items-center">
+            <div class="d-flex align-items-start gap-2 mb-2">
               <template v-if="isImageFilename(objType.icon)">
-                <img :src="`/images/objects/${encodeURIComponent(objType.icon)}`" class="me-2 object-palette-image" alt="obj" @error="(e)=>{ e.target.style.display='none' }" />
+                <img :src="`/images/objects/${encodeURIComponent(objType.icon)}`" class="fallback-obj-icon" alt="obj" @error="(e)=>{ e.target.style.display='none' }" />
               </template>
               <template v-else>
-                <c-icon :name="objType.icon" class="me-2" />
+                <c-icon :name="objType.icon" size="lg" />
               </template>
-              <div>{{ translateObjectLabel(objType.type, objType.name) }}</div>
-            </div>
-            <div class="d-flex align-items-center gap-2">
-                <div class="d-flex flex-column align-items-end">
-                <div class="text-muted small">{{ formatBuildTime(objType.build_time_minutes) }}</div>
-                <div class="text-success small fw-bold">{{ formatBuildTime(displayedTimes[objType.type] || objType.build_time_minutes) }}</div>
+              <div class="flex-grow-1">
+                <div class="fw-bold small">{{ translateObjectLabel(objType.type, objType.name) }}</div>
+                <div class="text-muted" style="font-size: 0.75rem;">
+                  <c-icon name="cilClock" size="sm" /> {{ formatBuildTime(displayedTimes[objType.type] || objType.build_time_minutes) }}
+                </div>
               </div>
-              <c-icon v-if="modalSelectedObjectType?.type === objType.type" name="cilCheck" class="text-primary" />
+              <c-icon v-if="modalSelectedObjectType?.type === objType.type" name="cilCheckCircle" class="text-success" />
+            </div>
+            
+            <div v-if="objType.recipe" class="fallback-materials" style="font-size: 0.75rem;">
+              <div class="fw-bold mb-1">{{ $t('city.required_materials') }}:</div>
+              <div v-for="(qty, tid) in objType.recipe" :key="tid" class="d-flex justify-content-between">
+                <span class="text-truncate me-2">{{ toolTypes[tid] ? translateToolName(toolTypes[tid].name) : ('ID:' + tid) }}</span>
+                <span :class="{ 'text-danger fw-bold': (inventories[tid]?.count || 0) < qty, 'text-success': (inventories[tid]?.count || 0) >= qty }">
+                  {{ qty }}/{{ inventories[tid]?.count || 0 }}
+                </span>
+              </div>
             </div>
           </div>
         </div>
+
+        <!-- Selected summary -->
+        <div v-if="modalSelectedObjectType" class="alert alert-info mt-3 mb-0 py-2 small">
+          <strong>{{ translateObjectLabel(modalSelectedObjectType.type, modalSelectedObjectType.name) }}</strong>
+          <span v-if="!canAfford(modalSelectedObjectType)" class="text-danger ms-2">
+            <c-icon name="cilWarning" /> {{ $t('city.insufficient_materials') }}
+          </span>
+        </div>
+
         <div class="d-flex justify-content-end gap-2 mt-3">
-          <c-button color="secondary" size="sm" @click="(modalSelectedObjectType = null, showObjectModal = false)">{{ $t('city.cancel') }}</c-button>
-          <c-button 
-            color="primary" 
-            size="sm" 
-            :disabled="!modalSelectedObjectType || !selectedWorkerLevel || selectedWorkerCount === 0" 
+          <button class="btn btn-secondary btn-sm" @click="(modalSelectedObjectType = null, showObjectModal = false)">
+            {{ $t('city.cancel') }}
+          </button>
+          <button 
+            class="btn btn-primary btn-sm" 
+            :disabled="!modalSelectedObjectType || !selectedWorkerLevel || selectedWorkerCount === 0 || !canAfford(modalSelectedObjectType)"
             @click="confirmModalPlacement"
           >
             {{ $t('city.confirm') }}
-          </c-button>
+          </button>
         </div>
       </div>
     </div>
@@ -445,6 +505,31 @@ export default {
       // Open modal for building on this cell
       pendingSelectionBounds.value = { x: cellX, y: cellY };
       await Promise.all([fetchObjectTypes(), fetchPeople()]);
+      // Load inventories so we can display available counts next to required materials
+      try {
+        const inv = await axios.get('/api/inventories');
+        inventories.value = (inv.data.items || []).reduce((acc, it) => {
+          acc[it.tool_type_id] = it;
+          return acc;
+        }, {});
+      } catch (e) {
+        inventories.value = {};
+      }
+      // Load tool types to resolve ids -> names
+      try {
+        const res = await axios.get('/api/tool-types');
+        if (res.data && res.data.success && Array.isArray(res.data.tool_types)) {
+          toolTypes.value = res.data.tool_types.reduce((acc, t) => {
+            acc[t.id] = t;
+            return acc;
+          }, {});
+        } else if (res.data && Array.isArray(res.data)) {
+          // fallback: some endpoints return plain arrays
+          toolTypes.value = res.data.reduce((acc, t) => { acc[t.id] = t; return acc; }, {});
+        }
+      } catch (e) {
+        toolTypes.value = {};
+      }
       selectedWorkerLevel.value = null;
       selectedWorkerCount.value = 0;
       updateDisplayedTimes();
@@ -604,7 +689,8 @@ export default {
             name: t.name,
             icon: t.icon || 'cilQuestion',
             build_time_minutes: t.build_time_minutes || 1,
-            meta: t.meta || null
+            meta: t.meta || null,
+            recipe: t.recipe || null
           }));
         }
       } catch (e) {
@@ -648,6 +734,35 @@ export default {
 
     // Reactive current time for triggering re-renders
     const currentTime = ref(Date.now());
+  const inventories = ref({});
+    const toolTypes = ref({});
+
+    const translateToolName = (name) => {
+      try {
+        const translated = $t ? $t(`tools.types.${name}`) : name;
+        if (!translated || translated === `tools.types.${name}`) return name;
+        return translated;
+      } catch (e) {
+        return name;
+      }
+    };
+
+    // Check if user can afford the recipe materials
+    const canAfford = (objType) => {
+      if (!objType || !objType.recipe) return true;
+      for (const [toolTypeId, qty] of Object.entries(objType.recipe)) {
+        const available = inventories.value[toolTypeId]?.count || 0;
+        if (available < qty) return false;
+      }
+      return true;
+    };
+
+    // Check if user can start build
+    const canStartBuild = computed(() => {
+      if (!modalSelectedObjectType.value) return false;
+      if (!selectedWorkerLevel.value || selectedWorkerCount.value <= 0) return false;
+      return canAfford(modalSelectedObjectType.value);
+    });
 
     const getRemainingTimeText = (obj) => {
       const ready = getReadyTimestamp(obj);
@@ -731,6 +846,12 @@ export default {
       gridCellCount,
       tr,
       translateObjectLabel
+      ,
+      inventories,
+      toolTypes,
+      translateToolName,
+      canAfford,
+      canStartBuild
     };
   }
 }
@@ -861,6 +982,104 @@ export default {
   max-width: 500px;
 }
 
+/* Modern object selection grid */
+.object-grid-selection {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.object-card {
+  border: 2px solid #dee2e6;
+  border-radius: 8px;
+  padding: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: white;
+}
+
+.object-card:hover {
+  border-color: #0d6efd;
+  box-shadow: 0 2px 8px rgba(13, 110, 253, 0.2);
+  transform: translateY(-2px);
+}
+
+.object-card.selected {
+  border-color: #198754;
+  background: rgba(25, 135, 84, 0.05);
+  box-shadow: 0 2px 12px rgba(25, 135, 84, 0.3);
+}
+
+.object-card.insufficient {
+  border-color: #dc3545;
+  background: rgba(220, 53, 69, 0.05);
+  opacity: 0.75;
+}
+
+.object-card.insufficient .object-card-header {
+  opacity: 0.7;
+}
+
+.object-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.object-icon {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+
+.object-card-materials {
+  padding-top: 8px;
+  border-top: 1px solid #e9ecef;
+}
+
+.material-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  font-size: 0.875rem;
+}
+
+.material-name {
+  color: #495057;
+  flex: 1;
+}
+
+.material-count {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+  color: #198754;
+}
+
+.material-count.text-danger {
+  color: #dc3545 !important;
+}
+
+.material-count .needed {
+  color: #495057;
+}
+
+.material-count .separator {
+  color: #adb5bd;
+  font-weight: normal;
+}
+
+.material-count .available {
+  min-width: 30px;
+  text-align: right;
+}
+
 /* Mobile responsive */
 @media (max-width: 768px) {
   .parcel-editor-page {
@@ -883,6 +1102,10 @@ export default {
 
   .editor-palette {
     max-width: 100vw;
+  }
+
+  .object-grid-selection {
+    grid-template-columns: 1fr;
   }
 
   .object-palette {
@@ -913,11 +1136,82 @@ export default {
   justify-content: center;
   z-index: 2000;
 }
+
 .fallback-modal {
   background: white;
-  padding: 16px;
+  padding: 20px;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.modal-header-custom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.fallback-object-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 12px;
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.fallback-object-card {
+  border: 2px solid #dee2e6;
   border-radius: 6px;
-  width: 320px;
-  max-width: 90%;
+  padding: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: white;
+}
+
+.fallback-object-card:hover {
+  border-color: #0d6efd;
+  box-shadow: 0 2px 6px rgba(13, 110, 253, 0.2);
+  transform: translateY(-1px);
+}
+
+.fallback-object-card.selected {
+  border-color: #198754;
+  background: rgba(25, 135, 84, 0.05);
+  box-shadow: 0 2px 10px rgba(25, 135, 84, 0.3);
+}
+
+.fallback-object-card.insufficient {
+  border-color: #dc3545;
+  background: rgba(220, 53, 69, 0.03);
+  opacity: 0.75;
+}
+
+.fallback-obj-icon {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
+.fallback-materials {
+  padding-top: 8px;
+  border-top: 1px solid #e9ecef;
+  margin-top: 8px;
+}
+
+@media (max-width: 768px) {
+  .fallback-modal {
+    width: 95%;
+    padding: 15px;
+  }
+  
+  .fallback-object-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

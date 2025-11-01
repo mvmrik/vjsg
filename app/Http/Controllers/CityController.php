@@ -259,7 +259,46 @@ class CityController extends Controller
                     $createData['level'] = 1;
                 }
 
-                $created = CityObject::create($createData);
+                // If object type has a recipe (required materials), verify and consume them
+                $recipe = $type->recipe ?? null; // expected array: [tool_type_id => qty]
+                if ($recipe && is_array($recipe) && count($recipe) > 0) {
+                    // For a NEW building we use multiplier = 1 (user expectation)
+                    $multiplier = 1;
+                    // Start transaction to lock inventory rows while deducting
+                    DB::beginTransaction();
+                    try {
+                        foreach ($recipe as $toolTypeId => $qty) {
+                            $need = intval($qty) * intval($multiplier);
+                            if ($need <= 0) continue;
+                            $inv = \App\Models\Inventory::where('user_id', $userId)
+                                ->where('tool_type_id', intval($toolTypeId))
+                                ->lockForUpdate()
+                                ->first();
+
+                            $available = $inv ? intval($inv->count) : 0;
+                            if ($available < $need) {
+                                DB::rollBack();
+                                return response()->json([
+                                    'success' => false,
+                                    'message' => 'Insufficient materials: need ' . $need . ' of tool_type ' . $toolTypeId
+                                ], 400);
+                            }
+
+                            // Deduct
+                            $inv->count = $inv->count - $need;
+                            $inv->save();
+                        }
+                        // Create object after successful deduction
+                        $created = CityObject::create($createData);
+                        DB::commit();
+                    } catch (\Exception $e) {
+                        DB::rollBack();
+                        return response()->json(['success' => false, 'message' => 'Failed to allocate materials: ' . $e->getMessage()], 500);
+                    }
+                } else {
+                    $created = CityObject::create($createData);
+                }
+
                 $arr = $created->toArray();
                 $arr['ready_at'] = $readyAt * 1000; // Convert to milliseconds for frontend
                 $arr['build_seconds'] = $buildSeconds;
@@ -405,8 +444,37 @@ class CityController extends Controller
     $finalSeconds = \App\Models\CityObject::calculateBuildSeconds($baseSeconds, $object->level ?? 0, intval($workerLevel), intval($workerCount));
     $finalMinutes = intval(ceil($finalSeconds / 60));
 
+    // Handle required recipe materials for upgrade (if any)
+    $recipe = $objectType->recipe ?? null;
+    $multiplier = intval(($object->level ?? 0)) + 1; // next level multiplier
+
+    // Perform inventory checks and object update in a transaction
+    $db = DB::connection();
+    $db->beginTransaction();
+    try {
+        if ($recipe && is_array($recipe) && count($recipe) > 0) {
+            foreach ($recipe as $toolTypeId => $qty) {
+                $need = intval($qty) * $multiplier;
+                if ($need <= 0) continue;
+                $inv = \App\Models\Inventory::where('user_id', $userId)
+                    ->where('tool_type_id', intval($toolTypeId))
+                    ->lockForUpdate()
+                    ->first();
+
+                $available = $inv ? intval($inv->count) : 0;
+                if ($available < $need) {
+                    $db->rollBack();
+                    return response()->json(['success' => false, 'message' => 'Insufficient materials: need ' . $need . ' of tool_type ' . $toolTypeId], 400);
+                }
+
+                // Deduct
+                $inv->count = $inv->count - $need;
+                $inv->save();
+            }
+        }
+
         // Update object to increase level and set build time
-    $readyAt = time() + $finalSeconds; // UNIX timestamp
+        $readyAt = time() + $finalSeconds; // UNIX timestamp
         $object->level = ($object->level ?? 0) + 1;
         $object->build_seconds = $finalSeconds;
         $object->ready_at = $readyAt;
@@ -430,6 +498,8 @@ class CityController extends Controller
             'city_object_id' => $object->id
         ]);
 
+        $db->commit();
+
         return response()->json([
             'success' => true,
             'message' => 'Upgrade started successfully',
@@ -446,6 +516,10 @@ class CityController extends Controller
             ],
             'upgrade_time_minutes' => $finalMinutes
         ]);
+    } catch (\Exception $e) {
+        $db->rollBack();
+        return response()->json(['success' => false, 'message' => 'Failed to start upgrade: ' . $e->getMessage()], 500);
+    }
     }
 
     /**

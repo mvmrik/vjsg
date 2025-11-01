@@ -14,11 +14,13 @@ class ObjectType extends Model
         'name',
         'icon',
         'build_time_minutes',
-        'meta'
+        'meta',
+        'recipe'
     ];
 
     protected $casts = [
-        'meta' => 'array'
+        'meta' => 'array',
+        'recipe' => 'array'
     ];
 
     public function toolTypes()

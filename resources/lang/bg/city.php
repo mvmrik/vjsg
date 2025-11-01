@@ -47,6 +47,11 @@ return [
     'production_failed' => 'Производството се провали',
     'production_length_hours' => 'Продължителност на производството (часове)',
     'unknown' => 'Непознат',
+    'required_materials' => 'Нужни материали',
+    'available' => 'Налични',
+    'insufficient_materials' => 'Недостатъчни материали',
+    'you_have' => 'Имате',
+    'you_need' => 'Нужни са',
     // Object type names
     'factory' => 'Фабрика',
     'house' => 'Къща',

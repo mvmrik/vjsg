@@ -47,6 +47,11 @@ return [
     'production_failed' => 'Production failed',
     'production_length_hours' => 'Production length (hours)',
     'unknown' => 'Unknown',
+    'required_materials' => 'Required materials',
+    'available' => 'Available',
+    'insufficient_materials' => 'Insufficient materials',
+    'you_have' => 'You have',
+    'you_need' => 'You need',
     // Object type names
     'factory' => 'Factory',
     'house' => 'House',
