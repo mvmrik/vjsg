@@ -750,7 +750,8 @@ export default {
         const mult = (object.value?.level ? Number(object.value.level) : 0) + 1;
         return Object.entries(recipe).map(([toolTypeId, qty]) => {
           const required = Math.max(0, Number(qty) * Number(mult));
-          const available = inventories.value[toolTypeId] ? parseInt(inventories.value[toolTypeId].count || 0) : 0;
+          const inv = inventories.value[toolTypeId];
+          const available = inv ? Math.max(0, (parseInt(inv.count) || 0) - (parseInt(inv.reserved_count) || 0)) : 0;
           const tt = toolTypesMap.value && toolTypesMap.value[toolTypeId] ? toolTypesMap.value[toolTypeId] : null;
           const name = tt ? translateToolName(tt.name) : null;
           return { tool_type_id: Number(toolTypeId), required, available, name };
