@@ -21,7 +21,7 @@
             <c-card-body>
               <div v-if="loading" class="text-center">
                 <c-spinner />
-                <p>{{ $t('city.loading') }}</p>
+                <p>{{ $t("city.loading") }}</p>
               </div>
 
               <div v-else-if="object" class="object-editor-content">
@@ -34,7 +34,8 @@
                       class="object-grid-cell"
                       :class="{
                         'cell-empty': !getToolAt(Math.floor((i - 1) / 4), (i - 1) % 4),
-                        'move-target': moveMode && !getToolAt(Math.floor((i - 1) / 4), (i - 1) % 4),
+                        'move-target':
+                          moveMode && !getToolAt(Math.floor((i - 1) / 4), (i - 1) % 4),
                       }"
                       @click="handleCellClick(Math.floor((i - 1) / 4), (i - 1) % 4)"
                     >
@@ -43,33 +44,53 @@
                         v-if="getToolAt(Math.floor((i - 1) / 4), (i - 1) % 4)"
                         class="placed-tool"
                         @click="handleToolClick(Math.floor((i - 1) / 4), (i - 1) % 4)"
-                        @touchstart="handleToolTouch(Math.floor((i - 1) / 4), (i - 1) % 4)"
+                        @touchstart="
+                          handleToolTouch(Math.floor((i - 1) / 4), (i - 1) % 4)
+                        "
                       >
                         <img
                           class="tool-image"
-                          :src="`/images/tools/${getToolAt(Math.floor((i - 1) / 4), (i - 1) % 4)?.tool_type_icon || 'student_materials.png'}`"
+                          :src="`/images/tools/${
+                            getToolAt(Math.floor((i - 1) / 4), (i - 1) % 4)
+                              ?.tool_type_icon || 'student_materials.png'
+                          }`"
                           alt="Tool"
                         />
 
                         <!-- Show tool level badge (desktop only) -->
                         <div class="object-info-badge d-none d-md-flex level-badge">
-                          {{ $t('city.level') }} {{ getToolAt(Math.floor((i - 1) / 4), (i - 1) % 4)?.level || 1 }}
+                          {{ $t("city.level") }}
+                          {{
+                            getToolAt(Math.floor((i - 1) / 4), (i - 1) % 4)?.level || 1
+                          }}
                         </div>
 
                         <!-- Tool actions overlay -->
                         <div
-                          v-if="hoveredCell && hoveredCell.x === Math.floor((i - 1) / 4) && hoveredCell.y === (i - 1) % 4"
+                          v-if="
+                            hoveredCell &&
+                            hoveredCell.x === Math.floor((i - 1) / 4) &&
+                            hoveredCell.y === (i - 1) % 4
+                          "
                           class="tool-actions"
                         >
                           <div
-                            @click.stop="startMoveMode(getToolAt(Math.floor((i - 1) / 4), (i - 1) % 4))"
+                            @click.stop="
+                              startMoveMode(
+                                getToolAt(Math.floor((i - 1) / 4), (i - 1) % 4)
+                              )
+                            "
                             class="action-icon move-icon"
                             title="Премести tool"
                           >
                             <c-icon name="cil-move" size="xl" />
                           </div>
                           <div
-                            @click.stop="showToolInfo(getToolAt(Math.floor((i - 1) / 4), (i - 1) % 4))"
+                            @click.stop="
+                              showToolInfo(
+                                getToolAt(Math.floor((i - 1) / 4), (i - 1) % 4)
+                              )
+                            "
                             class="action-icon info-icon"
                             title="Информация за tool"
                           >
@@ -91,52 +112,74 @@
 
                 <!-- Object info -->
                 <div class="object-info mt-4">
-                  <h6>{{ $t('city.object_info') }}</h6>
+                  <h6>{{ $t("city.object_info") }}</h6>
                   <div class="row">
                     <div class="col-md-6">
                       <p class="mb-1">
-                        <strong>{{ $t('city.type') }}:</strong>
+                        <strong>{{ $t("city.type") }}:</strong>
                         {{ getObjectTypeName(object.object_type) }}
                       </p>
                       <p class="mb-1">
-                        <strong>{{ $t('city.level') }}:</strong> {{ object.level || 1 }}
+                        <strong>{{ $t("city.level") }}:</strong> {{ object.level || 1 }}
                       </p>
                     </div>
                     <div class="col-md-6">
                       <p v-if="!object.ready_at || remainingTimeText === ''" class="mb-1">
-                        <strong>{{ $t('city.status') }}:</strong>
-                        <span class="text-success">{{ $t('city.ready') }}</span>
+                        <strong>{{ $t("city.status") }}:</strong>
+                        <span class="text-success">{{ $t("city.ready") }}</span>
                       </p>
                       <p v-else class="mb-1">
-                        <strong>{{ $t('city.status') }}:</strong>
-                        <span class="text-danger">{{ $t('city.building') }}</span> -
+                        <strong>{{ $t("city.status") }}:</strong>
+                        <span class="text-danger">{{ $t("city.building") }}</span> -
                         {{ remainingTimeText }}
                       </p>
                     </div>
                   </div>
                   <!-- Show workers info if building -->
-                  <div v-if="isBuilding(object) && buildingWorkers" class="mt-2 alert alert-info py-2">
+                  <div
+                    v-if="isBuilding(object) && buildingWorkers"
+                    class="mt-2 alert alert-info py-2"
+                  >
                     <small>
-                      <strong>{{ $t('city.workers') }}:</strong>
-                      {{ buildingWorkers.count }} х {{ $t('city.level') }}
+                      <strong>{{ $t("city.workers") }}:</strong>
+                      {{ buildingWorkers.count }} х {{ $t("city.level") }}
                       {{ buildingWorkers.level }}
                     </small>
                   </div>
                   <div class="mt-3">
-                    <template v-if="object && object.ready_at === null && (!object.workers || !object.workers.count)">
+                    <template
+                      v-if="
+                        object &&
+                        object.ready_at === null &&
+                        (!object.workers || !object.workers.count)
+                      "
+                    >
                       <c-button color="primary" @click="openUpgradeModal">
                         <c-icon name="cilArrowTop" class="me-1" />
-                        {{ $t('city.upgrade_level') }}
+                        {{ $t("city.upgrade_level") }}
                       </c-button>
-                      <c-button color="success" class="ms-2" v-if="objectHasProduction()" @click="openProduceModal">
+                      <c-button
+                        color="success"
+                        class="ms-2"
+                        v-if="objectHasProduction()"
+                        @click="openProduceModal"
+                      >
                         <c-icon name="cilFactory" class="me-1" />
-                        {{ $t('city.start_production') }}
+                        {{ $t("city.start_production") }}
                       </c-button>
                     </template>
-                    <template v-else-if="object && (object.ready_at !== null || (object.workers && object.workers.count))">
-                      <div class="alert alert-info py-2 mb-0 d-flex align-items-center gap-2">
+                    <template
+                      v-else-if="
+                        object &&
+                        (object.ready_at !== null ||
+                          (object.workers && object.workers.count))
+                      "
+                    >
+                      <div
+                        class="alert alert-info py-2 mb-0 d-flex align-items-center gap-2"
+                      >
                         <c-spinner class="spinner-border-sm" />
-                        <span>{{ $t('city.waiting_release_workers') }}</span>
+                        <span>{{ $t("city.waiting_release_workers") }}</span>
                       </div>
                     </template>
                   </div>
@@ -166,9 +209,13 @@
         <div class="modal-body">
           <p class="mb-3">{{ $t("city.select_workers_upgrade") }}</p>
           <div class="d-flex gap-2 mb-3">
-            <div style="flex:1">
+            <div style="flex: 1">
               <label class="form-label small mb-1">{{ $t("city.worker_level") }}</label>
-              <select class="form-select" v-model="upgradeWorkerLevel" @change="onUpgradeWorkerLevelChange">
+              <select
+                class="form-select"
+                v-model="upgradeWorkerLevel"
+                @change="onUpgradeWorkerLevelChange"
+              >
                 <option v-for="(count, lvl) in people.by_level" :key="lvl" :value="lvl">
                   LV {{ lvl }} ({{ count }})
                 </option>
@@ -190,16 +237,23 @@
               />
               <div class="fw-bold">{{ upgradeWorkerCount }}</div>
             </div>
-            <div class="small text-muted">{{ tr('city.available','Available') }}: {{ availableCountForLevel(upgradeWorkerLevel) }}</div>
+            <div class="small text-muted">
+              {{ tr("city.available", "Available") }}:
+              {{ availableCountForLevel(upgradeWorkerLevel) }}
+            </div>
           </div>
           <div v-if="upgradeWorkerLevel && upgradeWorkerCount" class="alert alert-info">
-            <strong>{{ $t("city.upgrade_time") }}:</strong> {{ formatBuildTime(upgradeTimeMinutes) }}
+            <strong>{{ $t("city.upgrade_time") }}:</strong>
+            {{ formatBuildTime(upgradeTimeMinutes) }}
           </div>
           <div v-if="upgradeRequirements.length > 0" class="mb-3">
-            <label class="form-label small mb-1">{{ tr('city.required_materials','Required materials') }}</label>
+            <label class="form-label small mb-1">{{
+              tr("city.required_materials", "Required materials")
+            }}</label>
             <ul class="list-unstyled small">
               <li v-for="r in upgradeRequirements" :key="r.tool_type_id">
-                {{ r.required }} / {{ r.available }} - {{ r.name || ('tool_type:' + r.tool_type_id) }}
+                {{ r.required }} / {{ r.available }} -
+                {{ r.name || "tool_type:" + r.tool_type_id }}
               </li>
             </ul>
           </div>
@@ -216,7 +270,10 @@
             type="button"
             class="btn btn-primary"
             :disabled="
-              !upgradeWorkerLevel || !upgradeWorkerCount || upgradeWorkerCount <= 0 || !hasEnoughMaterialsForUpgrade
+              !upgradeWorkerLevel ||
+              !upgradeWorkerCount ||
+              upgradeWorkerCount <= 0 ||
+              !hasEnoughMaterialsForUpgrade
             "
             @click="startUpgrade"
           >
@@ -234,16 +291,28 @@
     >
       <div class="upgrade-modal-content" @click.stop>
         <div class="modal-header">
-          <h5>{{ $t('city.start_production') }}</h5>
-          <button type="button" class="btn-close" @click="showProduceModal = false"></button>
+          <h5>{{ $t("city.start_production") }}</h5>
+          <button
+            type="button"
+            class="btn-close"
+            @click="showProduceModal = false"
+          ></button>
         </div>
         <div class="modal-body">
-          <p class="mb-3">{{ $t('city.select_workers_production') }}</p>
+          <p class="mb-3">{{ $t("city.select_workers_production") }}</p>
           <div class="d-flex gap-2 mb-3">
-            <div style="flex:1">
-              <label class="form-label small mb-1">{{ $t('city.worker_level') }}</label>
-              <select class="form-select" v-model="produceWorkerLevel" @change="onProduceWorkerLevelChange">
-                <option v-for="item in availableWorkerLevels" :key="item.level" :value="item.level">
+            <div style="flex: 1">
+              <label class="form-label small mb-1">{{ $t("city.worker_level") }}</label>
+              <select
+                class="form-select"
+                v-model="produceWorkerLevel"
+                @change="onProduceWorkerLevelChange"
+              >
+                <option
+                  v-for="item in availableWorkerLevels"
+                  :key="item.level"
+                  :value="item.level"
+                >
                   LV {{ item.level }} ({{ item.count }})
                 </option>
               </select>
@@ -252,7 +321,7 @@
 
           <!-- Worker count slider (full-width, like time) -->
           <div class="mb-3">
-            <label class="form-label small mb-1">{{ $t('city.worker_count') }}</label>
+            <label class="form-label small mb-1">{{ $t("city.worker_count") }}</label>
             <div class="d-flex align-items-center gap-3">
               <input
                 type="range"
@@ -264,22 +333,38 @@
               />
               <div class="fw-bold">{{ produceWorkerCount }}</div>
             </div>
-            <div class="small text-muted">{{ tr('city.available', 'Available') }}: {{ availableCountForLevel(produceWorkerLevel) }}</div>
+            <div class="small text-muted">
+              {{ tr("city.available", "Available") }}:
+              {{ availableCountForLevel(produceWorkerLevel) }}
+            </div>
           </div>
 
           <div class="mb-3">
-            <label class="form-label small mb-1">{{ $t('city.production_length_hours') || 'Production length (hours)' }}</label>
+            <label class="form-label small mb-1">{{
+              $t("city.production_length_hours") || "Production length (hours)"
+            }}</label>
             <div class="d-flex align-items-center gap-3">
-              <input type="range" min="1" max="24" v-model.number="produceDurationHours" @input="calculateProductionPreview" class="form-range" />
+              <input
+                type="range"
+                min="1"
+                max="24"
+                v-model.number="produceDurationHours"
+                @input="calculateProductionPreview"
+                class="form-range"
+              />
               <div class="fw-bold">{{ produceDurationHours }}h</div>
             </div>
           </div>
 
           <div v-if="productionPreview.length === 0" class="text-center">
-            {{ $t('city.no_production_materials') }}
+            {{ $t("city.no_production_materials") }}
           </div>
           <div v-else class="list-group">
-            <div v-for="item in productionPreview" :key="item.tool_type_id" class="list-group-item d-flex justify-content-between align-items-center">
+            <div
+              v-for="item in productionPreview"
+              :key="item.tool_type_id"
+              class="list-group-item d-flex justify-content-between align-items-center"
+            >
               <div>
                 <strong>
                   {{ getTranslatedName(item.tool_type_name) }}
@@ -289,23 +374,44 @@
                   </template>
                 </strong>
                 <div class="small text-muted">
-                  {{ item.fieldsCount }} {{ $t('city.fields') }}
+                  {{ item.fieldsCount }} {{ $t("city.fields") }}
                   <template v-if="item.needRaw > 0">
                     <span class="text-muted"> - </span>
-                    <small>{{ $t('city.need') || 'Need' }}: <strong>{{ item.needRaw }}</strong></small>
+                    <small
+                      >{{ $t("city.need") || "Need" }}:
+                      <strong>{{ item.needRaw }}</strong></small
+                    >
                   </template>
                 </div>
               </div>
-                <div class="text-end">
-                <div>{{ item.perHour }} / {{ $t('city.hour') }}</div>
-                <div><strong>{{ item.totalProduced }}</strong> / {{ produceDurationHours }} {{ $t('city.hours') }}</div>
+              <div class="text-end">
+                <div>{{ item.perHour }} / {{ $t("city.hour") }}</div>
+                <div>
+                  <strong>{{ item.totalProduced }}</strong> / {{ produceDurationHours }}
+                  {{ $t("city.hours") }}
+                </div>
               </div>
             </div>
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" @click="showProduceModal = false">{{ $t('city.cancel') }}</button>
-          <button type="button" class="btn btn-success" :disabled="!produceWorkerLevel || produceWorkerCount <= 0 || !produceStartAllowed" @click="startProduction">{{ $t('city.start_production') }}</button>
+          <button
+            type="button"
+            class="btn btn-secondary"
+            @click="showProduceModal = false"
+          >
+            {{ $t("city.cancel") }}
+          </button>
+          <button
+            type="button"
+            class="btn btn-success"
+            :disabled="
+              !produceWorkerLevel || produceWorkerCount <= 0 || !produceStartAllowed
+            "
+            @click="startProduction"
+          >
+            {{ $t("city.start_production") }}
+          </button>
         </div>
       </div>
     </div>
@@ -361,41 +467,45 @@ export default {
     const gameStore = useGameStore();
     const $t = inject("$t");
 
-      const getTranslatedName = (name) => {
-        if (!name) return '';
-        const key = `tools.types.${name}`;
-        try {
-          const translated = $t(key);
-          // if translation missing, some i18n implementations return the key unchanged
-          if (!translated || translated === key) {
-            // fallback: prettify the DB name (replace underscores, title-case)
-            return name
-              .replace(/_/g, ' ')
-              .split(' ')
-              .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-              .join(' ');
-          }
-          return translated;
-        } catch (e) {
-          return name.replace(/_/g, ' ').split(' ').map((w)=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ');
+    const getTranslatedName = (name) => {
+      if (!name) return "";
+      const key = `tools.types.${name}`;
+      try {
+        const translated = $t(key);
+        // if translation missing, some i18n implementations return the key unchanged
+        if (!translated || translated === key) {
+          // fallback: prettify the DB name (replace underscores, title-case)
+          return name
+            .replace(/_/g, " ")
+            .split(" ")
+            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+            .join(" ");
         }
-      };
+        return translated;
+      } catch (e) {
+        return name
+          .replace(/_/g, " ")
+          .split(" ")
+          .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+          .join(" ");
+      }
+    };
     const loading = ref(true);
     const cityObjects = ref([]);
     const showUpgradeModal = ref(false);
-  const showProduceModal = ref(false);
-  const produceWorkerLevel = ref(null);
-  const produceWorkerCount = ref(0);
-  const productionPreview = ref([]); // [{tool_type_name, fieldsCount, perHour, totalProduced, produces_tool_type_id}]
-  const produceDurationHours = ref(12);
-  const inventories = ref({});
-  const produceStartAllowed = ref(true);
+    const showProduceModal = ref(false);
+    const produceWorkerLevel = ref(null);
+    const produceWorkerCount = ref(0);
+    const productionPreview = ref([]); // [{tool_type_name, fieldsCount, perHour, totalProduced, produces_tool_type_id}]
+    const produceDurationHours = ref(12);
+    const inventories = ref({});
+    const produceStartAllowed = ref(true);
     const upgradeWorkerLevel = ref(null);
     const upgradeWorkerCount = ref(0);
     const people = ref({ total: 0, by_level: {}, groups: [] });
     const currentTime = ref(Date.now()); // For reactive time updates
     let tickInterval = null;
-  let pollInterval = null;
+    let pollInterval = null;
 
     // Tool-related data
     const tools = ref([]);
@@ -440,7 +550,7 @@ export default {
     const getObjectTypeName = (type) => {
       // Prefer language file translation city.{type}, fall back to availableObjects name or prettified type
       try {
-        const key = 'city.' + type;
+        const key = "city." + type;
         const translated = $t(key);
         if (translated && translated !== key) return translated;
       } catch (e) {
@@ -448,10 +558,12 @@ export default {
       }
       const obj = availableObjects.value.find((o) => o.type === type);
       if (obj && obj.name) return obj.name;
-      return type ? String(type).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : $t('city.unknown');
+      return type
+        ? String(type)
+            .replace(/_/g, " ")
+            .replace(/\b\w/g, (c) => c.toUpperCase())
+        : $t("city.unknown");
     };
-
-    
 
     const isBuilding = (obj) => {
       if (!obj) return false;
@@ -481,7 +593,7 @@ export default {
       const hours = Math.floor(totalSeconds / 3600);
       const minutes = Math.floor((totalSeconds % 3600) / 60);
       const seconds = totalSeconds % 60;
-      const two = (n) => String(n).padStart(2, '0');
+      const two = (n) => String(n).padStart(2, "0");
       if (hours > 0) {
         return `${hours}:${two(minutes)}:${two(seconds)}`;
       }
@@ -507,14 +619,17 @@ export default {
         const res = await axios.get("/api/city-objects");
         if (res.data.success) {
           // Normalize numeric fields to avoid strict type mismatches between server and client
-          cityObjects.value = (res.data.objects || []).map(o => {
+          cityObjects.value = (res.data.objects || []).map((o) => {
             const copy = Object.assign({}, o);
             if (copy.id && /^\d+$/.test(String(copy.id))) copy.id = Number(copy.id);
-            if (copy.parcel_id && /^\d+$/.test(String(copy.parcel_id))) copy.parcel_id = Number(copy.parcel_id);
-            if (copy.user_id && /^\d+$/.test(String(copy.user_id))) copy.user_id = Number(copy.user_id);
+            if (copy.parcel_id && /^\d+$/.test(String(copy.parcel_id)))
+              copy.parcel_id = Number(copy.parcel_id);
+            if (copy.user_id && /^\d+$/.test(String(copy.user_id)))
+              copy.user_id = Number(copy.user_id);
             if (copy.x != null && /^\d+$/.test(String(copy.x))) copy.x = Number(copy.x);
             if (copy.y != null && /^\d+$/.test(String(copy.y))) copy.y = Number(copy.y);
-            if (copy.ready_at != null && /^\d+$/.test(String(copy.ready_at))) copy.ready_at = Number(copy.ready_at);
+            if (copy.ready_at != null && /^\d+$/.test(String(copy.ready_at)))
+              copy.ready_at = Number(copy.ready_at);
             return copy;
           });
         }
@@ -526,11 +641,11 @@ export default {
     // Fetch a single object from server and update local copy. Used by the poller.
     const fetchSingleObject = async () => {
       try {
-        const res = await axios.get('/api/city-objects');
+        const res = await axios.get("/api/city-objects");
         if (res.data.success) {
-          const obj = (res.data.objects || []).find(o => o.id === objectId.value);
+          const obj = (res.data.objects || []).find((o) => o.id === objectId.value);
           if (obj) {
-            const idx = cityObjects.value.findIndex(o => o.id === objectId.value);
+            const idx = cityObjects.value.findIndex((o) => o.id === objectId.value);
             if (idx !== -1) {
               cityObjects.value[idx] = obj;
               cityObjects.value = [...cityObjects.value];
@@ -542,7 +657,7 @@ export default {
           }
         }
       } catch (e) {
-        console.error('Failed to fetch single object', e);
+        console.error("Failed to fetch single object", e);
       }
     };
 
@@ -550,10 +665,12 @@ export default {
       stopObjectPoll();
       // Poll every 15s while viewing the object and it appears to need finalization
       pollInterval = setInterval(async () => {
-        const obj = cityObjects.value.find(o => o.id === objectId.value);
+        const obj = cityObjects.value.find((o) => o.id === objectId.value);
         if (!obj) return;
         const readyTs = obj.ready_at ? new Date(obj.ready_at).getTime() : null;
-        const needsCheck = (readyTs !== null && readyTs <= Date.now()) || (obj.workers && obj.workers.count);
+        const needsCheck =
+          (readyTs !== null && readyTs <= Date.now()) ||
+          (obj.workers && obj.workers.count);
         if (needsCheck) {
           await fetchSingleObject();
         }
@@ -621,17 +738,17 @@ export default {
       const nextLevel = (currentLevel || 0) + 1;
       if (lvl > 0 && cnt > 0) {
         const levelAdjusted = baseTime * Math.max(1, nextLevel);
-        let reductionMinutes = (lvl * cnt) - 1;
+        let reductionMinutes = lvl * cnt - 1;
         if (reductionMinutes < 0) reductionMinutes = 0;
         return Math.max(1, levelAdjusted - reductionMinutes);
       }
-    return baseTime * Math.max(1, nextLevel);
+      return baseTime * Math.max(1, nextLevel);
     });
 
     // Format minutes to human-friendly string: minutes, hours or days+hours
     const formatBuildTime = (minutes) => {
       minutes = parseInt(minutes) || 0;
-      if (minutes <= 0) return '0m';
+      if (minutes <= 0) return "0m";
       const minsInDay = 1440; // 60*24
       if (minutes >= minsInDay) {
         const days = Math.floor(minutes / minsInDay);
@@ -691,13 +808,16 @@ export default {
 
     const openUpgradeModal = async () => {
       // Select first available level with workers > 0
-      const availableLevels = Object.entries(people.value.by_level || {}).filter(([lvl, count]) => count > 0);
-      upgradeWorkerLevel.value = availableLevels.length > 0 ? availableLevels[0][0] : null;
+      const availableLevels = Object.entries(people.value.by_level || {}).filter(
+        ([lvl, count]) => count > 0
+      );
+      upgradeWorkerLevel.value =
+        availableLevels.length > 0 ? availableLevels[0][0] : null;
       // default slider to 0 — require user to explicitly pick workers
       upgradeWorkerCount.value = 0;
       // Load inventories so we can show required vs available materials
       try {
-        const inv = await axios.get('/api/inventories');
+        const inv = await axios.get("/api/inventories");
         inventories.value = (inv.data.items || []).reduce((acc, it) => {
           acc[it.tool_type_id] = it;
           return acc;
@@ -708,15 +828,19 @@ export default {
 
       // Load tool types so we can show translated resource names
       try {
-        const res = await axios.get('/api/tool-types');
+        const res = await axios.get("/api/tool-types");
         if (res.data && res.data.success && Array.isArray(res.data.tool_types)) {
           // map by id
           const map = {};
-          res.data.tool_types.forEach((t) => { map[t.id] = t; });
+          res.data.tool_types.forEach((t) => {
+            map[t.id] = t;
+          });
           toolTypesMap.value = map;
         } else if (Array.isArray(res.data)) {
           const map = {};
-          res.data.forEach((t) => { map[t.id] = t; });
+          res.data.forEach((t) => {
+            map[t.id] = t;
+          });
           toolTypesMap.value = map;
         }
       } catch (e) {
@@ -744,15 +868,25 @@ export default {
 
     const upgradeRequirements = computed(() => {
       try {
-        const ot = availableObjects.value.find((o) => o.type === object.value?.object_type);
+        const ot = availableObjects.value.find(
+          (o) => o.type === object.value?.object_type
+        );
         const recipe = ot?.recipe || null;
-        if (!recipe || typeof recipe !== 'object') return [];
+        if (!recipe || typeof recipe !== "object") return [];
         const mult = (object.value?.level ? Number(object.value.level) : 0) + 1;
         return Object.entries(recipe).map(([toolTypeId, qty]) => {
           const required = Math.max(0, Number(qty) * Number(mult));
           const inv = inventories.value[toolTypeId];
-          const available = inv ? Math.max(0, (parseInt(inv.count) || 0) - (parseInt(inv.reserved_count) || 0)) : 0;
-          const tt = toolTypesMap.value && toolTypesMap.value[toolTypeId] ? toolTypesMap.value[toolTypeId] : null;
+          const available = inv
+            ? Math.max(
+                0,
+                (parseInt(inv.count) || 0) - (parseInt(inv.reserved_count) || 0)
+              )
+            : 0;
+          const tt =
+            toolTypesMap.value && toolTypesMap.value[toolTypeId]
+              ? toolTypesMap.value[toolTypeId]
+              : null;
           const name = tt ? translateToolName(tt.name) : null;
           return { tool_type_id: Number(toolTypeId), required, available, name };
         });
@@ -769,15 +903,24 @@ export default {
 
     const openProduceModal = async () => {
       // Select first available level with workers > 0
-      const availableLevels = Object.entries(people.value.by_level || {}).filter(([lvl, count]) => count > 0);
-      produceWorkerLevel.value = availableLevels.length > 0 ? availableLevels[0][0] : null;
+      const availableLevels = Object.entries(people.value.by_level || {}).filter(
+        ([lvl, count]) => count > 0
+      );
+      produceWorkerLevel.value =
+        availableLevels.length > 0 ? availableLevels[0][0] : null;
       // default slider to 0 — require user to explicitly pick workers
       produceWorkerCount.value = 0;
       // Try to load user's saved production length from game settings
       try {
-        const res = await axios.get('/api/game-settings');
-        if (res.data.success && res.data.settings && res.data.settings.production_length_hours) {
-          produceDurationHours.value = parseInt(res.data.settings.production_length_hours);
+        const res = await axios.get("/api/game-settings");
+        if (
+          res.data.success &&
+          res.data.settings &&
+          res.data.settings.production_length_hours
+        ) {
+          produceDurationHours.value = parseInt(
+            res.data.settings.production_length_hours
+          );
         } else {
           produceDurationHours.value = 12;
         }
@@ -786,7 +929,7 @@ export default {
       }
       // Load inventories BEFORE calculating preview
       try {
-        const inv = await axios.get('/api/inventories');
+        const inv = await axios.get("/api/inventories");
         inventories.value = (inv.data.items || []).reduce((acc, it) => {
           acc[it.tool_type_id] = it;
           return acc;
@@ -822,9 +965,11 @@ export default {
         byProduct[key].count++;
       });
 
-  const lvl = produceWorkerLevel.value ? parseInt(produceWorkerLevel.value) : 0;
-  const cnt = produceWorkerCount.value ? parseInt(produceWorkerCount.value) : 0;
-      const duration = produceDurationHours.value ? parseInt(produceDurationHours.value) : 1;
+      const lvl = produceWorkerLevel.value ? parseInt(produceWorkerLevel.value) : 0;
+      const cnt = produceWorkerCount.value ? parseInt(produceWorkerCount.value) : 0;
+      const duration = produceDurationHours.value
+        ? parseInt(produceDurationHours.value)
+        : 1;
 
       for (const key in byProduct) {
         const entry = byProduct[key];
@@ -832,18 +977,21 @@ export default {
         const tool = entry.tool;
 
         // Use PRODUCT units_per_hour for production calculation
-        const basePerHour = tool.product_units_per_hour 
-          ? parseInt(tool.product_units_per_hour) 
-          : (tool.units_per_hour ? parseInt(tool.units_per_hour) : 0);
-  const perHour = fieldsCount * basePerHour * Math.max(0, lvl) * Math.max(0, cnt);
+        const basePerHour = tool.product_units_per_hour
+          ? parseInt(tool.product_units_per_hour)
+          : tool.units_per_hour
+          ? parseInt(tool.units_per_hour)
+          : 0;
+        const perHour = fieldsCount * basePerHour * Math.max(0, lvl) * Math.max(0, cnt);
         const total = perHour * duration;
 
         // Need raw: 1 per field per hour (if raw exists)
         const rawId = tool.raw_tool_type_id;
-        const needRaw = rawId ? (fieldsCount * duration) : 0;
-        const availableRaw = rawId && inventories.value[rawId]
-          ? parseInt(inventories.value[rawId].count || 0)
-          : 0;
+        const needRaw = rawId ? fieldsCount * duration : 0;
+        const availableRaw =
+          rawId && inventories.value[rawId]
+            ? parseInt(inventories.value[rawId].count || 0)
+            : 0;
 
         productionPreview.value.push({
           tool_type_id: tool.tool_type_id,
@@ -859,16 +1007,18 @@ export default {
       }
 
       // Enable start only if user has enough raw materials
-      produceStartAllowed.value = productionPreview.value.every(p => (p.availableRaw || 0) >= (p.needRaw || 0));
+      produceStartAllowed.value = productionPreview.value.every(
+        (p) => (p.availableRaw || 0) >= (p.needRaw || 0)
+      );
     };
 
     const startProduction = async () => {
       try {
-        const res = await axios.post('/api/city-objects/produce', {
+        const res = await axios.post("/api/city-objects/produce", {
           object_id: objectId.value,
           worker_level: produceWorkerLevel.value,
           worker_count: produceWorkerCount.value,
-          duration_hours: produceDurationHours.value
+          duration_hours: produceDurationHours.value,
         });
 
         if (res.data.success) {
@@ -881,11 +1031,11 @@ export default {
           }
           await fetchPeople();
         } else {
-          alert('Production failed: ' + res.data.message);
+          alert("Production failed: " + res.data.message);
         }
       } catch (e) {
-        console.error('Failed to start production', e);
-        alert($t('city.production_failed') || 'Failed to start production');
+        console.error("Failed to start production", e);
+        alert($t("city.production_failed") || "Failed to start production");
       }
     };
 
@@ -895,10 +1045,11 @@ export default {
       try {
         const res = await axios.get(`/api/objects/${objectId.value}/available-tools`);
         // Normalize available tools (ids/numeric fields) to avoid type mismatch
-        availableTools.value = (res.data || []).map(t => {
+        availableTools.value = (res.data || []).map((t) => {
           const copy = Object.assign({}, t);
           if (copy.id && /^\d+$/.test(String(copy.id))) copy.id = Number(copy.id);
-          if (copy.tool_type_id && /^\d+$/.test(String(copy.tool_type_id))) copy.tool_type_id = Number(copy.tool_type_id);
+          if (copy.tool_type_id && /^\d+$/.test(String(copy.tool_type_id)))
+            copy.tool_type_id = Number(copy.tool_type_id);
           return copy;
         });
         showToolModal.value = true;
@@ -944,12 +1095,15 @@ export default {
       try {
         const res = await axios.get(`/api/objects/${objectId.value}/tools`);
         // Normalize tool fields so position_x/position_y and ids are Numbers
-        tools.value = (res.data || []).map(tt => {
+        tools.value = (res.data || []).map((tt) => {
           const copy = Object.assign({}, tt);
           if (copy.id && /^\d+$/.test(String(copy.id))) copy.id = Number(copy.id);
-          if (copy.position_x != null && /^\d+$/.test(String(copy.position_x))) copy.position_x = Number(copy.position_x);
-          if (copy.position_y != null && /^\d+$/.test(String(copy.position_y))) copy.position_y = Number(copy.position_y);
-          if (copy.tool_type_id && /^\d+$/.test(String(copy.tool_type_id))) copy.tool_type_id = Number(copy.tool_type_id);
+          if (copy.position_x != null && /^\d+$/.test(String(copy.position_x)))
+            copy.position_x = Number(copy.position_x);
+          if (copy.position_y != null && /^\d+$/.test(String(copy.position_y)))
+            copy.position_y = Number(copy.position_y);
+          if (copy.tool_type_id && /^\d+$/.test(String(copy.tool_type_id)))
+            copy.tool_type_id = Number(copy.tool_type_id);
           return copy;
         });
       } catch (e) {
@@ -1007,9 +1161,9 @@ export default {
 
     const showToolInfo = (tool) => {
       alert(
-        `Tool: ${getTranslatedName(tool.name)}\nType: ${getTranslatedName(tool.tool_type_name)}\nLevel: ${
-          tool.level || 1
-        }\nPosition: (${tool.position_x}, ${tool.position_y})`
+        `Tool: ${getTranslatedName(tool.name)}\nType: ${getTranslatedName(
+          tool.tool_type_name
+        )}\nLevel: ${tool.level || 1}\nPosition: (${tool.position_x}, ${tool.position_y})`
       );
       hoveredCell.value = null; // Hide actions after showing info
     };
@@ -1077,13 +1231,13 @@ export default {
       upgradeWorkerCount,
       people,
       upgradeTimeMinutes,
-  formatBuildTime,
+      formatBuildTime,
       buildingWorkers,
       goBackToParcel,
       getObjectTypeName,
       getTranslatedName,
       isBuilding,
-  remainingTimeText,
+      remainingTimeText,
       availableCountsForLevel,
       startUpgrade,
       // Tool-related
@@ -1107,26 +1261,26 @@ export default {
       cancelMove,
       handleToolClick,
       handleToolTouch,
-  // Production
-  showProduceModal,
-  produceWorkerLevel,
-  produceWorkerCount,
-  productionPreview,
-  produceDurationHours,
-  produceStartAllowed,
-  availableWorkerLevels,
-  availableCountForLevel,
-  onProduceWorkerLevelChange,
-  tr,
-  // Upgrade
-  openUpgradeModal,
+      // Production
+      showProduceModal,
+      produceWorkerLevel,
+      produceWorkerCount,
+      productionPreview,
+      produceDurationHours,
+      produceStartAllowed,
+      availableWorkerLevels,
+      availableCountForLevel,
+      onProduceWorkerLevelChange,
+      tr,
+      // Upgrade
+      openUpgradeModal,
       onUpgradeWorkerLevelChange,
       upgradeRequirements,
       hasEnoughMaterialsForUpgrade,
-  objectHasProduction,
-  openProduceModal,
-  calculateProductionPreview,
-  startProduction,
+      objectHasProduction,
+      openProduceModal,
+      calculateProductionPreview,
+      startProduction,
     };
   },
 };
@@ -1291,17 +1445,17 @@ export default {
   pointer-events: none;
   z-index: 5;
   padding: 3px 6px;
-  background: rgba(255,255,255,0.95);
+  background: rgba(255, 255, 255, 0.95);
   color: #222;
 }
 
 .building-badge {
-  background: rgba(220,53,69,0.95) !important;
+  background: rgba(220, 53, 69, 0.95) !important;
   color: #fff !important;
 }
 
 .level-badge {
-  background: rgba(40,167,69,0.95) !important;
+  background: rgba(40, 167, 69, 0.95) !important;
   color: #fff !important;
 }
 
