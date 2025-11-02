@@ -41,6 +41,18 @@ curl -H "Authorization: Bearer <token>" "{BASE}/api/player/inventories" | jq .
 5) Base URL
 - Use the server base URL provided by the operator (for example: https://vjsg.cqlo.info/). Replace {BASE} in examples with that value.
 
+8) Bot API namespace and reuse of created accounts
+- The server exposes a dedicated Bot API under the prefix `/api/bot/*`. These endpoints mirror user actions and require the same `Authorization: Bearer <token>` header.
+  - Example: `GET {BASE}/api/bot/inventories` behaves like the player inventory endpoint.
+  - Use `/api/bot/*` for automated agents rather than scraping UI endpoints.
+
+- Registered bot accounts are persisted to the server file `storage/app/bot_players.json` when created via `/api/register`. Bots MUST reuse those accounts rather than creating new ones every run. The file contains an array of objects with `user_id`, `username`, `token`, and `created_at`.
+
+Example flow for Grok (recommended):
+  1. Call POST `{BASE}/api/register` once and store returned token.
+  2. Use token for subsequent calls to `{BASE}/api/bot/...` endpoints.
+  3. On subsequent runs, read `storage/app/bot_players.json` (if Grok has access) or reuse the saved token provided by the operator.
+
 6) Reporting
 - After performing actions, return a compact report:
   - snapshot: inventories (top 5), city objects (count / key types), people counts

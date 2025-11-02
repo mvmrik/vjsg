@@ -66,6 +66,59 @@ Route::get('/translations/{locale}', function ($locale) {
 use App\Http\Controllers\RegisterController;
 Route::post('/register', [RegisterController::class, 'register']);
 
+// Bot API: mirror main game actions for automated players (protected by Sanctum)
+Route::middleware(['auth:sanctum', 'game.auth'])->prefix('bot')->group(function () {
+    // User data / settings
+    Route::get('/user-data', [GameController::class, 'getUserData']);
+    Route::post('/user-data', [GameController::class, 'updateUserData']);
+    Route::get('/game-settings', [GameController::class, 'getGameSettings']);
+    Route::post('/game-settings', [GameController::class, 'setGameSetting']);
+
+    // Parcels
+    Route::get('/parcels', [ParcelsController::class, 'index']);
+    Route::post('/parcels/claim', [ParcelsController::class, 'claim']);
+
+    // City objects / construction
+    Route::get('/city-objects', [CityController::class, 'index']);
+    Route::post('/city-objects/save', [CityController::class, 'save']);
+    Route::post('/city-objects/upgrade', [CityController::class, 'upgrade']);
+    Route::post('/city-objects/produce', [CityController::class, 'produce']);
+    Route::get('/object-types', [CityController::class, 'types']);
+
+    // People / workers
+    Route::get('/people', [\App\Http\Controllers\PeopleController::class, 'index']);
+
+    // Inventories & tools
+    Route::get('/inventories', [\App\Http\Controllers\InventoryController::class, 'index']);
+    Route::get('/objects/{objectId}/available-tools', [ToolController::class, 'getAvailableTools']);
+    Route::get('/tool-types', [ToolController::class, 'listToolTypes']);
+    Route::post('/objects/add-tool', [ToolController::class, 'addTool']);
+    Route::get('/objects/{objectId}/tools', [ToolController::class, 'getTools']);
+    Route::post('/objects/update-tool-position', [ToolController::class, 'updateToolPosition']);
+
+    // Market
+    Route::post('/market/orders', [\App\Http\Controllers\MarketController::class, 'order']);
+    Route::post('/market/orders/{id}/cancel', [\App\Http\Controllers\MarketController::class, 'cancelOrder']);
+    Route::get('/market/{toolType}/orderbook', [\App\Http\Controllers\MarketController::class, 'orderbook']);
+    Route::get('/market/{toolType}/trades', [\App\Http\Controllers\MarketController::class, 'trades']);
+    Route::get('/market/orders', [\App\Http\Controllers\MarketController::class, 'userOrders']);
+
+    // Notifications
+    Route::get('/notifications', [NotificationsController::class, 'index']);
+    Route::get('/notifications/unread-count', [NotificationsController::class, 'unreadCount']);
+    Route::get('/notifications/latest-unread', [NotificationsController::class, 'latestUnread']);
+    Route::get('/notifications/{id}', [NotificationsController::class, 'show']);
+    Route::patch('/notifications/{id}/read', [NotificationsController::class, 'markAsRead']);
+    Route::patch('/notifications/mark-all-read', [NotificationsController::class, 'markAllAsRead']);
+
+    // Stats / events
+    Route::get('/stats', [\App\Http\Controllers\StatsController::class, 'index']);
+    Route::get('/events/current', [\App\Http\Controllers\Events\EventController::class, 'current']);
+    Route::post('/events/lottery/enter', [\App\Http\Controllers\Events\LotteryController::class, 'enter']);
+    Route::get('/events/lottery/jackpot', [\App\Http\Controllers\Events\LotteryController::class, 'jackpot']);
+    Route::get('/events/lottery/history', [\App\Http\Controllers\Events\LotteryController::class, 'history']);
+});
+
 // User API routes (require authentication)
 Route::middleware(['game.auth'])->group(function () {
     Route::get('/user-data', [GameController::class, 'getUserData'])->name('api.user-data');

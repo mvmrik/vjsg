@@ -46,6 +46,24 @@ class RegisterController extends Controller
         // Base URL (use APP_URL if set, otherwise default to provided server)
         $baseUrl = config('app.url') ?: env('APP_URL', 'https://vjsg.cqlo.info/');
 
+        // Persist created bot users locally so we can reuse them later (no DB migration needed)
+        try {
+            $storagePath = storage_path('app/bot_players.json');
+            $existing = [];
+            if (file_exists($storagePath)) {
+                $existing = json_decode(file_get_contents($storagePath), true) ?: [];
+            }
+            $existing[] = [
+                'user_id' => $user->id,
+                'username' => $user->username,
+                'token' => $token,
+                'created_at' => now()->toDateTimeString(),
+            ];
+            @file_put_contents($storagePath, json_encode($existing, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        } catch (\Throwable $e) {
+            // ignore storage errors but continue returning token
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Registration successful',
@@ -56,3 +74,4 @@ class RegisterController extends Controller
         ], 201);
     }
 }
+
