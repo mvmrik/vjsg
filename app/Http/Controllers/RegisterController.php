@@ -30,17 +30,15 @@ class RegisterController extends Controller
         $keys = User::generateKeys();
         $privateLookup = User::computeLookup($keys['private_key']);
 
-        $user = User::create([
-            'username' => $username,
-            'public_key' => $keys['public_key'],
-            'last_active' => now(),
-            'locale' => $locale,
-            'balance' => 0,
-        ]);
-
-        // Store private key lookup directly (not mass assignable)
-        $user->private_key = $privateLookup;
-        $user->save();
+            // Create user and store private_key lookup atomically (DB requires private_key)
+            $user = User::create([
+                'username' => $username,
+                'public_key' => $keys['public_key'],
+                'private_key' => $privateLookup,
+                'last_active' => now(),
+                'locale' => $locale,
+                'balance' => 0,
+            ]);
 
         // Create a personal access token
         $token = $user->createToken('api-token')->plainTextToken;

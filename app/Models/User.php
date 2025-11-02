@@ -21,6 +21,9 @@ class User extends Authenticatable
         'username',
         'public_key',
         // store hashed private_key; raw private key should not be mass assignable
+        // For automated test registration we allow storing the lookup here.
+        // NOTE: this field is sensitive; do not expose raw private keys.
+        'private_key',
         'last_active',
         'locale',
         'balance',
