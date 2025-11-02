@@ -62,6 +62,10 @@ Route::get('/translations/{locale}', function ($locale) {
     return response()->json($translations);
 });
 
+// Public registration endpoint for bot/testing
+use App\Http\Controllers\RegisterController;
+Route::post('/register', [RegisterController::class, 'register']);
+
 // User API routes (require authentication)
 Route::middleware(['game.auth'])->group(function () {
     Route::get('/user-data', [GameController::class, 'getUserData'])->name('api.user-data');
