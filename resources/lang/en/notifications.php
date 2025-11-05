@@ -32,6 +32,8 @@ return [
     'population_increase_message' => 'Your population increased by :count people.',
     'population_decrease_title' => 'Population Decrease',
     'population_decrease_message' => 'Due to insufficient hospital capacity, :count people have died.',
+    'population_daily_summary_title' => 'Daily population update',
+    'population_daily_summary_message' => 'Today: +:born born, -:died died.',
     'production_cancelled_title' => 'Production Cancelled',
     'production_cancelled_message' => 'Production cancelled for :count workers at level :level due to insufficient people.',
     'production_overassigned_title' => 'Production Over-assigned',

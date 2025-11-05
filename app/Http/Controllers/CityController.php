@@ -218,19 +218,6 @@ class CityController extends Controller
                             'message' => 'Invalid workers: You do not have ' . $count . ' workers at level ' . $level
                         ], 400);
                     }
-
-                    // Enforce per-level free worker check: do not allow assigning more than free (total - already occupied at this level)
-                    $occupiedAtLevel = DB::table('occupied_workers')
-                        ->where('user_id', $userId)
-                        ->where('level', $level)
-                        ->sum('count');
-                    $freeAtLevel = intval($personGroup->count) - intval($occupiedAtLevel);
-                    if ($freeAtLevel < $count) {
-                        return response()->json([
-                            'success' => false,
-                            'message' => 'Insufficient free workers at level ' . $level
-                        ], 400);
-                    }
                     
                     // Use centralized helper that applies the 'next level' logic
                     $buildSeconds = \App\Models\CityObject::calculateBuildSeconds($baseSeconds, $objectLevel, $level, $count);
@@ -315,13 +302,52 @@ class CityController extends Controller
 
                 // OCCUPY WORKERS: Create occupied_worker record if workers were used
                 if ($workers && isset($workers['level']) && isset($workers['count'])) {
-                    OccupiedWorker::create([
-                        'user_id' => $userId,
-                        'level' => intval($workers['level']),
-                        'count' => intval($workers['count']),
-                        'occupied_until' => $readyAt,
-                        'city_object_id' => $created->id
-                    ]);
+                    // Transactionally decrement free people and create occupied record
+                    $db = DB::connection();
+                    $db->beginTransaction();
+                    try {
+                        $level = intval($workers['level']);
+                        $count = intval($workers['count']);
+
+                        // Lock person row for update
+                        $personRow = DB::table('people')
+                            ->where('user_id', $userId)
+                            ->where('level', $level)
+                            ->lockForUpdate()
+                            ->first();
+
+                        $available = $personRow ? intval($personRow->count) : 0;
+                        if ($available < $count) {
+                            $db->rollBack();
+                            return response()->json(['success' => false, 'message' => 'Insufficient free workers at level ' . $level], 400);
+                        }
+
+                        $newCount = $available - $count;
+                        if ($newCount <= 0) {
+                            DB::table('people')
+                                ->where('user_id', $userId)
+                                ->where('level', $level)
+                                ->delete();
+                        } else {
+                            DB::table('people')
+                                ->where('user_id', $userId)
+                                ->where('level', $level)
+                                ->update(['count' => $newCount]);
+                        }
+
+                        OccupiedWorker::create([
+                            'user_id' => $userId,
+                            'level' => $level,
+                            'count' => $count,
+                            'occupied_until' => $readyAt,
+                            'city_object_id' => $created->id
+                        ]);
+
+                        $db->commit();
+                    } catch (\Exception $e) {
+                        $db->rollBack();
+                        return response()->json(['success' => false, 'message' => 'Failed to occupy workers: ' . $e->getMessage()], 500);
+                    }
                 }
             }
         }
@@ -422,19 +448,7 @@ class CityController extends Controller
                     'message' => 'Invalid workers: You do not have ' . $workerCount . ' workers at level ' . $workerLevel
                 ], 400);
             }
-
-            // Enforce per-level free worker check
-            $occupiedAtLevel = DB::table('occupied_workers')
-                ->where('user_id', $userId)
-                ->where('level', intval($workerLevel))
-                ->sum('count');
-            $freeAtLevel = intval($personGroup->count) - intval($occupiedAtLevel);
-            if ($freeAtLevel < intval($workerCount)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Insufficient free workers at level ' . $workerLevel
-                ], 400);
-            }
+            // free workers are represented by `people` counts; we'll decrement when occupying
         }
 
     // Calculate upgrade time using centralized helper (next level logic)
@@ -489,16 +503,50 @@ class CityController extends Controller
             }
         }
 
-        // Create occupied workers record
-        OccupiedWorker::create([
-            'user_id' => $userId,
-            'level' => intval($workerLevel),
-            'count' => intval($workerCount),
-            'occupied_until' => $readyAt,
-            'city_object_id' => $object->id
-        ]);
+        // Create occupied workers record and decrement free people atomically
+        try {
+            $level = intval($workerLevel);
+            $count = intval($workerCount);
 
-        $db->commit();
+            // Lock person row and decrement
+            $personRow = DB::table('people')
+                ->where('user_id', $userId)
+                ->where('level', $level)
+                ->lockForUpdate()
+                ->first();
+
+            $available = $personRow ? intval($personRow->count) : 0;
+            if ($available < $count) {
+                $db->rollBack();
+                return response()->json(['success' => false, 'message' => 'Insufficient free workers at level ' . $level], 400);
+            }
+
+            $newCount = $available - $count;
+            if ($newCount <= 0) {
+                DB::table('people')
+                    ->where('user_id', $userId)
+                    ->where('level', $level)
+                    ->delete();
+            } else {
+                DB::table('people')
+                    ->where('user_id', $userId)
+                    ->where('level', $level)
+                    ->update(['count' => $newCount]);
+            }
+
+            OccupiedWorker::create([
+                'user_id' => $userId,
+                'level' => $level,
+                'count' => $count,
+                'occupied_until' => $readyAt,
+                'city_object_id' => $object->id
+            ]);
+
+            $db->commit();
+        } catch (\Exception $e) {
+            $db->rollBack();
+            return response()->json(['success' => false, 'message' => 'Failed to occupy workers: ' . $e->getMessage()], 500);
+        }
 
         return response()->json([
             'success' => true,
@@ -562,19 +610,7 @@ class CityController extends Controller
                     'message' => 'Invalid workers: You do not have ' . $workerCount . ' workers at level ' . $workerLevel
                 ], 400);
             }
-
-            // Enforce per-level free worker check
-            $occupiedAtLevel = DB::table('occupied_workers')
-                ->where('user_id', $userId)
-                ->where('level', intval($workerLevel))
-                ->sum('count');
-            $freeAtLevel = intval($personGroup->count) - intval($occupiedAtLevel);
-            if ($freeAtLevel < intval($workerCount)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Insufficient free workers at level ' . $workerLevel
-                ], 400);
-            }
+            // free workers are represented by `people` counts; we'll decrement when occupying
         }
 
         // INVERTED: placed tools are products, find their raw
@@ -737,10 +773,39 @@ class CityController extends Controller
             $object->ready_at = $readyAt;
             $object->save();
 
+            // Decrement people and create occupied worker (use same transaction)
+            $level = intval($workerLevel);
+            $count = intval($workerCount);
+
+            $personRow = DB::table('people')
+                ->where('user_id', $userId)
+                ->where('level', $level)
+                ->lockForUpdate()
+                ->first();
+
+            $available = $personRow ? intval($personRow->count) : 0;
+            if ($available < $count) {
+                $db->rollBack();
+                return response()->json(['success' => false, 'message' => 'Insufficient free workers at level ' . $level], 400);
+            }
+
+            $newCount = $available - $count;
+            if ($newCount <= 0) {
+                DB::table('people')
+                    ->where('user_id', $userId)
+                    ->where('level', $level)
+                    ->delete();
+            } else {
+                DB::table('people')
+                    ->where('user_id', $userId)
+                    ->where('level', $level)
+                    ->update(['count' => $newCount]);
+            }
+
             OccupiedWorker::create([
                 'user_id' => $userId,
-                'level' => intval($workerLevel),
-                'count' => intval($workerCount),
+                'level' => $level,
+                'count' => $count,
                 'occupied_until' => $readyAt,
                 'city_object_id' => $object->id
             ]);

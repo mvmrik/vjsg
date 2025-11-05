@@ -170,6 +170,15 @@
             <c-col class="col-sm-6 col-md-3 mb-3">
               <c-card class="text-center">
                 <c-card-body>
+                  <c-icon name="cilChart" size="xl" class="text-warning mb-2" />
+                  <h4 class="mb-1">{{ gameStats.occupied }}</h4>
+                  <p class="text-muted mb-0">{{ $t('settings.occupied_workers') }}</p>
+                </c-card-body>
+              </c-card>
+            </c-col>
+            <c-col class="col-sm-6 col-md-3 mb-3">
+              <c-card class="text-center">
+                <c-card-body>
                   <c-icon name="cilMap" size="xl" class="text-info mb-2" />
                   <h4 class="mb-1">{{ gameStats.parcels }}</h4>
                   <p class="text-muted mb-0">{{ $t('settings.parcels') }}</p>
@@ -185,39 +194,45 @@
                 </c-card-body>
               </c-card>
             </c-col>
-            <c-col class="col-sm-6 col-md-3 mb-3">
-              <c-card class="text-center">
-                <c-card-body>
-                  <c-icon name="cilChart" size="xl" class="text-warning mb-2" />
-                  <h4 class="mb-1">-</h4>
-                  <p class="text-muted mb-0">{{ $t('settings.new') }}</p>
-                </c-card-body>
-              </c-card>
-            </c-col>
           </c-row>
 
           <!-- Progress bars -->
           <div class="mt-4">
             <h6>{{ $t('settings.health') }}</h6>
-            <p class="text-muted small">{{ $t('settings.expected_mortality_desc') }}</p>
-            <c-progress class="mb-3">
-              <c-progress-bar
-                :value="Math.min(Math.max(Math.round(gameStats.expected_mortality), 0), 100)"
-                color="danger"
-              >
-                {{ Math.min(Math.max(gameStats.expected_mortality.toFixed(2), 0), 100) }}%
-              </c-progress-bar>
-            </c-progress>
+            <p class="text-muted small">
+              {{ $t('settings.expected_mortality_desc') }}
+              <span v-if="gameStats.death_threshold_level !== null">. {{ $t('settings.death_threshold') }}: {{ $t('settings.level') }} {{ gameStats.death_threshold_level }}</span>
+            </p>
+            <div class="position-relative mb-4" style="height: 40px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);">
+              <c-progress style="height: 100%; border-radius: 8px; background: transparent;">
+                <c-progress-bar
+                  :value="Math.min(Math.max(Math.round(gameStats.expected_mortality), 0), 100)"
+                  color="danger"
+                  style="transition: width 0.3s ease;"
+                />
+              </c-progress>
+              <div class="position-absolute w-100 h-100 d-flex align-items-center justify-content-center" style="top: 0; left: 0; pointer-events: none;">
+                <strong style="font-size: 1rem; text-shadow: 0 0 3px white, 0 0 3px white, 0 0 3px white;">
+                  {{ Math.min(Math.max((gameStats.expected_mortality || 0).toFixed(2), 0), 100) }}%
+                </strong>
+              </div>
+            </div>
 
             <h6>{{ $t('settings.activity_this_month') }}</h6>
-            <c-progress>
-              <c-progress-bar 
-                :value="monthlyActivity" 
-                color="info"
-              >
-                {{ monthlyActivity }}%
-              </c-progress-bar>
-            </c-progress>
+            <div class="position-relative mb-3" style="height: 40px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);">
+              <c-progress style="height: 100%; border-radius: 8px; background: transparent;">
+                <c-progress-bar 
+                  :value="monthlyActivity" 
+                  color="info"
+                  style="transition: width 0.3s ease;"
+                />
+              </c-progress>
+              <div class="position-absolute w-100 h-100 d-flex align-items-center justify-content-center" style="top: 0; left: 0; pointer-events: none;">
+                <strong style="font-size: 1rem; text-shadow: 0 0 3px white, 0 0 3px white, 0 0 3px white;">
+                  {{ monthlyActivity }}%
+                </strong>
+              </div>
+            </div>
           </div>
         </c-card-body>
       </c-card>
@@ -338,7 +353,9 @@ export default {
       objects: 0,
       hospital_capacity: 0,
       population: 0,
-      expected_mortality: 0 // percent
+      expected_mortality: 0, // percent
+      death_threshold_level: null,
+      occupied: 0
     });
 
     const settings = ref({
@@ -538,6 +555,8 @@ export default {
           gameStats.value.population = d.population ?? 0;
           gameStats.value.hospital_capacity = d.hospital_capacity ?? 0;
           gameStats.value.expected_mortality = (typeof d.expectedMortality === 'number') ? Number(d.expectedMortality) : 0;
+          gameStats.value.death_threshold_level = (typeof d.death_threshold_level === 'number') ? Number(d.death_threshold_level) : null;
+          gameStats.value.occupied = (typeof d.occupied === 'number') ? Number(d.occupied) : 0;
         } catch (e) {
           console.error('loadStats error', e);
         }

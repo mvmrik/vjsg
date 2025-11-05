@@ -32,6 +32,8 @@ return [
     'population_increase_message' => 'Вашето население се увеличи с :count човека.',
     'population_decrease_title' => 'Намаление на населението',
     'population_decrease_message' => 'Поради недостатъчна болнична капацитет, :count човека са починали.',
+    'population_daily_summary_title' => 'Дневен ъпдейт на населението',
+    'population_daily_summary_message' => 'Днес: +:born родени, -:died умрели.',
     'production_cancelled_title' => 'Производството спряно',
     'production_cancelled_message' => 'Производството бе спряно за :count работници на ниво :level поради недостатъчен брой хора.',
     'production_overassigned_title' => 'Производството има повече назначени работници',

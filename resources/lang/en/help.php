@@ -25,6 +25,7 @@ return [
                 . '<li><strong>First actions:</strong> Claim an available parcel on the map, place a basic object, and gather initial resources.</li>'
                 . '<li><strong>Language & settings:</strong> Switch language from the home page flags or update preferences in Settings.</li>'
                 . '<li><strong>Support & updates:</strong> Check Notifications for system messages and updates.</li>'
+        . '<li><strong>Installable app:</strong> You can install the game as an app from supported browsers (Chrome/Edge). Use the browser "Install" menu or "Add to Home screen" on mobile to create a shortcut and run the game in a separate window.</li>'
                 . '</ul>'
         ],
         'game_basics' => [
@@ -101,6 +102,7 @@ return [
         . '<li>Input resources consumed when the production started are <strong>not</strong> refunded (starting a production spends the inputs immediately).</li>'
         . '</ul>'
         . '<li><strong>Why this design:</strong> This prevents having active productions that reference non-existing people and keeps the server state consistent. It also encourages players to build hospitals to protect their population and to manage worker assignments carefully.</li>'
+    . '<li><strong>Daily summary notifications:</strong> Each daily population tick now creates a single summary Notification (in Notifications) that reports how many people were added and how many died in that tick. Check Notifications to review the daily summary for your account.</li>'
         . '</ul>'
     ],
         'economy' => [

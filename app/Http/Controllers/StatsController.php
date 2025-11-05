@@ -32,7 +32,10 @@ class StatsController extends Controller
 
             $population = (int) DB::table('people')->where('user_id', $userId)->sum('count');
 
-            // Hospital capacity = sum(hospital.level) + sum(tools.level for tools attached to hospitals)
+            // Compute hospital effect for new level-threshold mortality:
+            // hospital effect = sum(hospital.level) + sum(tools.level in hospitals) / 10
+            // threshold_level = 5 + round(hospital_effect, half-up)
+            // expectedMortality (frontend) = percent of people whose level > threshold_level
             $hospitalLevelSum = (int) DB::table('city_objects')
                 ->where('user_id', $userId)
                 ->where('object_type', 'hospital')
@@ -44,34 +47,34 @@ class StatsController extends Controller
                 ->where('city_objects.user_id', $userId)
                 ->sum('tools.level');
 
-            $hospitalCapacity = $hospitalLevelSum + $hospitalToolSum;
+            $hospitalEffect = $hospitalLevelSum + ($hospitalToolSum / 10.0);
+            $roundedEffect = intval(round($hospitalEffect, 0, PHP_ROUND_HALF_UP));
+            $thresholdLevel = 5 + $roundedEffect;
 
-            $deficit = max(0, $population - $hospitalCapacity);
+            // Count people above threshold
+            $above = (int) DB::table('people')
+                ->where('user_id', $userId)
+                ->where('level', '>', $thresholdLevel)
+                ->sum('count');
 
-            // Compute expected immediate mortality similar to population:births but scaled down
-            $maxRemovable = intval(floor($population * 0.8));
-            $originalToRemove = min($deficit, $maxRemovable);
-            // Scale mortality down by factor 10 to match daily tick logic
-            $toRemove = intval(floor($originalToRemove / 10));
+            // Count currently occupied workers (active productions)
+            // Sum all occupied_workers for the user. If an occupied record exists it counts as occupied.
+            $occupiedActive = (int) DB::table('occupied_workers')
+                ->where('user_id', $userId)
+                ->sum('count');
 
-            // Enforce minimum mortality floor of 5% (rounded up), but do not exceed originalToRemove
-            $minPercent = 0.05; // 5%
-            $minRemovable = intval(ceil($population * $minPercent));
-            if ($minRemovable < 1) $minRemovable = 1;
-            if ($originalToRemove > 0 && $toRemove < $minRemovable) {
-                $toRemove = min($minRemovable, $originalToRemove);
-            }
-
-            $expectedMortality = ($population > 0) ? ($toRemove / max(1, $population)) * 100 : 0;
-            $expectedMortality = min(80, $expectedMortality);
+            $expectedMortality = ($population > 0) ? ($above / $population) * 100 : 0;
 
             return response()->json([
                 'success' => true,
                 'parcels' => $parcels,
                 'objects' => $objects,
                 'population' => $population,
-                'hospital_capacity' => $hospitalCapacity,
-                'expectedMortality' => round($expectedMortality, 4)
+                // keep hospital_capacity for backwards compatibility but provide breakdown
+                'hospital_capacity' => $hospitalLevelSum + $hospitalToolSum,
+                'expectedMortality' => round($expectedMortality, 4),
+                'death_threshold_level' => $thresholdLevel,
+                'occupied' => $occupiedActive
             ]);
         } catch (\Exception $e) {
             \Log::error('StatsController@index error: ' . $e->getMessage());

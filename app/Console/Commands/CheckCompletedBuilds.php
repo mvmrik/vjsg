@@ -145,10 +145,50 @@ class CheckCompletedBuilds extends Command
             $object->ready_at = null;
             $object->save();
 
-            // Free workers if they were occupied
-            OccupiedWorker::where('user_id', $object->user_id)
-                ->where('city_object_id', $object->id)
-                ->delete();
+            // Free workers if they were occupied: restore them back to `people` counts
+            try {
+                $db2 = \Illuminate\Support\Facades\DB::connection();
+                $db2->beginTransaction();
+
+                $occupiedRows = OccupiedWorker::where('user_id', $object->user_id)
+                    ->where('city_object_id', $object->id)
+                    ->get();
+
+                foreach ($occupiedRows as $occ) {
+                    $lvl = intval($occ->level);
+                    $cnt = intval($occ->count);
+
+                    // Lock and increment or insert person row
+                    $person = DB::table('people')
+                        ->where('user_id', $object->user_id)
+                        ->where('level', $lvl)
+                        ->lockForUpdate()
+                        ->first();
+
+                    if ($person) {
+                        DB::table('people')
+                            ->where('user_id', $object->user_id)
+                            ->where('level', $lvl)
+                            ->update(['count' => intval($person->total ?? $person->count) + $cnt]);
+                    } else {
+                        DB::table('people')->insert([
+                            'user_id' => $object->user_id,
+                            'level' => $lvl,
+                            'count' => $cnt
+                        ]);
+                    }
+                }
+
+                // Delete occupied rows for this object
+                OccupiedWorker::where('user_id', $object->user_id)
+                    ->where('city_object_id', $object->id)
+                    ->delete();
+
+                $db2->commit();
+            } catch (\Exception $e) {
+                try { $db2->rollBack(); } catch (\Exception $_) {}
+                \Log::error('Failed to restore occupied workers for object ' . $object->id . ': ' . $e->getMessage());
+            }
 
             $count++;
         }

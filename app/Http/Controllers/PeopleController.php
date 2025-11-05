@@ -18,22 +18,13 @@ class PeopleController extends Controller
 
         $groups = Person::where('user_id', $userId)->get();
 
-        // Get occupied counts by level
-        $occupiedByLevel = OccupiedWorker::where('user_id', $userId)
-            ->where('occupied_until', '>', now())
-            ->selectRaw('level, SUM(count) as occupied_count')
-            ->groupBy('level')
-            ->pluck('occupied_count', 'level')
-            ->all();
-
-        $total = $groups->sum('count');
-        $totalOccupied = array_sum($occupiedByLevel);
-        $totalFree = $total - $totalOccupied;
+        // Under the simplified model, `people` already represents free workers only.
+        // So simply return counts from the `people` table directly.
+        $totalFree = $groups->sum('count');
 
         // Breakdown by level (free counts)
-        $byLevel = $groups->mapWithKeys(function ($g) use ($occupiedByLevel) {
-            $occupied = $occupiedByLevel[$g->level] ?? 0;
-            return [$g->level => $g->count - $occupied];
+        $byLevel = $groups->mapWithKeys(function ($g) {
+            return [$g->level => intval($g->count)];
         })->all();
 
         return response()->json([

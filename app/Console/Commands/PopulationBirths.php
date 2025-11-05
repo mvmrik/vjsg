@@ -48,7 +48,16 @@ class PopulationBirths extends Command
             try {
                 // --- Mortality: account for hospitals ---
                 try {
-                    // Sum hospital levels per user (only built hospitals with level > 0 contribute)
+                    // New simplified mortality rule (level-threshold based):
+                    // - base threshold is level 5 (everyone with level > 5 dies)
+                    // - each hospital contributes its level to the threshold
+                    // - tools inside hospitals contribute their tool level / 10 to the threshold
+                    // - hospital effect is: sum(hospital.level) + sum(tools.level) / 10
+                    // - round hospital effect half-up (PHP_ROUND_HALF_UP)
+                    // - final threshold = 5 + round(hospital_effect)
+                    // Remove ALL people with level > threshold (delete their rows and count them as deaths)
+
+                    // Sum hospital levels per user
                     $hospitalSum = DB::table('city_objects')
                         ->where('object_type', 'hospital')
                         ->where('user_id', $userId)
@@ -61,84 +70,38 @@ class PopulationBirths extends Command
                         ->where('city_objects.user_id', $userId)
                         ->sum('tools.level');
 
-                    $hospitalCapacity = intval($hospitalSum) + intval($hospitalToolSum);
+                    $hospitalSum = intval($hospitalSum);
+                    $hospitalToolSum = intval($hospitalToolSum);
+
+                    // Compute hospital effect and threshold
+                    $hospitalEffect = $hospitalSum + ($hospitalToolSum / 10.0);
+                    // Round half-up
+                    $roundedEffect = intval(round($hospitalEffect, 0, PHP_ROUND_HALF_UP));
+                    $thresholdLevel = 5 + $roundedEffect;
 
                     // Total current population for user (before births)
                     $totalPop = intval(DB::table('people')->where('user_id', $userId)->sum('count'));
 
-                    if ($hospitalCapacity < $totalPop) {
-                        $deficit = $totalPop - $hospitalCapacity;
+                    if ($totalPop > 0) {
+                        // Sum counts of people above threshold
+                        $toRemoveTotal = intval(DB::table('people')
+                            ->where('user_id', $userId)
+                            ->where('level', '>', $thresholdLevel)
+                            ->sum('count'));
 
-                        // Cap mortality so it can never reach 100% of the population.
-                        // Maximum removable people is 80% of the total population.
-                        $maxRemovable = intval(floor($totalPop * 0.8));
-                        // Determine how many to remove (can't exceed deficit nor maxRemovable)
-                        $toRemoveTotal = min($deficit, $maxRemovable);
-
-                        // Keep original (pre-scale) for bounds
-                        $originalToRemove = $toRemoveTotal;
-
-                        // Scale mortality down so hospitals are more effective: divide removals by 10
-                        // (this implements: 10x fewer deaths; e.g. previous 80 -> now 8)
-                        $toRemoveTotal = intval(floor($toRemoveTotal / 10));
-
-                        // Enforce a minimum mortality floor of 5% of population (rounded up)
-                        // This guarantees some mortality when there is a deficit, but still
-                        // doesn't exceed the original computed removals.
-                        $minPercent = 0.05; // 5%
-                        $minRemovable = intval(ceil($totalPop * $minPercent));
-                        if ($minRemovable < 1) $minRemovable = 1;
-                        if ($originalToRemove > 0 && $toRemoveTotal < $minRemovable) {
-                            // Respect original bound (can't remove more than originalToRemove)
-                            $toRemoveTotal = min($minRemovable, $originalToRemove);
-                        }
-
-                        // If capped removal is zero, skip deletion (we don't remove everybody)
                         if ($toRemoveTotal > 0) {
-                            // Remove people from highest levels first (descending level)
                             DB::beginTransaction();
                             try {
-                                $levels = Person::where('user_id', $userId)
-                                    ->where('count', '>', 0)
-                                    ->orderBy('level', 'desc')
-                                    ->get();
-
-                                $remaining = $toRemoveTotal;
-                                foreach ($levels as $lvlRow) {
-                                    if ($remaining <= 0) break;
-                                    $available = intval($lvlRow->count);
-                                    if ($available <= 0) continue;
-                                    $take = min($available, $remaining);
-                                    // decrement count; if becomes zero, delete the row to avoid empty-level rows
-                                    $newCount = $available - $take;
-                                    if ($newCount <= 0) {
-                                        $lvlRow->delete();
-                                    } else {
-                                        $lvlRow->count = $newCount;
-                                        $lvlRow->save();
-                                    }
-                                    $remaining -= $take;
-                                }
+                                // Delete rows strictly above threshold and record removed count
+                                DB::table('people')
+                                    ->where('user_id', $userId)
+                                    ->where('level', '>', $thresholdLevel)
+                                    ->delete();
 
                                 DB::commit();
 
-                                // Create notification about deaths
-                                $title = __('notifications.population_decrease_title');
-                                $message = __('notifications.population_decrease_message', ['count' => $toRemoveTotal]);
-                                Notification::create([
-                                    'user_id' => $userId,
-                                    'title' => $title,
-                                    'message' => $message,
-                                    'type' => 'danger',
-                                    'is_read' => false,
-                                    'data' => json_encode([
-                                        'removed' => $toRemoveTotal,
-                                        'hospital_capacity' => $hospitalCapacity,
-                                        'total_before' => $totalPop,
-                                        'deficit' => $deficit,
-                                        'max_removable' => $maxRemovable
-                                    ])
-                                ]);
+                                // Record removed total for daily summary
+                                $removedForUser = $toRemoveTotal;
                             } catch (\Exception $e) {
                                 DB::rollBack();
                                 \Log::error('population:births: mortality processing failed for user ' . $userId . ': ' . $e->getMessage());
@@ -149,8 +112,85 @@ class PopulationBirths extends Command
                     \Log::error('population:births: failed to compute hospital capacity for user ' . $userId . ': ' . $e->getMessage());
                 }
 
-                // Reconcile occupied workers: if assigned workers at a level exceed available people at that level,
-                // cancel affected productions (delete occupied records, clear ready_at, remove production outputs and adjust temp_count).
+                // --- Level up: increase level of available (not-occupied) people by 1 ---
+                try {
+                    // Initialize per-user removed counter (deaths) for daily summary
+                    $removedForUser = 0;
+                    // Active occupied workers (they are in production and must not be levelled)
+                    $nowDt = date('Y-m-d H:i:s', time());
+                    $occupiedActive = DB::table('occupied_workers')
+                        ->where('user_id', $userId)
+                        ->where('occupied_until', '>', $nowDt)
+                        ->select('level', DB::raw('SUM(count) as total'))
+                        ->groupBy('level')
+                        ->pluck('total', 'level')
+                        ->toArray();
+
+                    // Level up only the free (not occupied) people. Lock rows for update to avoid races.
+                    DB::beginTransaction();
+                    try {
+                        $peopleRows = DB::table('people')
+                            ->where('user_id', $userId)
+                            ->select('level', 'count')
+                            ->orderBy('level')
+                            ->lockForUpdate()
+                            ->get();
+
+                        foreach ($peopleRows as $row) {
+                            $level = intval($row->level);
+                            $count = intval($row->count);
+                            $occupied = intval($occupiedActive[$level] ?? 0);
+                            $available = max(0, $count - $occupied);
+                            if ($available <= 0) continue;
+
+                            $nextLevel = $level + 1;
+
+                            // Decrement current level
+                            $newCount = $count - $available;
+                            if ($newCount <= 0) {
+                                DB::table('people')
+                                    ->where('user_id', $userId)
+                                    ->where('level', $level)
+                                    ->delete();
+                            } else {
+                                DB::table('people')
+                                    ->where('user_id', $userId)
+                                    ->where('level', $level)
+                                    ->update(['count' => $newCount]);
+                            }
+
+                            // Increment next level (create if missing)
+                            $existing = DB::table('people')
+                                ->where('user_id', $userId)
+                                ->where('level', $nextLevel)
+                                ->lockForUpdate()
+                                ->first();
+
+                            if ($existing) {
+                                DB::table('people')
+                                    ->where('user_id', $userId)
+                                    ->where('level', $nextLevel)
+                                    ->update(['count' => intval($existing->count) + $available]);
+                            } else {
+                                DB::table('people')
+                                    ->insert([
+                                        'user_id' => $userId,
+                                        'level' => $nextLevel,
+                                        'count' => $available
+                                    ]);
+                            }
+                        }
+
+                        DB::commit();
+                    } catch (\Exception $e) {
+                        DB::rollBack();
+                        \Log::error('population:births: level-up failed for user ' . $userId . ': ' . $e->getMessage());
+                    }
+                } catch (\Exception $e) {
+                    \Log::error('population:births: failed to compute level-up for user ' . $userId . ': ' . $e->getMessage());
+                }
+
+                // Reconcile occupied workers (now after level-up) — this no longer creates notifications, only logs.
                 try {
                     $this->reconcileOccupiedWorkers($userId);
                 } catch (\Exception $e) {
@@ -179,25 +219,32 @@ class PopulationBirths extends Command
 
                 $this->info("User {$userId}: +{$toAdd} people (houses: {$houses}, tools: {$tools})");
 
-                // Create a notification for the user about population increase
+                // Create a single daily summary notification (born + died)
                 try {
-                    $title = __('notifications.population_increase_title');
-                    $message = __('notifications.population_increase_message', ['count' => $toAdd]);
-                    Notification::create([
-                        'user_id' => $userId,
-                        'title' => $title,
-                        'message' => $message,
-                        'type' => 'success',
-                        'is_read' => false,
-                        'data' => json_encode([
-                            'added' => $toAdd,
-                            'houses' => $houses,
-                            'tools' => $tools
-                        ])
-                    ]);
+                    $born = $toAdd;
+                    $died = intval($removedForUser ?? 0);
+
+                    // Only create summary if anything changed
+                    if ($born > 0 || $died > 0) {
+                        $title = __('notifications.population_daily_summary_title');
+                        $message = __('notifications.population_daily_summary_message', ['born' => $born, 'died' => $died]);
+                        Notification::create([
+                            'user_id' => $userId,
+                            'title' => $title,
+                            'message' => $message,
+                            'type' => 'success',
+                            'is_read' => false,
+                            'data' => json_encode([
+                                'born' => $born,
+                                'died' => $died,
+                                'houses' => $houses,
+                                'tools' => $tools
+                            ])
+                        ]);
+                    }
                 } catch (\Exception $e) {
                     // log and continue
-                    \Log::error('population:births: failed to create notification for user ' . $userId . ': ' . $e->getMessage());
+                    \Log::error('population:births: failed to create daily summary notification for user ' . $userId . ': ' . $e->getMessage());
                 }
             } catch (\Exception $e) {
                 // Log and continue with other users
@@ -235,32 +282,13 @@ class PopulationBirths extends Command
             ->pluck('total', 'level')
             ->toArray();
 
-        foreach ($occupiedSums as $level => $assigned) {
-            $available = intval($peopleByLevel[$level] ?? 0);
-            if ($assigned <= $available) continue;
+            foreach ($occupiedSums as $level => $assigned) {
+                $available = intval($peopleByLevel[$level] ?? 0);
+                if ($assigned <= $available) continue;
 
-            // Too many assigned at this level -> DO NOT cancel productions or clear ready_at.
-            // Instead, notify the user and log the condition. Occupied workers remain as-is.
-            try {
-                $title = __('notifications.production_overassigned_title');
-                $message = __('notifications.production_overassigned_message', ['assigned' => $assigned, 'available' => $available, 'level' => $level]);
-                Notification::create([
-                    'user_id' => $userId,
-                    'title' => $title,
-                    'message' => $message,
-                    'type' => 'warning',
-                    'is_read' => false,
-                    'data' => json_encode([
-                        'assigned' => $assigned,
-                        'available' => $available,
-                        'level' => $level
-                    ])
-                ]);
-
+                // Too many assigned at this level -> DO NOT cancel productions or clear ready_at.
+                // Per user request, do NOT create notifications. Log a warning for server operators.
                 \Log::warning('population:births: reconcileOccupiedWorkers over-assigned for user ' . $userId . ', level ' . $level . ': assigned=' . $assigned . ' available=' . $available);
-            } catch (\Exception $e) {
-                \Log::error('population:births: reconcileOccupiedWorkers notify failed for user ' . $userId . ', level ' . $level . ': ' . $e->getMessage());
             }
-        }
     }
 }
