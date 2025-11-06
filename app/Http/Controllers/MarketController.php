@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use App\Models\MarketOrder;
 
 class MarketController extends Controller
@@ -35,13 +36,19 @@ class MarketController extends Controller
 
         DB::beginTransaction();
         try {
+            // Lock user row first to check fee availability (prevents negative balance scenarios)
+            $user = DB::table('users')->where('id', $userId)->lockForUpdate()->first();
+            $feeBps = intval($user->fee_bps ?? 1000);
+            $potentialTradeValue = $price * $quantity;
+            $potentialFee = intdiv($potentialTradeValue * $feeBps, 10000);
+
             if ($side === 'buy') {
-                $cost = $price * $quantity;
-                $user = DB::table('users')->where('id', $userId)->lockForUpdate()->first();
+                $cost = $potentialTradeValue;
                 $available = intval($user->balance) - intval($user->reserved_balance ?? 0);
-                if ($available < $cost) {
+                // Ensure user can pay both the cost (reserved) and the fee (from balance)
+                if ($available < ($cost + $potentialFee)) {
                     DB::rollBack();
-                    return response()->json(['success' => false, 'message' => "Insufficient funds. Available: $available, need: $cost"], 400);
+                    return response()->json(['success' => false, 'message' => "Insufficient funds. Available: $available, need for order+fee: " . ($cost + $potentialFee)], 400);
                 }
                 DB::table('users')->where('id', $userId)->increment('reserved_balance', $cost);
             } else {
@@ -52,6 +59,11 @@ class MarketController extends Controller
                     DB::rollBack();
                     $toolTypeName = DB::table('tool_types')->where('id', $toolTypeId)->value('name') ?? 'items';
                     return response()->json(['success' => false, 'message' => "Insufficient $toolTypeName to sell. You have: $have, need: $quantity"], 400);
+                }
+                // Ensure seller has enough balance to cover the potential fee (prevent negative on fee debit)
+                if (intval($user->balance) < $potentialFee) {
+                    DB::rollBack();
+                    return response()->json(['success' => false, 'message' => "Insufficient balance to cover potential fee: need $potentialFee, have " . intval($user->balance)], 400);
                 }
                 DB::table('inventories')->where('user_id', $userId)->where('tool_type_id', $toolTypeId)->increment('reserved_count', $quantity);
             }
@@ -69,7 +81,7 @@ class MarketController extends Controller
             return response()->json(['success' => true, 'order_id' => $orderId]);
         } catch (\Exception $e) {
             DB::rollBack();
-            \Log::error('market order create failed: ' . $e->getMessage());
+            Log::error('market order create failed: ' . $e->getMessage());
             return response()->json(['success' => false, 'message' => 'Server error'], 500);
         }
     }
@@ -188,7 +200,7 @@ class MarketController extends Controller
             return response()->json(['success' => true]);
         } catch (\Exception $e) {
             DB::rollBack();
-            \Log::error('market order cancel failed: ' . $e->getMessage());
+            Log::error('market order cancel failed: ' . $e->getMessage());
             return response()->json(['success' => false, 'message' => 'Server error'], 500);
         }
     }

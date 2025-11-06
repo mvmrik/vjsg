@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use App\Models\Person;
 use App\Models\Notification;
 use App\Models\OccupiedWorker;
@@ -19,23 +20,21 @@ class PopulationBirths extends Command
     {
         $this->info('Starting population births (UTC): ' . now()->utc()->toDateTimeString());
 
-        // Sum of house levels per user (only built/upgraded houses with level > 0 contribute).
-        $houseSums = DB::table('city_objects')
-            ->select('user_id', DB::raw('SUM(level) as house_sum'))
+        // Use cached aggregated values when available to avoid expensive SUMs.
+        $houseAgg = DB::table('aggregated_object_levels')
             ->where('object_type', 'house')
-            ->groupBy('user_id')
-            ->pluck('house_sum', 'user_id')
+            ->select('user_id', 'object_level_sum', 'tool_sum', 'total_level')
+            ->get()
+            ->keyBy('user_id')
             ->toArray();
 
-        // Sum of tool levels for tools that belong to houses, per user
-        // Sum of tool levels for tools that belong to houses, per user.
-        $toolSums = DB::table('tools')
-            ->join('city_objects', 'tools.object_id', '=', 'city_objects.id')
-            ->where('city_objects.object_type', 'house')
-            ->select('city_objects.user_id as user_id', DB::raw('SUM(tools.level) as tools_sum'))
-            ->groupBy('city_objects.user_id')
-            ->pluck('tools_sum', 'user_id')
-            ->toArray();
+        // Build maps similar to previous variables for compatibility
+        $houseSums = [];
+        $toolSums = [];
+        foreach ($houseAgg as $uid => $row) {
+            $houseSums[$uid] = intval($row->object_level_sum ?? 0);
+            $toolSums[$uid] = intval($row->tool_sum ?? 0);
+        }
 
     // Also include users who currently have people and users who have hospitals
     $peopleUsers = DB::table('people')->select('user_id')->distinct()->pluck('user_id')->toArray();
@@ -57,18 +56,23 @@ class PopulationBirths extends Command
                     // - final threshold = 5 + round(hospital_effect)
                     // Remove ALL people with level > threshold (delete their rows and count them as deaths)
 
-                    // Sum hospital levels per user
-                    $hospitalSum = DB::table('city_objects')
-                        ->where('object_type', 'hospital')
-                        ->where('user_id', $userId)
-                        ->sum('level');
-
-                    // Sum tool levels for tools attached to hospitals
-                    $hospitalToolSum = DB::table('tools')
-                        ->join('city_objects', 'tools.object_id', '=', 'city_objects.id')
-                        ->where('city_objects.object_type', 'hospital')
-                        ->where('city_objects.user_id', $userId)
-                        ->sum('tools.level');
+                    // Use cached aggregate for hospital if available (object_level_sum and tool_sum)
+                    $hospitalRow = \App\Services\ObjectLevelService::getCachedAggregateRow($userId, 'hospital');
+                    if ($hospitalRow !== null) {
+                        $hospitalSum = intval($hospitalRow['object_level_sum']);
+                        $hospitalToolSum = intval($hospitalRow['tool_sum']);
+                    } else {
+                        // fallback to raw DB sums if cache missing
+                        $hospitalSum = DB::table('city_objects')
+                            ->where('object_type', 'hospital')
+                            ->where('user_id', $userId)
+                            ->sum('level');
+                        $hospitalToolSum = DB::table('tools')
+                            ->join('city_objects', 'tools.object_id', '=', 'city_objects.id')
+                            ->where('city_objects.object_type', 'hospital')
+                            ->where('city_objects.user_id', $userId)
+                            ->sum('tools.level');
+                    }
 
                     $hospitalSum = intval($hospitalSum);
                     $hospitalToolSum = intval($hospitalToolSum);
@@ -104,12 +108,12 @@ class PopulationBirths extends Command
                                 $removedForUser = $toRemoveTotal;
                             } catch (\Exception $e) {
                                 DB::rollBack();
-                                \Log::error('population:births: mortality processing failed for user ' . $userId . ': ' . $e->getMessage());
+                                Log::error('population:births: mortality processing failed for user ' . $userId . ': ' . $e->getMessage());
                             }
                         }
                     }
                 } catch (\Exception $e) {
-                    \Log::error('population:births: failed to compute hospital capacity for user ' . $userId . ': ' . $e->getMessage());
+                    Log::error('population:births: failed to compute hospital capacity for user ' . $userId . ': ' . $e->getMessage());
                 }
 
                 // --- Level up: increase level of available (not-occupied) people by 1 ---
@@ -184,17 +188,17 @@ class PopulationBirths extends Command
                         DB::commit();
                     } catch (\Exception $e) {
                         DB::rollBack();
-                        \Log::error('population:births: level-up failed for user ' . $userId . ': ' . $e->getMessage());
+                        Log::error('population:births: level-up failed for user ' . $userId . ': ' . $e->getMessage());
                     }
                 } catch (\Exception $e) {
-                    \Log::error('population:births: failed to compute level-up for user ' . $userId . ': ' . $e->getMessage());
+                    Log::error('population:births: failed to compute level-up for user ' . $userId . ': ' . $e->getMessage());
                 }
 
                 // Reconcile occupied workers (now after level-up) — this no longer creates notifications, only logs.
                 try {
                     $this->reconcileOccupiedWorkers($userId);
                 } catch (\Exception $e) {
-                    \Log::error('population:births: reconcileOccupiedWorkers failed for user ' . $userId . ': ' . $e->getMessage());
+                    Log::error('population:births: reconcileOccupiedWorkers failed for user ' . $userId . ': ' . $e->getMessage());
                 }
 
                 // --- Births: add people based on houses/tools ---
@@ -244,11 +248,11 @@ class PopulationBirths extends Command
                     }
                 } catch (\Exception $e) {
                     // log and continue
-                    \Log::error('population:births: failed to create daily summary notification for user ' . $userId . ': ' . $e->getMessage());
+                    Log::error('population:births: failed to create daily summary notification for user ' . $userId . ': ' . $e->getMessage());
                 }
             } catch (\Exception $e) {
                 // Log and continue with other users
-                \Log::error('population:births error for user ' . $userId . ': ' . $e->getMessage(), ['exception' => $e]);
+                Log::error('population:births error for user ' . $userId . ': ' . $e->getMessage(), ['exception' => $e]);
                 $this->error('Error processing user ' . $userId . '. See log for details.');
                 continue;
             }
@@ -288,7 +292,7 @@ class PopulationBirths extends Command
 
                 // Too many assigned at this level -> DO NOT cancel productions or clear ready_at.
                 // Per user request, do NOT create notifications. Log a warning for server operators.
-                \Log::warning('population:births: reconcileOccupiedWorkers over-assigned for user ' . $userId . ', level ' . $level . ': assigned=' . $assigned . ' available=' . $available);
+                Log::warning('population:births: reconcileOccupiedWorkers over-assigned for user ' . $userId . ', level ' . $level . ': assigned=' . $assigned . ' available=' . $available);
             }
     }
 }

@@ -57,11 +57,11 @@
                           alt="Tool"
                         />
 
-                        <!-- Show tool level badge (desktop only) -->
+                        <!-- Show tool durability badge (desktop only) -->
                         <div class="object-info-badge d-none d-md-flex level-badge">
-                          {{ $t("city.level") }}
+                          {{ $t("tools.durability") }}
                           {{
-                            getToolAt(Math.floor((i - 1) / 4), (i - 1) % 4)?.level || 1
+                            getToolAt(Math.floor((i - 1) / 4), (i - 1) % 4)?.durability || 100
                           }}
                         </div>
 
@@ -95,6 +95,15 @@
                             title="Информация за tool"
                           >
                             <c-icon name="cil-info" size="xl" />
+                          </div>
+                          <div
+                            @click.stop="deleteTool(
+                              getToolAt(Math.floor((i - 1) / 4), (i - 1) % 4)
+                            )"
+                            class="action-icon delete-icon"
+                            title="Изтрий инструмент"
+                          >
+                            <c-icon name="cil-trash" size="xl" />
                           </div>
                           <div
                             @click.stop="hideToolActions()"
@@ -1153,6 +1162,21 @@ export default {
       }
     };
 
+    const deleteTool = async (tool) => {
+      if (!tool || !tool.id) return;
+      const ok = confirm($t('tools.confirm_delete') || 'Delete this tool?');
+      if (!ok) return;
+      try {
+        await axios.delete(`/api/objects/tool/${tool.id}`);
+        // reload tools list
+        await loadTools();
+      } catch (e) {
+        console.error('Failed to delete tool', e);
+        alert($t('tools.delete_failed') || 'Failed to delete tool');
+      }
+      hoveredCell.value = null;
+    };
+
     const startMoveMode = (tool) => {
       moveMode.value = true;
       selectedTool.value = tool;
@@ -1163,7 +1187,7 @@ export default {
       alert(
         `Tool: ${getTranslatedName(tool.name)}\nType: ${getTranslatedName(
           tool.tool_type_name
-        )}\nLevel: ${tool.level || 1}\nPosition: (${tool.position_x}, ${tool.position_y})`
+        )}\n${$t('tools.durability')}: ${tool.durability || 100}\nPosition: (${tool.position_x}, ${tool.position_y})`
       );
       hoveredCell.value = null; // Hide actions after showing info
     };
@@ -1261,6 +1285,7 @@ export default {
       cancelMove,
       handleToolClick,
       handleToolTouch,
+  deleteTool,
       // Production
       showProduceModal,
       produceWorkerLevel,

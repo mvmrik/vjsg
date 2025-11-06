@@ -218,7 +218,7 @@
               </div>
             </div>
 
-            <h6>{{ $t('settings.activity_this_month') }}</h6>
+            <h6>{{ $t('settings.market_fee') }}</h6>
             <div class="position-relative mb-3" style="height: 40px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);">
               <c-progress style="height: 100%; border-radius: 8px; background: transparent;">
                 <c-progress-bar 
@@ -392,8 +392,23 @@ export default {
     });
 
     const monthlyActivity = computed(() => {
-      // Mock calculation - replace with real data
-      return 75;
+      // Reuse the existing UI slot for a single percentage value. Now used for market fee.
+      // If user has fee_bps (basis points) provided by the API, convert to percent (bps/100).
+      try {
+        const bps = gameStore.user && typeof gameStore.user.fee_bps !== 'undefined' && gameStore.user.fee_bps !== null
+          ? Number(gameStore.user.fee_bps)
+          : null;
+        if (bps !== null && !isNaN(bps)) {
+          // convert bps -> percent (100 bps = 1%)
+          const pct = Math.round(Math.max(0, Math.min(10000, bps)) / 100);
+          // pct is 0..100 (since we clamp bps 0..10000)
+          return Math.min(100, Math.max(0, pct));
+        }
+      } catch (e) {
+        // ignore and fallback
+      }
+      // Fallback default: show 10% as requested
+      return 10;
     });
     
     const copyToClipboard = (text) => {

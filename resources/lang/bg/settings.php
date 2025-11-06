@@ -27,6 +27,7 @@ return [
     'activity_this_month' => 'Активност този месец',
     'profile_settings' => 'Настройки на профила',
     'display' => 'Изглед',
+        'market_fee' => 'Такса на пазара',
     'display_settings' => 'Настройки на изгледа',
     'game_settings' => 'Игрови настройки',
     'production_length_hours' => 'Продължителност по подразбиране (часове)',

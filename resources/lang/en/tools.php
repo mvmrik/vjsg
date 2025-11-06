@@ -16,4 +16,7 @@ return [
         'food' => 'Food',
         'building_materials' => 'Building materials',
     ],
+    'durability' => 'Durability',
+    'confirm_delete' => 'Are you sure you want to delete this tool?',
+    'delete_failed' => 'Failed to delete tool',
 ];

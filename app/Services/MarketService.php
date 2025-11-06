@@ -7,8 +7,9 @@ use Illuminate\Support\Facades\DB;
 class MarketService
 {
     // Base fee settings (bps)
-    const BASE_FEE_BPS = 1000; // 10%
-    const BANK_REDUCTION_BPS = 100; // 1% per bank tool
+    // Base fee settings (bps) - base 100% (10000 bps). Bank units reduce fee by BANK_REDUCTION_BPS each.
+    const BASE_FEE_BPS = 10000; // 100%
+    const BANK_REDUCTION_BPS = 100; // 1% per bank unit
     const MIN_FEE_BPS = 100; // 1% minimum
 
     /**
@@ -16,21 +17,15 @@ class MarketService
      */
     public static function recomputeUserFee(int $userId)
     {
-        // Count bank levels
-        $bankLevelSum = intval(DB::table('city_objects')
-            ->where('user_id', $userId)
-            ->where('object_type', 'bank')
-            ->sum('level'));
+        // Use cached aggregate when available, otherwise recompute and store it.
+        $cachedRow = \App\Services\ObjectLevelService::getCachedAggregateRow($userId, 'bank');
+        if ($cachedRow === null) {
+            $totalBankUnits = \App\Services\ObjectLevelService::recomputeAndStore($userId, 'bank');
+        } else {
+            $totalBankUnits = intval($cachedRow['total_level']);
+        }
 
-        // Count tools attached to banks (their levels)
-        $bankToolSum = intval(DB::table('tools')
-            ->join('city_objects', 'tools.object_id', '=', 'city_objects.id')
-            ->where('city_objects.user_id', $userId)
-            ->where('city_objects.object_type', 'bank')
-            ->sum('tools.level'));
-
-        $totalBankUnits = $bankLevelSum + $bankToolSum;
-
+        // Reduction: each unit reduces fee by BANK_REDUCTION_BPS (bps)
         $reduction = $totalBankUnits * self::BANK_REDUCTION_BPS;
         $fee = max(self::MIN_FEE_BPS, self::BASE_FEE_BPS - $reduction);
 

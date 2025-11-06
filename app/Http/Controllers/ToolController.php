@@ -6,6 +6,7 @@ use App\Models\CityObject;
 use App\Models\Tool;
 use App\Models\ToolType;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class ToolController extends Controller
 {
@@ -38,9 +39,28 @@ class ToolController extends Controller
             return response()->json(['error' => 'Tool not allowed for this object type'], 403);
         }
 
-        Tool::create($request->only(['object_id', 'tool_type_id', 'position_x', 'position_y']));
+    // Ensure durability is set to full on creation (DB default is 100, but be explicit)
+    $data = $request->only(['object_id', 'tool_type_id', 'position_x', 'position_y']);
+    $data['durability'] = 100;
+    $created = Tool::create($data);
 
-        return response()->json(['success' => true]);
+        // If the parent object exists, recompute cached aggregate for its type and
+        // update related systems (e.g. market fee for banks).
+        try {
+            $parent = CityObject::find($data['object_id']);
+            if ($parent) {
+                $otype = $parent->object_type;
+                \App\Services\ObjectLevelService::recomputeAndStore($parent->user_id, $otype);
+                // If banks changed, also recompute user's market fee
+                if ($otype === 'bank') {
+                    \App\Services\MarketService::recomputeUserFee($parent->user_id);
+                }
+            }
+        } catch (\Exception $e) {
+            Log::error('Failed to recompute aggregate after addTool: ' . $e->getMessage());
+        }
+
+        return response()->json(['success' => true, 'tool_id' => $created->id]);
     }
 
     public function getTools($objectId)
@@ -73,6 +93,7 @@ class ToolController extends Controller
                 'raw_tool_type_id' => $rawType ? $rawType->id : null,
                 'raw_name' => $rawType ? $rawType->name : null,
                 'product_units_per_hour' => $productType->units_per_hour, // USE THIS for production calculation
+                'durability' => isset($tool->durability) ? intval($tool->durability) : (isset($tool->level) ? intval($tool->level) : 100),
             ];
         }
 
@@ -103,6 +124,37 @@ class ToolController extends Controller
         $tool->position_x = $request->x;
         $tool->position_y = $request->y;
         $tool->save();
+
+        return response()->json(['success' => true]);
+    }
+
+    public function deleteTool($toolId)
+    {
+        $tool = Tool::findOrFail($toolId);
+
+        // Only owner of the object can delete tools
+        $object = $tool->object;
+        $userId = auth()->id();
+        if (!$object || $object->user_id !== $userId) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $object = $tool->object;
+        $userId = $object ? $object->user_id : null;
+        $tool->delete();
+
+        // Recompute aggregate for the parent object's type and related systems.
+        try {
+            if ($object && $userId) {
+                $otype = $object->object_type;
+                \App\Services\ObjectLevelService::recomputeAndStore($userId, $otype);
+                if ($otype === 'bank') {
+                    \App\Services\MarketService::recomputeUserFee($userId);
+                }
+            }
+        } catch (\Exception $e) {
+            Log::error('Failed to recompute aggregate after deleteTool: ' . $e->getMessage());
+        }
 
         return response()->json(['success' => true]);
     }

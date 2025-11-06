@@ -11,6 +11,7 @@ use App\Models\Person;
 use App\Models\OccupiedWorker;
 use App\Models\Parcel;
 use App\Services\MarketService;
+use Illuminate\Support\Facades\Log;
 
 class CityController extends Controller
 {
@@ -292,12 +293,14 @@ class CityController extends Controller
                 $objects[] = (object)$arr;
 
                 // If this is a bank, recompute user's market fee
-                if (($createData['object_type'] ?? null) === 'bank') {
-                    try {
+                // Recompute cached aggregate for the created object's type and update related systems
+                try {
+                    \App\Services\ObjectLevelService::recomputeAndStore($userId, $createData['object_type']);
+                    if (($createData['object_type'] ?? null) === 'bank') {
                         MarketService::recomputeUserFee($userId);
-                    } catch (\Exception $e) {
-                        \Log::error('MarketService::recomputeUserFee failed for user ' . $userId . ': ' . $e->getMessage());
                     }
+                } catch (\Exception $e) {
+                    Log::error('Failed to recompute aggregate after object create for user ' . $userId . ': ' . $e->getMessage());
                 }
 
                 // OCCUPY WORKERS: Create occupied_worker record if workers were used
@@ -494,13 +497,14 @@ class CityController extends Controller
         $object->ready_at = $readyAt;
         $object->save();
 
-        // If this object is a bank, recompute user's market fee (bank upgrades reduce fee)
-        if ($object->object_type === 'bank') {
-            try {
+        // Recompute cached aggregate for this object's type and update related systems
+        try {
+            \App\Services\ObjectLevelService::recomputeAndStore($userId, $object->object_type);
+            if ($object->object_type === 'bank') {
                 \App\Services\MarketService::recomputeUserFee($userId);
-            } catch (\Exception $e) {
-                \Log::error('MarketService::recomputeUserFee failed for user ' . $userId . ': ' . $e->getMessage());
             }
+        } catch (\Exception $e) {
+            Log::error('Failed to recompute aggregate after upgrade for user ' . $userId . ': ' . $e->getMessage());
         }
 
         // Create occupied workers record and decrement free people atomically

@@ -88,3 +88,24 @@ These instructions are for GitHub Copilot to understand and follow specific rule
 
 When working with this project, always consult these instructions. If you have doubts about any rule, ask the user for clarification. These instructions can be updated over time according to project needs.
 
+
+## Aggregate Level Cache Policy (for developers / Copilot)
+
+When working with building-level logic (houses, banks, hospitals, etc.), always prefer the central cached aggregate instead of running ad-hoc SUM queries. This project maintains a per-user, per-object-type cache table called `aggregated_object_levels` and a helper service `App\Services\ObjectLevelService`.
+
+Key rules:
+- Read aggregated values using `ObjectLevelService::getCachedAggregateRow($userId, $objectType)` (returns object_level_sum, tool_sum, total_level).
+- If a cached row is missing and the code requires a value immediately, call `ObjectLevelService::recomputeAndStore($userId, $objectType)` to recompute and persist the cache — but prefer updating cache on change rather than recomputing on reads.
+- Always update the cached aggregate after any change to `CityObject` or `Tool` (create/update/delete). Use `recomputeAndStore` for the affected `object_type` and `user_id`.
+- For banks specifically, `recomputeAndStore(..., 'bank')` will also trigger `MarketService::recomputeUserFee($userId)` so market fees are updated immediately.
+- Use cached aggregates in scheduled jobs (population births, mortality, etc.) to avoid expensive repeat SUMs. Only fall back to direct SUM queries when a cache row is missing.
+
+Implementation references:
+- Aggregator service: `app/Services/ObjectLevelService.php`
+- Cached table: `aggregated_object_levels` (created via migrations)
+- Market fee logic: `app/Services/MarketService.php`
+- Places where updates are triggered: `ToolController`, `CityController`, `ToolsDecay` command, and population cron `PopulationBirths` (these examples show how to call recomputeAndStore after changes).
+
+Recommendation:
+- Prefer adding model observers for `Tool` and `CityObject` (created/updated/deleted) to call `recomputeAndStore` automatically. This ensures the cache stays correct regardless of which code path modifies models (controllers, seeds, imports, artisan scripts).
+

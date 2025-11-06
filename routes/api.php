@@ -121,6 +121,7 @@ Route::middleware(['game.auth'])->group(function () {
     Route::post('/objects/add-tool', [ToolController::class, 'addTool']);
     Route::get('/objects/{objectId}/tools', [ToolController::class, 'getTools']);
     Route::post('/objects/update-tool-position', [ToolController::class, 'updateToolPosition']);
+    Route::delete('/objects/tool/{toolId}', [ToolController::class, 'deleteTool']);
     
     // Inventory
     Route::get('/inventories', [\App\Http\Controllers\InventoryController::class, 'index']);

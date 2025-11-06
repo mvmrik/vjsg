@@ -25,6 +25,7 @@ return [
     'death_threshold' => 'Death threshold',
     'level' => 'Level',
     'activity_this_month' => 'Activity this month',
+    'market_fee' => 'Market fee',
     'profile_settings' => 'Profile Settings',
     'display' => 'Display',
     'display_settings' => 'Display Settings',

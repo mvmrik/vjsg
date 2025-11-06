@@ -35,7 +35,9 @@ class GameController extends Controller
                 // Do not expose private_key in API responses
                 //'private_key' => $user->private_key,
                 'locale' => $user->locale,
-                'balance' => $user->balance
+                'balance' => $user->balance,
+                // Per-user market fee in basis points (bps). Frontend will display as percent (fee_bps/100)
+                'fee_bps' => isset($user->fee_bps) ? intval($user->fee_bps) : null,
             ]
         ]);
     }

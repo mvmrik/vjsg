@@ -91,7 +91,7 @@ return [
     'title' => 'Population, Hospitals & Productions',
     'body' => '<p>This section describes population dynamics, hospitals and how the server handles occupied workers and cancelled productions.</p>'
     . '<ul>'
-    . '<li><strong>Births:</strong> Each day the server runs a population tick. New people are added based on your <em>houses</em> and their attached tools. The formula sums house levels and tool levels and adds that many level-1 people to your population.</li>'
+    . '<li><strong>Births:</strong> Each day the server runs a population tick. New people are added based on your <em>houses</em> and their attached tools. The formula sums house levels and the durability of attached tools and adds that many level-1 people to your population.</li>'
     . '<li><strong>Hospitals and deaths:</strong> Hospitals (object type "hospital") and tools placed in hospitals provide medical capacity. After births, the server checks hospital capacity vs current population. If capacity is lower than population, the server will remove (kill) a portion of the excess people. Removal is applied from highest-level people first (older people die first). When a people group reaches zero it is removed from the database.</li>'
     . '<li><strong>Behavior when no hospitals:</strong> If you have zero hospital capacity, the server will still remove people due to lack of capacity but will cap immediate mortality so it never removes more than 80% of your total population in a single tick — you will not lose your entire population at once.</li>'
         . '<li><strong>Occupied workers reconciliation:</strong> If the number of occupied workers assigned at a particular level exceeds the available people at that level, all affected occupied records for that level are cancelled. When this happens the server:</li>'
@@ -113,6 +113,13 @@ return [
                 . '<li><strong>Trading:</strong> If trading features are enabled, use them to exchange resources with other players or marketplaces.</li>'
                 . '<li><strong>Costs and ROI:</strong> Consider the return on investment for buildings (production vs cost and build time).</li>'
                 . '<li><strong>Player Market:</strong> A new Market page lets you place limit buy and sell orders for tools and products. Orders are matched in periodic batches (every 10 minutes) to ensure fair matching and to reduce server load. When you place an order the required funds or items are reserved; that reservation is released if the order is cancelled or consumed when a trade executes. Trades use integer prices and small taker fees — check the Market UI for current fees and your reserved balances.</li>'
+                . '</ul>'
+
+                . '<p><strong>Important updates:</strong></p>'
+                . '<ul>'
+                . '<li><strong>Cached object aggregates:</strong> The server now keeps per-user cached totals for building levels and tools (for example houses, banks, hospitals). The market and daily jobs use these cached values for faster, consistent calculations.</li>'
+                . '<li><strong>Bank fee reduction:</strong> Banks now reduce your market taker fee. Upgrade your banks to lower your fees — the fee is recalculated immediately after bank changes.</li>'
+                . '<li><strong>Order placement checks:</strong> When placing an order the system checks that you have enough balance to cover any potential taker fee for that order. If you cannot cover the potential fee the order will be rejected to prevent negative balances.</li>'
                 . '</ul>'
 
                 . '<p><strong>Market UI notes:</strong> The Market orders table includes a dedicated "Actions" column (trash icon) for cancelling orders. Use the small cancel icon to remove open orders. The "Hide cancelled" checkbox on the Market page is persisted in your browser so your preference is preserved between visits.</p>'
