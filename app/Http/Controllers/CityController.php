@@ -252,7 +252,7 @@ class CityController extends Controller
                 if ($recipe && is_array($recipe) && count($recipe) > 0) {
                     // For a NEW building we use multiplier = 1 (user expectation)
                     $multiplier = 1;
-                    // Start transaction to lock inventory rows while deducting
+                    // Start transaction to lock inventory rows while deducting and recompute cache atomically
                     DB::beginTransaction();
                     try {
                         foreach ($recipe as $toolTypeId => $qty) {
@@ -278,13 +278,25 @@ class CityController extends Controller
                         }
                         // Create object after successful deduction
                         $created = CityObject::create($createData);
+
+                        // Recompute cached aggregate for the created object's type inside same transaction
+                        \App\Services\ObjectLevelService::recomputeAndStore($userId, $createData['object_type']);
                         DB::commit();
                     } catch (\Exception $e) {
                         DB::rollBack();
                         return response()->json(['success' => false, 'message' => 'Failed to allocate materials: ' . $e->getMessage()], 500);
                     }
                 } else {
-                    $created = CityObject::create($createData);
+                    // No recipe: create and recompute inside transaction to guarantee cache update
+                    try {
+                        DB::beginTransaction();
+                        $created = CityObject::create($createData);
+                        \App\Services\ObjectLevelService::recomputeAndStore($userId, $createData['object_type']);
+                        DB::commit();
+                    } catch (\Exception $e) {
+                        DB::rollBack();
+                        return response()->json(['success' => false, 'message' => 'Failed to create object: ' . $e->getMessage()], 500);
+                    }
                 }
 
                 $arr = $created->toArray();
@@ -292,16 +304,7 @@ class CityController extends Controller
                 $arr['build_seconds'] = $buildSeconds;
                 $objects[] = (object)$arr;
 
-                // If this is a bank, recompute user's market fee
-                // Recompute cached aggregate for the created object's type and update related systems
-                try {
-                    \App\Services\ObjectLevelService::recomputeAndStore($userId, $createData['object_type']);
-                    if (($createData['object_type'] ?? null) === 'bank') {
-                        MarketService::recomputeUserFee($userId);
-                    }
-                } catch (\Exception $e) {
-                    Log::error('Failed to recompute aggregate after object create for user ' . $userId . ': ' . $e->getMessage());
-                }
+                // Note: recomputeAndStore was executed inside the create transaction above.
 
                 // OCCUPY WORKERS: Create occupied_worker record if workers were used
                 if ($workers && isset($workers['level']) && isset($workers['count'])) {

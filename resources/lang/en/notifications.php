@@ -38,4 +38,6 @@ return [
     'production_cancelled_message' => 'Production cancelled for :count workers at level :level due to insufficient people.',
     'production_overassigned_title' => 'Production Over-assigned',
     'production_overassigned_message' => 'There are :assigned workers assigned but only :available available at level :level.',
+    'daily_income_title' => 'Daily income added',
+    'daily_income_message' => 'You received :total coins today (details: :details).',
 ];

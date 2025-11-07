@@ -7,6 +7,7 @@ use App\Models\Tool;
 use App\Models\ToolType;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 
 class ToolController extends Controller
 {
@@ -42,25 +43,28 @@ class ToolController extends Controller
     // Ensure durability is set to full on creation (DB default is 100, but be explicit)
     $data = $request->only(['object_id', 'tool_type_id', 'position_x', 'position_y']);
     $data['durability'] = 100;
-    $created = Tool::create($data);
 
-        // If the parent object exists, recompute cached aggregate for its type and
-        // update related systems (e.g. market fee for banks).
-        try {
-            $parent = CityObject::find($data['object_id']);
-            if ($parent) {
-                $otype = $parent->object_type;
-                \App\Services\ObjectLevelService::recomputeAndStore($parent->user_id, $otype);
-                // If banks changed, also recompute user's market fee
-                if ($otype === 'bank') {
-                    \App\Services\MarketService::recomputeUserFee($parent->user_id);
-                }
-            }
-        } catch (\Exception $e) {
-            Log::error('Failed to recompute aggregate after addTool: ' . $e->getMessage());
+    // Create tool and recompute aggregate inside a transaction so cache update is atomic
+    try {
+        DB::beginTransaction();
+        $created = Tool::create($data);
+
+        // Recompute aggregate for parent object type in the same transaction
+        $parent = CityObject::find($data['object_id']);
+        if ($parent) {
+            $otype = $parent->object_type;
+            \App\Services\ObjectLevelService::recomputeAndStore($parent->user_id, $otype);
+            // recomputeAndStore already updates MarketService for banks internally
         }
 
-        return response()->json(['success' => true, 'tool_id' => $created->id]);
+        DB::commit();
+    } catch (\Exception $e) {
+        DB::rollBack();
+        Log::error('Failed to create tool and recompute aggregate: ' . $e->getMessage());
+        return response()->json(['success' => false, 'message' => 'Failed to add tool'], 500);
+    }
+
+    return response()->json(['success' => true, 'tool_id' => $created->id]);
     }
 
     public function getTools($objectId)
@@ -141,19 +145,21 @@ class ToolController extends Controller
 
         $object = $tool->object;
         $userId = $object ? $object->user_id : null;
-        $tool->delete();
 
-        // Recompute aggregate for the parent object's type and related systems.
         try {
+            DB::beginTransaction();
+            $tool->delete();
+
             if ($object && $userId) {
                 $otype = $object->object_type;
                 \App\Services\ObjectLevelService::recomputeAndStore($userId, $otype);
-                if ($otype === 'bank') {
-                    \App\Services\MarketService::recomputeUserFee($userId);
-                }
+                // recomputeAndStore will update MarketService for banks
             }
+            DB::commit();
         } catch (\Exception $e) {
-            Log::error('Failed to recompute aggregate after deleteTool: ' . $e->getMessage());
+            DB::rollBack();
+            Log::error('Failed to delete tool and recompute aggregate: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Failed to delete tool'], 500);
         }
 
         return response()->json(['success' => true]);

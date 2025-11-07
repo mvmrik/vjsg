@@ -24,25 +24,26 @@ class ObjectLevelService
             ->where('object_type', $objectType)
             ->sum('level'));
 
-        // Sum tool contributions separately (prefer tools.level if exists else tools.durability)
+        // Sum tool contributions separately (prefer tools.level if exists else count tools presence)
         $schema = DB::getSchemaBuilder();
         $toolLevelCol = $schema->hasColumn('tools', 'level') ? 'tools.level' : null;
         $toolDurabilityCol = $schema->hasColumn('tools', 'durability') ? 'tools.durability' : null;
 
         $toolSum = 0;
         if ($toolLevelCol) {
+            // Older tools used explicit 'level' column -> sum levels
             $toolSum = intval(DB::table('tools')
                 ->join('city_objects', 'tools.object_id', '=', 'city_objects.id')
                 ->where('city_objects.user_id', $userId)
                 ->where('city_objects.object_type', $objectType)
                 ->sum(DB::raw($toolLevelCol)));
         } elseif ($toolDurabilityCol) {
-            // Durability is 0..100; treat it as contribution directly (same units as level)
+            // Newer tools use 'durability'. Count each tool as 1 unit (presence), not sum of durability
             $toolSum = intval(DB::table('tools')
                 ->join('city_objects', 'tools.object_id', '=', 'city_objects.id')
                 ->where('city_objects.user_id', $userId)
                 ->where('city_objects.object_type', $objectType)
-                ->sum(DB::raw($toolDurabilityCol)));
+                ->count());
         }
 
         return $objectLevelSum + $toolSum;
@@ -95,46 +96,53 @@ class ObjectLevelService
      */
     public static function recomputeAndStore(int $userId, string $objectType): int
     {
-        // Compute object level sum and tool sum separately
-        $objectLevelSum = intval(DB::table('city_objects')
-            ->where('user_id', $userId)
-            ->where('object_type', $objectType)
-            ->sum('level'));
+        // Compute and persist inside a transaction to ensure atomic update of the cache
+        $total = DB::transaction(function () use ($userId, $objectType) {
+            // Compute object level sum and tool sum separately
+            $objectLevelSum = intval(DB::table('city_objects')
+                ->where('user_id', $userId)
+                ->where('object_type', $objectType)
+                ->sum('level'));
 
-        $schema = DB::getSchemaBuilder();
-        $toolLevelCol = $schema->hasColumn('tools', 'level') ? 'tools.level' : null;
-        $toolDurabilityCol = $schema->hasColumn('tools', 'durability') ? 'tools.durability' : null;
+            $schema = DB::getSchemaBuilder();
+            $toolLevelCol = $schema->hasColumn('tools', 'level') ? 'tools.level' : null;
+            $toolDurabilityCol = $schema->hasColumn('tools', 'durability') ? 'tools.durability' : null;
 
-        $toolSum = 0;
-        if ($toolLevelCol) {
-            $toolSum = intval(DB::table('tools')
-                ->join('city_objects', 'tools.object_id', '=', 'city_objects.id')
-                ->where('city_objects.user_id', $userId)
-                ->where('city_objects.object_type', $objectType)
-                ->sum(DB::raw($toolLevelCol)));
-        } elseif ($toolDurabilityCol) {
-            $toolSum = intval(DB::table('tools')
-                ->join('city_objects', 'tools.object_id', '=', 'city_objects.id')
-                ->where('city_objects.user_id', $userId)
-                ->where('city_objects.object_type', $objectType)
-                ->sum(DB::raw($toolDurabilityCol)));
-        }
-
-        $total = $objectLevelSum + $toolSum;
-        DB::table('aggregated_object_levels')->updateOrInsert(
-            ['user_id' => $userId, 'object_type' => $objectType],
-            ['object_level_sum' => $objectLevelSum, 'tool_sum' => $toolSum, 'total_level' => $total, 'updated_at' => now()]
-        );
-
-        // If this is a bank aggregate, update user's market fee immediately so fee does not wait for cron.
-        if ($objectType === 'bank') {
-            try {
-                \App\Services\MarketService::recomputeUserFee($userId);
-            } catch (\Exception $e) {
-                // Log and continue — don't break aggregate update
-                try { \Illuminate\Support\Facades\Log::error('ObjectLevelService::recomputeAndStore: failed to recompute user fee for user ' . $userId . ': ' . $e->getMessage()); } catch (\Exception $_) {}
+            $toolSum = 0;
+            if ($toolLevelCol) {
+                // Older tools used explicit 'level' column -> sum levels
+                $toolSum = intval(DB::table('tools')
+                    ->join('city_objects', 'tools.object_id', '=', 'city_objects.id')
+                    ->where('city_objects.user_id', $userId)
+                    ->where('city_objects.object_type', $objectType)
+                    ->sum(DB::raw($toolLevelCol)));
+            } elseif ($toolDurabilityCol) {
+                // Newer tools use 'durability'. Count each tool as 1 unit (presence), not sum of durability
+                $toolSum = intval(DB::table('tools')
+                    ->join('city_objects', 'tools.object_id', '=', 'city_objects.id')
+                    ->where('city_objects.user_id', $userId)
+                    ->where('city_objects.object_type', $objectType)
+                    ->count());
             }
-        }
+
+            $total = $objectLevelSum + $toolSum;
+            DB::table('aggregated_object_levels')->updateOrInsert(
+                ['user_id' => $userId, 'object_type' => $objectType],
+                ['object_level_sum' => $objectLevelSum, 'tool_sum' => $toolSum, 'total_level' => $total, 'updated_at' => now()]
+            );
+
+            // If this is a bank aggregate, update user's market fee immediately so fee does not wait for cron.
+            if ($objectType === 'bank') {
+                try {
+                    \App\Services\MarketService::recomputeUserFee($userId);
+                } catch (\Exception $e) {
+                    // Log and continue — don't break aggregate update
+                    try { \Illuminate\Support\Facades\Log::error('ObjectLevelService::recomputeAndStore: failed to recompute user fee for user ' . $userId . ': ' . $e->getMessage()); } catch (\Exception $_) {}
+                }
+            }
+
+            return $total;
+        });
 
         return $total;
     }

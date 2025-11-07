@@ -38,4 +38,6 @@ return [
     'production_cancelled_message' => 'Производството бе спряно за :count работници на ниво :level поради недостатъчен брой хора.',
     'production_overassigned_title' => 'Производството има повече назначени работници',
     'production_overassigned_message' => 'Имате :assigned назначени работници, но само :available налични на ниво :level.',
+        'daily_income_title' => 'Дневен доход добавен',
+        'daily_income_message' => 'Получихте :total монети днес (детайли: :details).',
 ];

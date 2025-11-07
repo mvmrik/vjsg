@@ -57,21 +57,16 @@ class PopulationBirths extends Command
                     // Remove ALL people with level > threshold (delete their rows and count them as deaths)
 
                     // Use cached aggregate for hospital if available (object_level_sum and tool_sum)
+                    // Use cached aggregate only. If cache is missing, treat hospital contributions as zero.
                     $hospitalRow = \App\Services\ObjectLevelService::getCachedAggregateRow($userId, 'hospital');
                     if ($hospitalRow !== null) {
                         $hospitalSum = intval($hospitalRow['object_level_sum']);
                         $hospitalToolSum = intval($hospitalRow['tool_sum']);
                     } else {
-                        // fallback to raw DB sums if cache missing
-                        $hospitalSum = DB::table('city_objects')
-                            ->where('object_type', 'hospital')
-                            ->where('user_id', $userId)
-                            ->sum('level');
-                        $hospitalToolSum = DB::table('tools')
-                            ->join('city_objects', 'tools.object_id', '=', 'city_objects.id')
-                            ->where('city_objects.object_type', 'hospital')
-                            ->where('city_objects.user_id', $userId)
-                            ->sum('tools.level');
+                        // Missing cache: assume zero and log (cache should be kept up-to-date by object/tool changes)
+                        $hospitalSum = 0;
+                        $hospitalToolSum = 0;
+                        Log::warning('population:births: missing aggregated cache for user ' . $userId . ' object_type hospital');
                     }
 
                     $hospitalSum = intval($hospitalSum);
@@ -199,6 +194,57 @@ class PopulationBirths extends Command
                     $this->reconcileOccupiedWorkers($userId);
                 } catch (\Exception $e) {
                     Log::error('population:births: reconcileOccupiedWorkers failed for user ' . $userId . ': ' . $e->getMessage());
+                }
+
+                // --- Daily income from aggregated building levels ---
+                try {
+                    $incomeRows = DB::table('aggregated_object_levels')
+                        ->where('user_id', $userId)
+                        ->get();
+
+                    $rates = config('game.daily_income_rates', []);
+                    $incomeByType = [];
+                    $incomeTotal = 0;
+                    foreach ($incomeRows as $r) {
+                        $otype = $r->object_type;
+                        $rate = intval($rates[$otype] ?? 0);
+                        if ($rate <= 0) continue;
+                        $units = intval($r->total_level ?? (intval($r->object_level_sum ?? 0) + intval($r->tool_sum ?? 0)));
+                        if ($units <= 0) continue;
+                        $inc = intval($units * $rate);
+                        if ($inc <= 0) continue;
+                        $incomeByType[$otype] = ($incomeByType[$otype] ?? 0) + $inc;
+                        $incomeTotal += $inc;
+                    }
+
+                    if ($incomeTotal > 0) {
+                        // Credit the user balance
+                        DB::table('users')->where('id', $userId)->increment('balance', $incomeTotal);
+
+                        // Create aggregated income notification
+                        try {
+                            $title = __('notifications.daily_income_title');
+                            $detailsParts = [];
+                            foreach ($incomeByType as $otype => $amt) {
+                                $detailsParts[] = ucfirst($otype) . ' ' . $amt;
+                            }
+                            $details = implode(', ', $detailsParts);
+                            $message = __('notifications.daily_income_message', ['details' => $details, 'total' => $incomeTotal]);
+
+                            Notification::create([
+                                'user_id' => $userId,
+                                'title' => $title,
+                                'message' => $message,
+                                'type' => 'success',
+                                'is_read' => false,
+                                'data' => json_encode(['incomes' => $incomeByType, 'total' => $incomeTotal])
+                            ]);
+                        } catch (\Exception $e) {
+                            Log::error('population:births: failed to create income notification for user ' . $userId . ': ' . $e->getMessage());
+                        }
+                    }
+                } catch (\Exception $e) {
+                    Log::error('population:births: failed to compute daily incomes for user ' . $userId . ': ' . $e->getMessage());
                 }
 
                 // --- Births: add people based on houses/tools ---

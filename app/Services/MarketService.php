@@ -18,12 +18,10 @@ class MarketService
     public static function recomputeUserFee(int $userId)
     {
         // Use cached aggregate when available, otherwise recompute and store it.
+        // Strictly use cached aggregate. If cache is missing, treat as zero.
+        // Cache should be maintained by object/tool updates; missing cache indicates a data issue.
         $cachedRow = \App\Services\ObjectLevelService::getCachedAggregateRow($userId, 'bank');
-        if ($cachedRow === null) {
-            $totalBankUnits = \App\Services\ObjectLevelService::recomputeAndStore($userId, 'bank');
-        } else {
-            $totalBankUnits = intval($cachedRow['total_level']);
-        }
+        $totalBankUnits = $cachedRow ? intval($cachedRow['total_level']) : 0;
 
         // Reduction: each unit reduces fee by BANK_REDUCTION_BPS (bps)
         $reduction = $totalBankUnits * self::BANK_REDUCTION_BPS;
