@@ -194,6 +194,68 @@ class CheckCompletedBuilds extends Command
         }
 
         $this->info("Processed {$count} completed builds/upgrades");
+        // Additional cleanup: if any occupied_workers remain for objects whose ready_at is NULL,
+        // restore them back to people. This handles cases where previous runs failed mid-way.
+        try {
+            $stale = OccupiedWorker::select('user_id', 'city_object_id')
+                ->groupBy('user_id', 'city_object_id')
+                ->get();
+
+            foreach ($stale as $s) {
+                $obj = CityObject::where('id', $s->city_object_id)->first();
+                if ($obj && $obj->ready_at !== null) {
+                    // object still building, skip
+                    continue;
+                }
+
+                // restore all occupied_workers for this object
+                $occRows = OccupiedWorker::where('user_id', $s->user_id)
+                    ->where('city_object_id', $s->city_object_id)
+                    ->get();
+
+                if ($occRows->isEmpty()) continue;
+
+                $db3 = \Illuminate\Support\Facades\DB::connection();
+                $db3->beginTransaction();
+                try {
+                    foreach ($occRows as $occ) {
+                        $lvl = intval($occ->level);
+                        $cnt = intval($occ->count);
+
+                        $person = DB::table('people')
+                            ->where('user_id', $occ->user_id)
+                            ->where('level', $lvl)
+                            ->lockForUpdate()
+                            ->first();
+
+                        if ($person) {
+                            DB::table('people')
+                                ->where('user_id', $occ->user_id)
+                                ->where('level', $lvl)
+                                ->update(['count' => intval($person->total ?? $person->count) + $cnt]);
+                        } else {
+                            DB::table('people')->insert([
+                                'user_id' => $occ->user_id,
+                                'level' => $lvl,
+                                'count' => $cnt
+                            ]);
+                        }
+                    }
+
+                    OccupiedWorker::where('user_id', $s->user_id)
+                        ->where('city_object_id', $s->city_object_id)
+                        ->delete();
+
+                    $db3->commit();
+                } catch (\Exception $e) {
+                    try { $db3->rollBack(); } catch (\Exception $_) {}
+                    \Log::error('check:completed-builds: failed to cleanup occupied workers for object ' . $s->city_object_id . ': ' . $e->getMessage());
+                }
+            }
+        } catch (\Exception $e) {
+            \Log::error('check:completed-builds: post-cleanup failed: ' . $e->getMessage());
+        }
+
         return 0;
     }
 }

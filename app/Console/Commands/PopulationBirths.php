@@ -196,48 +196,26 @@ class PopulationBirths extends Command
                     Log::error('population:births: reconcileOccupiedWorkers failed for user ' . $userId . ': ' . $e->getMessage());
                 }
 
-                // --- Daily income from aggregated building levels ---
+                // --- Daily income from cached aggregated building total_level ---
                 try {
-                    $incomeRows = DB::table('aggregated_object_levels')
+                    // Sum all cached total_level values for the user and credit that amount as balance.
+                    // This intentionally ignores per-type rates and uses the cached total_level directly
+                    // as the user requested: credit = SUM(total_level).
+                    $incomeTotal = intval(DB::table('aggregated_object_levels')
                         ->where('user_id', $userId)
-                        ->get();
-
-                    $rates = config('game.daily_income_rates', []);
-                    $incomeByType = [];
-                    $incomeTotal = 0;
-                    foreach ($incomeRows as $r) {
-                        $otype = $r->object_type;
-                        $rate = intval($rates[$otype] ?? 0);
-                        if ($rate <= 0) continue;
-                        $units = intval($r->total_level ?? (intval($r->object_level_sum ?? 0) + intval($r->tool_sum ?? 0)));
-                        if ($units <= 0) continue;
-                        $inc = intval($units * $rate);
-                        if ($inc <= 0) continue;
-                        $incomeByType[$otype] = ($incomeByType[$otype] ?? 0) + $inc;
-                        $incomeTotal += $inc;
-                    }
+                        ->sum(DB::raw('COALESCE(total_level, (COALESCE(object_level_sum,0) + COALESCE(tool_sum,0)))')));
 
                     if ($incomeTotal > 0) {
-                        // Credit the user balance
                         DB::table('users')->where('id', $userId)->increment('balance', $incomeTotal);
-
-                        // Create aggregated income notification
+                        // create a simple notification summarizing the income
                         try {
-                            $title = __('notifications.daily_income_title');
-                            $detailsParts = [];
-                            foreach ($incomeByType as $otype => $amt) {
-                                $detailsParts[] = ucfirst($otype) . ' ' . $amt;
-                            }
-                            $details = implode(', ', $detailsParts);
-                            $message = __('notifications.daily_income_message', ['details' => $details, 'total' => $incomeTotal]);
-
                             Notification::create([
                                 'user_id' => $userId,
-                                'title' => $title,
-                                'message' => $message,
+                                'title' => __('notifications.daily_income_title'),
+                                'message' => __('notifications.daily_income_message', ['details' => '', 'total' => $incomeTotal]),
                                 'type' => 'success',
                                 'is_read' => false,
-                                'data' => json_encode(['incomes' => $incomeByType, 'total' => $incomeTotal])
+                                'data' => json_encode(['total' => $incomeTotal])
                             ]);
                         } catch (\Exception $e) {
                             Log::error('population:births: failed to create income notification for user ' . $userId . ': ' . $e->getMessage());
