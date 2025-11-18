@@ -146,4 +146,27 @@ class ObjectLevelService
 
         return $total;
     }
+
+    /**
+     * Calculate tools decay rate based on workshop level.
+     * 
+     * - No workshops (0 level): 100% decay per day (tools last 1 day)
+     * - Each workshop level reduces decay by 0.99%
+     * - Max 100 workshop levels = 1% decay (100 days lifespan)
+     * 
+     * Formula: decay_percent = max(1, 100 - (workshopLevel * 0.99))
+     * 
+     * @param int $userId
+     * @return float Decay percentage per day
+     */
+    public static function getToolsDecayRate(int $userId): float
+    {
+        $workshopData = self::getCachedAggregateRow($userId, 'workshop');
+        $workshopLevel = $workshopData ? intval($workshopData['total_level']) : 0;
+        
+        // Calculate decay rate: 100% down to 1% based on workshop level
+        $decayPercent = max(1.0, 100.0 - ($workshopLevel * 0.99));
+        
+        return $decayPercent;
+    }
 }

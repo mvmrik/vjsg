@@ -120,6 +120,7 @@ return [
                 . '<li><strong>Cached object aggregates:</strong> The server now keeps per-user cached totals for building levels and tools (for example houses, banks, hospitals). The market and daily jobs use these cached values for faster, consistent calculations.</li>'
                 . '<li><strong>Bank fee reduction:</strong> Banks now reduce your market taker fee. Upgrade your banks to lower your fees — the fee is recalculated immediately after bank changes.</li>'
                 . '<li><strong>Order placement checks:</strong> When placing an order the system checks that you have enough balance to cover any potential taker fee for that order. If you cannot cover the potential fee the order will be rejected to prevent negative balances.</li>'
+                . '<li><strong>Tool decay and workshops:</strong> All installed tools now wear out daily. Without workshops, tools last only 1 day (100% decay). Build workshops to extend tool lifespan — each workshop level reduces decay by 0.99%, up to 100 levels for maximum durability (1% decay, 100 days lifespan). Tool decay happens AFTER daily population calculations, so tools are counted before they wear out.</li>'
                 . '</ul>'
 
                 . '<p><strong>Market UI notes:</strong> The Market orders table includes a dedicated "Actions" column (trash icon) for cancelling orders. Use the small cancel icon to remove open orders. The "Hide cancelled" checkbox on the Market page is persisted in your browser so your preference is preserved between visits.</p>'

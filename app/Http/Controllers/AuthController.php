@@ -50,6 +50,27 @@ class AuthController extends Controller
         // Add 2 level 1 people as one record
         \App\Models\Person::create(['user_id' => $user->id, 'level' => 1, 'count' => 2]);
 
+        // Give starter building materials (100 units) - finished materials, not raw
+        // Building materials (finished) should be ID 4 based on typical seeder order
+        $buildingMaterialsType = \App\Models\ToolType::find(4);
+        
+        // Fallback: try to find by name pattern if ID doesn't exist
+        if (!$buildingMaterialsType) {
+            $buildingMaterialsType = \App\Models\ToolType::where('name', 'LIKE', '%Building%')
+                ->where('name', 'NOT LIKE', '%Raw%')
+                ->first();
+        }
+
+        if ($buildingMaterialsType) {
+            \App\Models\Inventory::create([
+                'user_id' => $user->id,
+                'tool_type_id' => $buildingMaterialsType->id,
+                'count' => 100,
+                'temp_count' => 0,
+                'reserved_count' => 0
+            ]);
+        }
+
         // Auto-login
         $request->session()->put('user_id', $user->id);
         $request->session()->put('logged_in', true);

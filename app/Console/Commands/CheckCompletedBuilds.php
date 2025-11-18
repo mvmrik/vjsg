@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\DB;
 use App\Models\User;
 use App\Models\CityObject;
 use App\Models\Notification;

@@ -56,6 +56,8 @@ return [
     'factory' => 'Factory',
     'house' => 'House',
     'hospital' => 'Hospital',
+    'bank' => 'Bank',
+    'workshop' => 'Workshop',
     'harvest' => 'Harvest resources',
     'waiting_release_workers' => 'Workers will be released after the time elapses.',
     // Inventory

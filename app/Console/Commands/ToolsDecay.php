@@ -22,26 +22,73 @@ class ToolsDecay extends Command
      */
     protected $description = 'Daily decay of installed tools: reduce durability and remove broken tools';
 
+    /**
+     * Execute the console command.
+     * 
+     * Applies daily tool decay based on user's workshop level:
+     * - No workshops (0 level): 100% decay per day (tools last 1 day)
+     * - Each workshop level reduces decay by 0.99%
+     * - Max 100 workshop levels = 1% decay (100 days lifespan)
+     * 
+     * Formula: decay_percent = max(1, 100 - (workshopLevel * 0.99))
+     * 
+     * NOTE: This command MUST run AFTER population:births to ensure
+     * tools are counted/used before they decay and potentially get removed.
+     */
     public function handle()
     {
         $this->info('Starting tools decay run');
 
         DB::beginTransaction();
         try {
-            // Decrement durability by 1 for all tools that have durability > 0
-            // Use a single fast UPDATE query for scale
-            DB::statement('UPDATE tools SET durability = GREATEST(durability - 1, 0) WHERE durability IS NOT NULL');
-
-            // Find affected (user_id, object_type) pairs for objects which lost tools
-            $affectedPairs = DB::table('tools')
+            // Get all users with tools
+            $usersWithTools = DB::table('tools')
                 ->join('city_objects', 'tools.object_id', '=', 'city_objects.id')
-                ->where('tools.durability', '<=', 0)
-                ->select('city_objects.user_id', 'city_objects.object_type')
+                ->select('city_objects.user_id')
                 ->distinct()
-                ->get();
+                ->pluck('user_id');
 
-            // Remove all tools that reached 0 durability
-            $deleted = DB::table('tools')->where('durability', '<=', 0)->delete();
+            // Process each user separately to apply different decay rates
+            $totalDeleted = 0;
+            $affectedPairs = [];
+
+            foreach ($usersWithTools as $userId) {
+                // Get workshop level and calculate decay rate
+                $decayPercent = \App\Services\ObjectLevelService::getToolsDecayRate($userId);
+                
+                $this->info("User {$userId}: Decay rate {$decayPercent}%");
+
+                // Apply decay to this user's tools
+                DB::statement(
+                    'UPDATE tools 
+                     JOIN city_objects ON tools.object_id = city_objects.id 
+                     SET tools.durability = GREATEST(tools.durability - ?, 0) 
+                     WHERE city_objects.user_id = ? AND tools.durability IS NOT NULL',
+                    [$decayPercent, $userId]
+                );
+
+                // Find affected (user_id, object_type) pairs for this user's broken tools
+                $userAffectedPairs = DB::table('tools')
+                    ->join('city_objects', 'tools.object_id', '=', 'city_objects.id')
+                    ->where('city_objects.user_id', $userId)
+                    ->where('tools.durability', '<=', 0)
+                    ->select('city_objects.user_id', 'city_objects.object_type')
+                    ->distinct()
+                    ->get();
+
+                foreach ($userAffectedPairs as $pair) {
+                    $affectedPairs[] = $pair;
+                }
+
+                // Remove broken tools for this user
+                $deleted = DB::table('tools')
+                    ->join('city_objects', 'tools.object_id', '=', 'city_objects.id')
+                    ->where('city_objects.user_id', $userId)
+                    ->where('tools.durability', '<=', 0)
+                    ->delete();
+
+                $totalDeleted += $deleted;
+            }
 
             // Recompute cached aggregates and related systems for affected pairs
             foreach ($affectedPairs as $p) {
@@ -59,7 +106,7 @@ class ToolsDecay extends Command
 
             DB::commit();
 
-            $this->info('Tools decay completed. Removed ' . $deleted . ' broken tools.');
+            $this->info('Tools decay completed. Removed ' . $totalDeleted . ' broken tools.');
         } catch (\Exception $e) {
             DB::rollBack();
             $this->error('Tools decay failed: ' . $e->getMessage());

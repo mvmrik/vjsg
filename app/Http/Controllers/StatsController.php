@@ -45,7 +45,7 @@ class StatsController extends Controller
                 ->join('city_objects', 'tools.object_id', '=', 'city_objects.id')
                 ->where('city_objects.object_type', 'hospital')
                 ->where('city_objects.user_id', $userId)
-                ->sum('tools.level');
+                ->sum('tools.durability');
 
             $hospitalEffect = $hospitalLevelSum + ($hospitalToolSum / 10.0);
             $roundedEffect = intval(round($hospitalEffect, 0, PHP_ROUND_HALF_UP));
@@ -65,6 +65,37 @@ class StatsController extends Controller
 
             $expectedMortality = ($population > 0) ? ($above / $population) * 100 : 0;
 
+            // Food sufficiency calculation
+            // Get available food (tool_type_id = 3)
+            $availableFood = (int) DB::table('inventories')
+                ->where('user_id', $userId)
+                ->where('tool_type_id', 3)
+                ->value('count') ?: 0;
+
+            // Calculate food needed for next level-up (sum of next level for each person)
+            $foodNeeded = 0;
+            $peopleRows = DB::table('people')
+                ->where('user_id', $userId)
+                ->select('level', 'count')
+                ->get();
+            
+            foreach ($peopleRows as $row) {
+                $level = intval($row->level);
+                $count = intval($row->count);
+                $nextLevel = $level + 1;
+                $foodNeeded += $nextLevel * $count;
+            }
+
+            // Calculate food sufficiency as percentage
+            $foodSufficiency = ($foodNeeded > 0) ? ($availableFood / $foodNeeded) * 100 : 100;
+
+            // Tools decay rate calculation (workshop-based)
+            $toolsDecayRate = \App\Services\ObjectLevelService::getToolsDecayRate($userId);
+            
+            // Get workshop level for display
+            $workshopData = \App\Services\ObjectLevelService::getCachedAggregateRow($userId, 'workshop');
+            $workshopLevel = $workshopData ? intval($workshopData['total_level']) : 0;
+
             return response()->json([
                 'success' => true,
                 'parcels' => $parcels,
@@ -74,7 +105,12 @@ class StatsController extends Controller
                 'hospital_capacity' => $hospitalLevelSum + $hospitalToolSum,
                 'expectedMortality' => round($expectedMortality, 4),
                 'death_threshold_level' => $thresholdLevel,
-                'occupied' => $occupiedActive
+                'occupied' => $occupiedActive,
+                'food_available' => $availableFood,
+                'food_needed' => $foodNeeded,
+                'food_sufficiency' => round($foodSufficiency, 2),
+                'tools_decay_rate' => round($toolsDecayRate, 2),
+                'workshop_level' => $workshopLevel
             ]);
         } catch (\Exception $e) {
             \Log::error('StatsController@index error: ' . $e->getMessage());

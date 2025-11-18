@@ -218,6 +218,45 @@
               </div>
             </div>
 
+            <h6>{{ $t('settings.food_sufficiency') }}</h6>
+            <p class="text-muted small">
+              {{ $t('settings.food_sufficiency_desc') }}
+            </p>
+            <div class="position-relative mb-4" style="height: 40px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);">
+              <c-progress style="height: 100%; border-radius: 8px; background: transparent;">
+                <c-progress-bar
+                  :value="Math.min(Math.round(gameStats.food_sufficiency), 100)"
+                  :color="gameStats.food_sufficiency >= 100 ? 'success' : gameStats.food_sufficiency >= 50 ? 'warning' : 'danger'"
+                  style="transition: width 0.3s ease;"
+                />
+              </c-progress>
+              <div class="position-absolute w-100 h-100 d-flex align-items-center justify-content-center" style="top: 0; left: 0; pointer-events: none;">
+                <strong style="font-size: 1rem; text-shadow: 0 0 3px white, 0 0 3px white, 0 0 3px white;">
+                  {{ Math.round(gameStats.food_sufficiency) }}% ({{ gameStats.food_available }}/{{ gameStats.food_needed }})
+                </strong>
+              </div>
+            </div>
+
+            <h6>{{ $t('settings.tools_decay_rate') }}</h6>
+            <p class="text-muted small">
+              {{ $t('settings.tools_decay_desc') }}
+              <span v-if="gameStats.workshop_level > 0"> {{ $t('settings.workshop_level') }}: {{ gameStats.workshop_level }}</span>
+            </p>
+            <div class="position-relative mb-4" style="height: 40px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);">
+              <c-progress style="height: 100%; border-radius: 8px; background: transparent;">
+                <c-progress-bar
+                  :value="Math.min(Math.round(gameStats.tools_decay_rate * 4), 100)"
+                  :color="gameStats.tools_decay_rate <= 5 ? 'success' : gameStats.tools_decay_rate <= 15 ? 'warning' : 'danger'"
+                  style="transition: width 0.3s ease;"
+                />
+              </c-progress>
+              <div class="position-absolute w-100 h-100 d-flex align-items-center justify-content-center" style="top: 0; left: 0; pointer-events: none;">
+                <strong style="font-size: 1rem; text-shadow: 0 0 3px white, 0 0 3px white, 0 0 3px white;">
+                  {{ gameStats.tools_decay_rate }}% {{ $t('settings.per_day') }} ({{ Math.round(100 / gameStats.tools_decay_rate) }} {{ $t('settings.days_lifespan') }})
+                </strong>
+              </div>
+            </div>
+
             <h6>{{ $t('settings.market_fee') }}</h6>
             <div class="position-relative mb-3" style="height: 40px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 8px; box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);">
               <c-progress style="height: 100%; border-radius: 8px; background: transparent;">
@@ -355,7 +394,12 @@ export default {
       population: 0,
       expected_mortality: 0, // percent
       death_threshold_level: null,
-      occupied: 0
+      occupied: 0,
+      food_available: 0,
+      food_needed: 0,
+      food_sufficiency: 0,
+      tools_decay_rate: 25.0,
+      workshop_level: 0
     });
 
     const settings = ref({
@@ -446,6 +490,7 @@ export default {
 
         const response = await fetch('/api/user-data', {
           method: 'POST',
+          credentials: 'include',
           headers: {
             'Content-Type': 'application/json',
             'X-CSRF-TOKEN': csrfToken
@@ -510,6 +555,7 @@ export default {
         if (!csrfToken) return;
         await fetch('/api/game-settings', {
           method: 'POST',
+          credentials: 'include',
           headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
           body: JSON.stringify({ key, value: String(value) })
         });
@@ -557,7 +603,9 @@ export default {
       // Load game statistics (parcels, objects, population, expected mortality)
       const loadStats = async () => {
         try {
-          const res = await fetch('/api/stats');
+          const res = await fetch('/api/stats', {
+            credentials: 'include'
+          });
           if (!res.ok) {
             console.error('Failed to fetch stats', res.status);
             return;
@@ -572,6 +620,11 @@ export default {
           gameStats.value.expected_mortality = (typeof d.expectedMortality === 'number') ? Number(d.expectedMortality) : 0;
           gameStats.value.death_threshold_level = (typeof d.death_threshold_level === 'number') ? Number(d.death_threshold_level) : null;
           gameStats.value.occupied = (typeof d.occupied === 'number') ? Number(d.occupied) : 0;
+          gameStats.value.food_available = (typeof d.food_available === 'number') ? Number(d.food_available) : 0;
+          gameStats.value.food_needed = (typeof d.food_needed === 'number') ? Number(d.food_needed) : 0;
+          gameStats.value.food_sufficiency = (typeof d.food_sufficiency === 'number') ? Number(d.food_sufficiency) : 0;
+          gameStats.value.tools_decay_rate = (typeof d.tools_decay_rate === 'number') ? Number(d.tools_decay_rate) : 25.0;
+          gameStats.value.workshop_level = (typeof d.workshop_level === 'number') ? Number(d.workshop_level) : 0;
         } catch (e) {
           console.error('loadStats error', e);
         }
@@ -585,7 +638,9 @@ export default {
         settings.value.language = userLanguage.value;
         // load per-user game settings
         try {
-          const r = await fetch('/api/game-settings');
+          const r = await fetch('/api/game-settings', {
+            credentials: 'include'
+          });
           const data = await r.json();
           if (data.success && data.settings) {
             const s = data.settings;
