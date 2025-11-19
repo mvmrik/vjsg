@@ -16,8 +16,8 @@ class ToolController extends Controller
         $object = CityObject::findOrFail($objectId);
 
         // ensure the requester owns the object
-        $currentUserId = auth()->id() ?: session('user_id');
-        if ($object->user_id !== $currentUserId) {
+        $currentUserId = intval(auth()->id() ?: session('user_id'));
+        if (intval($object->user_id) !== $currentUserId) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
@@ -65,8 +65,8 @@ class ToolController extends Controller
         }
 
         // Ensure caller owns the object (support legacy session-based auth)
-        $currentUserId = auth()->id() ?: $request->session()->get('user_id');
-        if ($object->user_id !== $currentUserId) {
+        $currentUserId = intval(auth()->id() ?: $request->session()->get('user_id'));
+        if (intval($object->user_id) !== $currentUserId) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
@@ -196,7 +196,7 @@ class ToolController extends Controller
         $tool = Tool::with('object')->findOrFail($toolId);
         
         // Get current user from auth or session
-        $userId = auth()->id() ?: session('user_id');
+        $userId = intval(auth()->id() ?: session('user_id'));
         
         // Detailed logging for debugging
         Log::info('Delete tool request', [
@@ -216,7 +216,7 @@ class ToolController extends Controller
             return response()->json(['error' => 'Object not found'], 404);
         }
         
-        if ($object->user_id !== $userId) {
+        if (intval($object->user_id) !== $userId) {
             Log::warning('Tool delete failed: unauthorized', [
                 'tool_id' => $toolId,
                 'object_user_id' => $object->user_id,
