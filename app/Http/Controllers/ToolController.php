@@ -15,6 +15,12 @@ class ToolController extends Controller
     {
         $object = CityObject::findOrFail($objectId);
 
+        // ensure the requester owns the object
+        $currentUserId = auth()->id() ?: session('user_id');
+        if ($object->user_id !== $currentUserId) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
         // CityObject has 'object_type' which is the type string, not ID.
         // Need to get ObjectType by type.
         $objectType = \App\Models\ObjectType::where('type', $object->object_type)->firstOrFail();
@@ -40,22 +46,75 @@ class ToolController extends Controller
             return response()->json(['error' => 'Tool not allowed for this object type'], 403);
         }
 
-    // Ensure durability is set to full on creation (DB default is 100, but be explicit)
+        // Prevent rapid repeated additions: reject if a tool was added to this object very recently
+        $recentWindowSeconds = 5; // client-side delay is 5s, enforce same on server
+        $recent = Tool::where('object_id', $object->id)
+            ->where('created_at', '>=', now()->subSeconds($recentWindowSeconds))
+            ->exists();
+        if ($recent) {
+            return response()->json(['error' => 'Too many tool additions. Please wait a moment and try again.'], 429);
+        }
+
+        // Ensure the target position is free
+        $posConflict = Tool::where('object_id', $request->object_id)
+            ->where('position_x', $request->position_x)
+            ->where('position_y', $request->position_y)
+            ->exists();
+        if ($posConflict) {
+            return response()->json(['error' => 'Position already occupied'], 400);
+        }
+
+        // Ensure caller owns the object (support legacy session-based auth)
+        $currentUserId = auth()->id() ?: $request->session()->get('user_id');
+        if ($object->user_id !== $currentUserId) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        // Ensure durability is set to full on creation (DB default is 100, but be explicit)
     $data = $request->only(['object_id', 'tool_type_id', 'position_x', 'position_y']);
     $data['durability'] = 100;
 
     // Create tool and recompute aggregate inside a transaction so cache update is atomic
     try {
         DB::beginTransaction();
+
+        // Verify inventory: user must have at least 1 available item of this tool_type
+        $parent = CityObject::find($data['object_id']);
+        if (!$parent) {
+            DB::rollBack();
+            return response()->json(['error' => 'Parent object not found'], 404);
+        }
+
+        $inv = \App\Models\Inventory::where('user_id', $parent->user_id)
+            ->where('tool_type_id', $data['tool_type_id'])
+            ->lockForUpdate()
+            ->first();
+
+        $available = 0;
+        if ($inv) {
+            $available = intval($inv->count) - intval($inv->reserved_count ?? 0) - intval($inv->temp_count ?? 0);
+        }
+
+        if ($available < 1) {
+            DB::rollBack();
+            return response()->json(['error' => 'Insufficient inventory: you do not have this tool'], 400);
+        }
+
+        // consume one unit from inventory
+        $newCount = intval($inv->count) - 1;
+        if ($newCount <= 0) {
+            $inv->delete();
+        } else {
+            $inv->count = $newCount;
+            $inv->save();
+        }
+
         $created = Tool::create($data);
 
         // Recompute aggregate for parent object type in the same transaction
-        $parent = CityObject::find($data['object_id']);
-        if ($parent) {
-            $otype = $parent->object_type;
-            \App\Services\ObjectLevelService::recomputeAndStore($parent->user_id, $otype);
-            // recomputeAndStore already updates MarketService for banks internally
-        }
+        $otype = $parent->object_type;
+        \App\Services\ObjectLevelService::recomputeAndStore($parent->user_id, $otype);
+        // recomputeAndStore already updates MarketService for banks internally
 
         DB::commit();
     } catch (\Exception $e) {
@@ -138,7 +197,7 @@ class ToolController extends Controller
 
         // Only owner of the object can delete tools
         $object = $tool->object;
-        $userId = auth()->id();
+        $userId = auth()->id() ?: session('user_id');
         if (!$object || $object->user_id !== $userId) {
             return response()->json(['error' => 'Unauthorized'], 403);
         }

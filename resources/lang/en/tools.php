@@ -19,4 +19,5 @@ return [
     'durability' => 'Durability',
     'confirm_delete' => 'Are you sure you want to delete this tool?',
     'delete_failed' => 'Failed to delete tool',
+    'adding_in_progress' => 'Adding',
 ];

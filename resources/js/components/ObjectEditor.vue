@@ -442,8 +442,8 @@
           </div>
           <div v-else class="row">
             <div v-for="tool in availableTools" :key="tool.id" class="col-md-4 mb-3">
-              <div class="card tool-card" @click="addTool(tool)">
-                <div class="card-body text-center">
+                <div class="card tool-card" :class="{ 'disabled-card': addInProgress || !canAffordTool(tool) }">
+                <div class="card-body text-center" @click="canAffordTool(tool) && startAddTool(tool)">
                   <img
                     :src="`/images/tools/${tool.icon || 'student_materials.png'}`"
                     alt="Tool"
@@ -452,6 +452,15 @@
                   />
                   <h6 class="card-title">{{ getTranslatedName(tool.name) }}</h6>
                   <p class="card-text small">{{ tool.description }}</p>
+                  <div v-if="addInProgress && addingToolId === tool.id" class="add-progress-overlay">
+                    <div class="progress" style="height:8px;">
+                      <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" :style="{ width: addProgress + '%' }"></div>
+                    </div>
+                    <div class="small mt-2">{{ $t('tools.adding_in_progress') || 'Adding...' }} {{ addProgress }}%</div>
+                  </div>
+                  <div v-else-if="!canAffordTool(tool)" class="add-progress-overlay">
+                    <div class="small text-danger">{{ $t('tools.selector_no_inventory_hint') || 'You do not have this tool in inventory' }}</div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -463,7 +472,7 @@
 </template>
 
 <script>
-import { ref, computed, onMounted, onUnmounted, inject } from "vue";
+import { ref, computed, onMounted, onUnmounted, inject, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useGameStore } from "../stores/gameStore";
 import axios from "axios";
@@ -525,6 +534,11 @@ export default {
     const selectedTool = ref(null);
     const hoveredCell = ref(null);
     let longPressTimer = null;
+    // Add-tool progress state
+    const addInProgress = ref(false);
+    const addProgress = ref(0);
+    const addingToolId = ref(null);
+    let addInterval = null;
 
     const parcelId = computed(() => parseInt(route.params.parcelId));
     const objectId = computed(() => parseInt(route.params.objectId));
@@ -1061,11 +1075,53 @@ export default {
             copy.tool_type_id = Number(copy.tool_type_id);
           return copy;
         });
+        // Load user's inventories to show availability
+        try {
+          const invRes = await axios.get('/api/inventories');
+          // Build map by tool_type_id
+          inventories.value = (invRes.data.items || []).reduce((acc, it) => {
+            acc[it.tool_type_id] = it;
+            return acc;
+          }, {});
+        } catch (ie) {
+          inventories.value = {};
+        }
+
+        // Remove any tools the user cannot actually afford so they are not shown
+        try {
+          availableTools.value = availableTools.value.filter((t) => {
+            const key = t.tool_type_id || t.id;
+            const invRow = inventories.value[key];
+            const available = invRow
+              ? Math.max(
+                  0,
+                  (parseInt(invRow.count || 0) - parseInt(invRow.reserved_count || 0) - parseInt(invRow.temp_count || 0))
+                )
+              : 0;
+            return available > 0;
+          });
+        } catch (e) {
+          // If anything goes wrong, fall back to showing none
+          availableTools.value = [];
+        }
+
         showToolModal.value = true;
       } catch (e) {
         console.error("Failed to fetch available tools", e);
         alert("Failed to load available tools.");
       }
+    };
+
+    const canAffordTool = (tool) => {
+      if (!tool) return false;
+      const key = tool.tool_type_id || tool.id;
+      const inv = inventories.value[key];
+      if (!inv) return false;
+      const available = Math.max(
+        0,
+        (parseInt(inv.count || 0) - parseInt(inv.reserved_count || 0) - parseInt(inv.temp_count || 0))
+      );
+      return available > 0;
     };
 
     const handleCellClick = (x, y) => {
@@ -1098,6 +1154,43 @@ export default {
         console.error("Failed to add tool", e);
         alert($t("tools.tool_add_failed"));
       }
+    };
+
+    const stopAddInProgress = () => {
+      if (addInterval) {
+        clearInterval(addInterval);
+        addInterval = null;
+      }
+      addInProgress.value = false;
+      addProgress.value = 0;
+      addingToolId.value = null;
+    };
+
+    const startAddTool = (tool) => {
+      // Prevent starting while another add is in progress
+      if (addInProgress.value) return;
+      addInProgress.value = true;
+      addingToolId.value = tool.id;
+      addProgress.value = 0;
+
+      const totalMs = 5000; // 5 seconds
+      const tickMs = 100; // update every 100ms
+      const step = (100 * tickMs) / totalMs;
+      addInterval = setInterval(async () => {
+        addProgress.value = Math.min(100, Math.round(addProgress.value + step));
+        if (addProgress.value >= 100) {
+          // finalize
+          clearInterval(addInterval);
+          addInterval = null;
+          try {
+            await addTool(tool);
+          } catch (e) {
+            console.error('Error adding tool after progress', e);
+          } finally {
+            stopAddInProgress();
+          }
+        }
+      }, tickMs);
     };
 
     const loadTools = async () => {
@@ -1268,9 +1361,16 @@ export default {
       tools,
       showToolModal,
       availableTools,
+      inventories,
+      toolTypesMap,
       openToolModal,
       handleCellClick,
       addTool,
+      startAddTool,
+      addInProgress,
+      addProgress,
+      addingToolId,
+      canAffordTool,
       loadTools,
       getToolAt,
       moveMode,
@@ -1449,6 +1549,23 @@ export default {
 
 .tool-card:hover {
   transform: scale(1.05);
+}
+
+.disabled-card {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.add-progress-overlay {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  background: rgba(255,255,255,0.95);
+  padding: 6px;
+  border-radius: 6px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  z-index: 30;
 }
 
 .object-info {
