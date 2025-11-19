@@ -193,28 +193,48 @@ class ToolController extends Controller
 
     public function deleteTool($toolId)
     {
-        $tool = Tool::findOrFail($toolId);
+        $tool = Tool::with('object')->findOrFail($toolId);
+        
+        // Get current user from auth or session
+        $userId = auth()->id() ?: session('user_id');
+        
+        // Detailed logging for debugging
+        Log::info('Delete tool request', [
+            'tool_id' => $toolId,
+            'auth_id' => auth()->id(),
+            'session_user_id' => session('user_id'),
+            'final_user_id' => $userId,
+            'tool_object_id' => $tool->object_id,
+            'object_exists' => $tool->object ? 'yes' : 'no',
+            'object_user_id' => $tool->object ? $tool->object->user_id : 'N/A',
+        ]);
 
         // Only owner of the object can delete tools
         $object = $tool->object;
-        $userId = auth()->id() ?: session('user_id');
-        if (!$object || $object->user_id !== $userId) {
+        if (!$object) {
+            Log::warning('Tool delete failed: object not found', ['tool_id' => $toolId]);
+            return response()->json(['error' => 'Object not found'], 404);
+        }
+        
+        if ($object->user_id !== $userId) {
+            Log::warning('Tool delete failed: unauthorized', [
+                'tool_id' => $toolId,
+                'object_user_id' => $object->user_id,
+                'request_user_id' => $userId,
+            ]);
             return response()->json(['error' => 'Unauthorized'], 403);
         }
-
-        $object = $tool->object;
-        $userId = $object ? $object->user_id : null;
 
         try {
             DB::beginTransaction();
             $tool->delete();
 
-            if ($object && $userId) {
-                $otype = $object->object_type;
-                \App\Services\ObjectLevelService::recomputeAndStore($userId, $otype);
-                // recomputeAndStore will update MarketService for banks
-            }
+            $otype = $object->object_type;
+            \App\Services\ObjectLevelService::recomputeAndStore($userId, $otype);
+            // recomputeAndStore will update MarketService for banks
+            
             DB::commit();
+            Log::info('Tool deleted successfully', ['tool_id' => $toolId, 'user_id' => $userId]);
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Failed to delete tool and recompute aggregate: ' . $e->getMessage());
